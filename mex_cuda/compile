@@ -1,0 +1,5 @@
+give the following commands from matlab
+
+!/usr/local/cuda/bin/nvcc -c sgemm_cu.cu -Xcompiler -fPIC -I /opt/matlab/extern/include
+
+mex -largeArrayDims sgemm_cu.o -L /usr/local/cuda/lib64 -lcudart -lcufft -L /usr/local/cuda/lib64/ -lcublas
