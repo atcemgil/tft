@@ -41,7 +41,24 @@ tensorMul( float* C, float* A, float* B, size_t total_size)
 }
 
 
+void print( const mxArray *prhs[], float* output, int total_size){
+  std::cout << "\ntotal_size " << total_size << std::endl; 
 
+  std::cout << std::endl << std::endl << "input A:" << std::endl;
+  for (int i=0; i<total_size ; i++){
+    std::cout << i << "\t" << ((float*)mxGetPr(prhs[0]))[i] << std::endl;
+  }
+
+  std::cout << std::endl << std::endl << "input B:" << std::endl;
+  for (int i=0; i<total_size ; i++){
+    std::cout << i << "\t" << ((float*)mxGetPr(prhs[1]))[i]  << std::endl;
+  }
+
+  std::cout << std::endl << std::endl << "output C:" << std::endl;
+  for (int i=0; i<total_size ; i++){
+    std::cout << i << "\t" <<  output[i]  << std::endl;
+  }
+}
 
 
 
@@ -49,16 +66,43 @@ tensorMul( float* C, float* A, float* B, size_t total_size)
 
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+  /*
+    //test block
+  int i=1;
+  if (i==1){
+    std::cout << "get data test " << std::endl;
+    int col_size = mxGetN(prhs[0]);
+    int row_size = mxGetM(prhs[0]);
+    int total_size = col_size * row_size;
+
+    mwSize argMatDims[2];
+    argMatDims[0]=row_size;
+    argMatDims[1]=col_size;
+    plhs[0] = mxCreateNumericArray(2,argMatDims,mxSINGLE_CLASS,mxREAL); 
+    double* output = (double*) mxGetPr(plhs[0]);
+
+    print(prhs, output, total_size);
+
+    return;
+  }
+  */
+
   int col_size = mxGetN(prhs[0]);
   int row_size = mxGetM(prhs[0]);
   int total_size = col_size * row_size;
 
+
   // arrange Matlab output storage
-    mwSize argMatDims[2];
+  mwSize argMatDims[2];
   argMatDims[0]=row_size;
   argMatDims[1]=col_size;
   plhs[0] = mxCreateNumericArray(2,argMatDims,mxSINGLE_CLASS,mxREAL); 
-  float* output = (float*) mxGetData(plhs[0]);
+  float* output = (float*) mxGetPr(plhs[0]);
+
+  std::cout << "BEFORE " << std::endl;
+  print(prhs, output, total_size);
+
+
 
   // allocate device memory
   unsigned int mem_size_mat = sizeof(float) * total_size;
@@ -70,8 +114,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   //cutilSafeCall(cudaMalloc((void**) &d_strides, nDims*sizeof(size_t)));
 
   // copy host memory to device
-  cutilSafeCall(cudaMemcpy(d_A, prhs[0], mem_size_mat, cudaMemcpyHostToDevice) );
-  cutilSafeCall(cudaMemcpy(d_B, prhs[1], mem_size_mat, cudaMemcpyHostToDevice) );
+  cutilSafeCall(cudaMemcpy(d_A, (float*) mxGetPr(prhs[0]), mem_size_mat, cudaMemcpyHostToDevice) );
+  cutilSafeCall(cudaMemcpy(d_B, (float*) mxGetPr(prhs[1]), mem_size_mat, cudaMemcpyHostToDevice) );
   //cutilSafeCall(cudaMemcpy(d_strides, h_strides, nDims*sizeof(size_t), cudaMemcpyHostToDevice) );
 
   // allocate device memory for result
@@ -117,21 +161,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   // copy result from device to host
   cutilSafeCall(cudaMemcpy(output, d_C, mem_size_mat, cudaMemcpyDeviceToHost) );
 
-  std::cout << std::endl << std::endl << "input A:" << std::endl;
-  for (int i=0; i<total_size ; i++){
-    std::cout << i << "\t" << ((float*)mxGetData(prhs[0]))[i] << std::endl;
-  }
-
-  std::cout << std::endl << std::endl << "input B:" << std::endl;
-  for (int i=0; i<total_size ; i++){
-    std::cout << i << "\t" << ((float*)mxGetData(prhs[1]))[i]  << std::endl;
-  }
-
-  std::cout << std::endl << std::endl << "output C:" << std::endl;
-  for (int i=0; i<total_size ; i++){
-    std::cout << i << "\t" <<  output[i]  << std::endl;
-  }
-
+  std::cout << " AFTER " << std::endl;
+  print(prhs, output, total_size);
 
   // clean up memory
   //free(h_A);
