@@ -4,3 +4,8 @@ from matlab:
 
 mex -largeArrayDims cudatensor.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.cpp.o cutil/cutil.cpp.o cutil/multithreading.cpp.o cutil/param.cpp.o cutil/stopwatch.cpp.o cutil/stopwatch_linux.cpp.o   -L /usr/local/cuda/lib64 -lcudart -lcufft -L /usr/local/cuda/lib64/  
 
+
+# test
+
+X=single(magic(2))
+A=cudatensor(X,X)
