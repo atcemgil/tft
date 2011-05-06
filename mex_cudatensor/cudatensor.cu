@@ -22,13 +22,14 @@ int threads=512;
 // Tensor .* operation. Multiply corresponding entries of tensors A,B of same size
 // Store the result in tensor C
 
-// two operators are available 
-// dot product: multiplies each element of input objects elementwise
+// two operators are available
+// hadamard product: multiplies each element of input objects elementwise
 // C = A .* B
+// requires two input tensors A, B as input
 
 // contract product: performs matrix multiplication if elements are 2 dimensional
 // C = A * B
-
+/// requires four input arguments A, A_cardinalities, B, B_cardinalities
 
 
 
@@ -40,15 +41,19 @@ struct ct_config{
   // defines how many dimensions are there
   size_t ndims;
 
-  // defines the maximum possible size of each dimension 
+  // defines the maximum possible size of each dimension
   //   for all tensors using this configuration
   // must be allocated dynamically as an array of type size_t
   // size of the array must be equal to ndims
   size_t* cardinalities;
 
   // total size of the related objects
-  // multiplication of all cardinalities
-  size_t total_cardinality;
+  // maximum of cardinality of input objects
+  // cardinality for an object is found by multiplying object's cardinalities of each dimension
+  size_t element_number;
+
+  // index of the dimension to contract over
+  //size_t contract_dim;
 };
 
 // cuda tensor object
@@ -80,7 +85,7 @@ struct dev_ct_ptrs{
 
 // multiply corresponding elemens of A, B tensors, put result in tensor C
 __global__ void
-tensorDotStar( ct* C, ct* A, ct* B)
+tensorHadamard( ct* C, ct* A, ct* B)
 {
   // Block index
   size_t bx = blockIdx.x;
@@ -93,11 +98,31 @@ tensorDotStar( ct* C, ct* A, ct* B)
   size_t threadsPerblock = blockDim.x * blockDim.y * blockDim.z;
   size_t thread_id = bx * threadsPerblock + tx;
 
-  if ( thread_id  < A->config->total_cardinality ){
+  if ( thread_id  < A->config->element_number ){
     C->data[thread_id] = A->data[thread_id] * B->data[thread_id];
   }
-
 }
+
+// multiply corresponding elements and contract along specified dimension
+__global__ void
+tensorContract( ct* C, ct* A, ct* B )
+{
+  // Block index
+  size_t bx = blockIdx.x;
+  //int by = blockIdx.y;
+
+  // Thread index
+  size_t tx = threadIdx.x;
+  //int ty = threadIdx.y;
+
+  size_t threadsPerblock = blockDim.x * blockDim.y * blockDim.z;
+  size_t thread_id = bx * threadsPerblock + tx;
+
+  if ( thread_id  < A->config->element_number ){
+    C->data[thread_id] += A->data[thread_id] * B->data[thread_id];
+  }
+}
+
 
 __global__ void
 assignCudatensor( ct* c, ct_config* ctc, size_t* cards, size_t mem_size, float* data){
@@ -114,18 +139,20 @@ void print_ct_config(char* txt, ct_config* ctc){
 
   std::cout << "Number of dimensions " << (int) (ctc->ndims) << std::endl;
 
+  //std::cout << "Contract dimension " << (int) (ctc->contract_dim) << std::endl;
+
   std::cout << "Cardinalities for each dimension of this configuration " << std::endl;
   size_t i=0;
   for ( i=0; i< ctc->ndims; i++){
     std::cout << ctc->cardinalities[i] << " ";
   }
-  std::cout << "\nTotal cardinality: " << ctc->total_cardinality << std::endl;
-  std::cout << std::endl;
+  std::cout << "\Element number: " << ctc->element_number << std::endl;
+  std::cout << std::endl << std::endl << std::endl;
 }
 
 
 void print_ct(char* txt, ct* ct, bool print_config=false, bool printdata=false){
-  
+
   std::cout << txt << std::endl;
 
   if (print_config) print_ct_config(txt, ct->config);
@@ -140,37 +167,50 @@ void print_ct(char* txt, ct* ct, bool print_config=false, bool printdata=false){
 
   if (printdata){
     std::cout << "Data" << std::endl;
-    for (size_t i=0; i< ct->config->total_cardinality; i++){
-	std::cout << ct->data[i] << " ";
+    for (size_t i=0; i< ct->config->element_number; i++){
+      std::cout << ct->data[i] << " ";
     }
   }
-
-  std::cout << std::endl << std::endl;
+  std::cout << std::endl << std::endl << std::endl;
 }
 
 // returns a dev_ct_ptrs struct with information about the cudatensor generated on the device
-dev_ct_ptrs prepareDeviceTensor(ct_config* h_ctc, ct_config* d_ctc, ct* h_ct, const mxArray* data){
+dev_ct_ptrs prepareDeviceTensor(ct_config* h_ctc, ct_config* d_ctc, ct* h_ct,
+                                const mxArray* data, const mxArray* tensor_card = NULL){
 
   // generate h_ct
-  
+
   h_ct->config = h_ctc;
   h_ct->cardinalities = (size_t*) malloc(sizeof(size_t)*h_ctc->ndims);
 
   // assign cardinalities for the tensor objects
-  const mwSize *dims_c = mxGetDimensions(data);
+  const mwSize* dims_c = mxGetDimensions(data);
   for (size_t i=0; i<h_ctc->ndims; i++){
-    h_ct->cardinalities[i] = dims_c[i];
-    std::cout << "dim "<< i << " cardinality assignment: " << h_ct->cardinalities[i] << "<-" << dims_c[i] << std::endl;
+    if (tensor_card==NULL){
+      // we are doing hadamard multiplication, all tensors have same cardinalities
+      // or we are doing output tensor object, which as maximum cardinalities on all dimensions
+      h_ct->cardinalities[i] = dims_c[i];
+      std::cout << "H dim "<< i << " cardinality assignment: " 
+		<< h_ct->cardinalities[i]
+		<< " <- " << dims_c[i]
+		<< std::endl;
+    }else{
+      // we are doing tensor contraction, tensors may have different cardinalities
+      h_ct->cardinalities[i] = ((float *)mxGetData(tensor_card))[i];
+      std::cout << "TC dim "<< i << " cardinality assignment: " 
+		<< h_ct->cardinalities[i]
+		<< " <- " << ((float *)mxGetData(tensor_card))[i] << std::endl;
+    }
   }
 
 
   // assign h_ct host data
-  //size_t elnum = (size_t) mxGetNumberOfElements(data);
-  h_ct->mem_size= sizeof(float) * h_ctc->total_cardinality;
+  size_t elnum = (size_t) mxGetNumberOfElements(data);
+  h_ct->mem_size= sizeof(float) * elnum;
   h_ct->data = (float*)malloc( h_ct->mem_size );
   memcpy(h_ct->data, (float*)mxGetData(data), h_ct->mem_size);
 
-  print_ct("prepareDeviceTensor h_ct",h_ct,true,true);
+  print_ct("prepareDeviceTensor h_ct",h_ct,false,true);
 
 
   // allocate d_ct
@@ -199,26 +239,71 @@ dev_ct_ptrs prepareDeviceTensor(ct_config* h_ctc, ct_config* d_ctc, ct* h_ct, co
   return dcp;
 }
 
-ct_config* prepareDeviceTensorConfig(ct_config* ctc, const mxArray* sampleObject){
-  ctc->ndims = mxGetNumberOfDimensions(sampleObject);
-  ctc->cardinalities = (size_t*) malloc(sizeof(size_t)*ctc->ndims);
-  const mwSize *dims = mxGetDimensions(sampleObject);
-  ctc->total_cardinality = 1;
-  for (size_t i=0; i<ctc->ndims; i++){
-    ctc->cardinalities[i] = dims[i];
-    ctc->total_cardinality *= dims[i];
-  }
-
+ct_config* ctcToDevice(ct_config* h_ctc){
   // transfer to device
   ct_config* d_ctc;
   cutilSafeCall(cudaMalloc((void**) &d_ctc, sizeof(ct_config) ));
-  cutilSafeCall(cudaMemcpy( d_ctc , ctc, sizeof(ct_config), cudaMemcpyHostToDevice) );
-
+  cutilSafeCall(cudaMemcpy( d_ctc , h_ctc, sizeof(ct_config), cudaMemcpyHostToDevice) );
   return d_ctc;
 }
 
+ct_config* prepareDeviceTensorConfig(ct_config* h_ctc, const mxArray* sampleObject){
+  h_ctc->ndims = mxGetNumberOfDimensions(sampleObject);
+  h_ctc->cardinalities = (size_t*) malloc(sizeof(size_t)*h_ctc->ndims);
+  const mwSize *dims = mxGetDimensions(sampleObject);
+  h_ctc->element_number = 1;
+  for (size_t i=0; i<h_ctc->ndims; i++){
+    h_ctc->cardinalities[i] = dims[i];
+    h_ctc->element_number *= dims[i];
+  }
+  return ctcToDevice(h_ctc);
+}
+
+ct_config* getDeviceTensorContractConfig(ct_config* h_ctc, const mxArray* tensor1, const mxArray* tensor1_card, const mxArray* tensor2, const mxArray* tensor2_card){
+  h_ctc->ndims = mxGetNumberOfElements(tensor1_card); // assumes both objects of same size
+  h_ctc->cardinalities = (size_t*) malloc(sizeof(size_t)*h_ctc->ndims);
+  h_ctc->element_number = 1;
+
+  float tmpcard1[h_ctc->ndims];
+  float tmptotalcard1=1;
+
+  float tmpcard2[h_ctc->ndims];
+  float tmptotalcard2=1;
+
+  for (size_t i=0; i<h_ctc->ndims; i++){
+    tmpcard1[i] = ((float*)mxGetData(tensor1_card))[i];
+    tmptotalcard1 *= ((float*)mxGetData(tensor1_card))[i];
+
+    tmpcard2[i] = ((float*)mxGetData(tensor2_card))[i];
+    tmptotalcard2 *= ((float*)mxGetData(tensor2_card))[i];
+  }
+
+  
+  float* tmpcard;
+  if (tmptotalcard1 > tmptotalcard2){ tmpcard = tmpcard1; }
+  else { tmpcard = tmpcard2; }
+
+  if (tmptotalcard1 != tmptotalcard2){
+    std::cout << "input arguments have different number of elements, exiting" << std::endl;
+  }
+  h_ctc->element_number = tmptotalcard1;
+
+  for (size_t i=0; i<h_ctc->ndims; i++){
+    h_ctc->cardinalities[i] = std::max( ((float*)mxGetData(tensor1_card))[i] , 
+					((float*)mxGetData(tensor2_card))[i] );
+  }
+
+  return ctcToDevice(h_ctc);
+}
+
+void print_device_ctc(char* txt, ct_config* d_ctc){
+  ct_config tmp_ctc;
+  cutilSafeCall(cudaMemcpy(&tmp_ctc, d_ctc, sizeof(ct_config), cudaMemcpyDeviceToHost));
+  print_ct_config(txt,&tmp_ctc);
+}
+
 void print_device_ct(char* txt,dev_ct_ptrs* dcp, ct* host_ct){
-  ct tmp_ct; 
+  ct tmp_ct;
   cutilSafeCall(cudaMemcpy(&tmp_ct, dcp->ct, sizeof(ct), cudaMemcpyDeviceToHost));
 
   tmp_ct.config = (ct_config*) malloc( sizeof(ct_config) );
@@ -233,39 +318,40 @@ void print_device_ct(char* txt,dev_ct_ptrs* dcp, ct* host_ct){
 }
 
 
-void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
-{
+enum tensor_operation{
+  hadamard,
+  contract
+};
 
-  // ASSUMES target tensors are of the same dimension
-  ct_config h_ctc;
-  ct_config* d_ctc = prepareDeviceTensorConfig(&h_ctc,prhs[0]);
 
-  print_ct_config("Host ctc",&h_ctc);
-
-  ct_config tmp_ctc;
-  cutilSafeCall(cudaMemcpy(&tmp_ctc, d_ctc, sizeof(ct_config), cudaMemcpyDeviceToHost));
-  print_ct_config("Device tmp ctc",&tmp_ctc);
-
+void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray *plhs[], tensor_operation operation){
 
   // input tensor A
-  ct h_it_A;
-  dev_ct_ptrs d_A=prepareDeviceTensor(&h_ctc, d_ctc, &h_it_A, prhs[0]);
-
+  ct h_it_A; dev_ct_ptrs d_A;
   // input tensor B
-  ct h_it_B;
-  dev_ct_ptrs d_B=prepareDeviceTensor(&h_ctc, d_ctc, &h_it_B, prhs[1]);
+  ct h_it_B; dev_ct_ptrs d_B;
+
+  if (operation==hadamard){
+    // we are doing hadamard multiplication, all tensors have same cardinalities
+    d_A=prepareDeviceTensor(h_ctc, d_ctc, &h_it_A, prhs[0]);
+    d_B=prepareDeviceTensor(h_ctc, d_ctc, &h_it_B, prhs[1]);
+  }else if (operation==contract){
+    // we are doing tensor contraction, tensors may have different cardinalities
+    d_A=prepareDeviceTensor(h_ctc, d_ctc, &h_it_A, prhs[0], prhs[1]);
+    d_B=prepareDeviceTensor(h_ctc, d_ctc, &h_it_B, prhs[2], prhs[3]);
+  }
 
   // output tensor C
   ct h_ot_C;
   // prepare MATLAB storage
   // calculate total cardinalities for all objects
-  mwSize argMatDims[h_ctc.ndims];
-  for (size_t i=0; i<h_ctc.ndims; i++){
-    argMatDims[i] = h_ctc.cardinalities[i];
+  mwSize argMatDims[h_ctc->ndims];
+  for (size_t i=0; i<h_ctc->ndims; i++){
+    argMatDims[i] = h_ctc->cardinalities[i];
   }
-  plhs[0] = mxCreateNumericArray(h_ctc.ndims,argMatDims,mxSINGLE_CLASS,mxREAL); 
+  plhs[0] = mxCreateNumericArray(h_ctc->ndims,argMatDims,mxSINGLE_CLASS,mxREAL);
   float* m_C = (float*) mxGetPr(plhs[0]);
-  dev_ct_ptrs d_C=prepareDeviceTensor(&h_ctc, d_ctc, &h_ot_C, plhs[0]);
+  dev_ct_ptrs d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0]);
 
   bool printdata=true;
   print_ct("Host A",&h_it_A,false,printdata);
@@ -276,12 +362,15 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   print_device_ct("Device A",&d_A, &h_it_A);
   print_device_ct("Device B",&d_B, &h_it_B);
   print_device_ct("Device C",&d_C, &h_ot_C);
-  
+
 
 
   // allocate device memory for result
   // kernel warmup
-  tensorDotStar<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
+  if (operation == hadamard){
+    tensorHadamard<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
+  }else if (operation == contract){
+  }
 
   cudaThreadSynchronize();
 
@@ -295,7 +384,10 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   // execute the kernel
   int nIter = 30;
   for (int j = 0; j < nIter; j++) {
-    tensorDotStar<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
+    if (operation == hadamard){
+      tensorHadamard<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
+    }else if (operation == contract){
+    }
   }
 
   // check if kernel execution generated and error
@@ -331,15 +423,53 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 
   // required to avoid memory leak?
-  delete h_ctc.cardinalities;
+  delete h_ctc->cardinalities;
   delete h_it_A.cardinalities;
   delete h_it_B.cardinalities;
+}
+
+
+
+void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+{
+
+  std::cout << "mex: found " << nrhs << " number of arguments " << std::endl;
+  if (nrhs == 2){
+    // hadamard multiplication
+    std::cout << "mex: applying hadamard multiplication " << std::endl;
+
+    // ASSUMES target tensors are of the same dimension
+    ct_config h_ctc;
+    ct_config* d_ctc = prepareDeviceTensorConfig(&h_ctc,prhs[0]);
+
+    print_ct_config("Host ctc",&h_ctc);
+
+    operate(&h_ctc, d_ctc, prhs, plhs, hadamard);
+
+  }else if(nrhs==4){
+    // tensor contraction operation
+    std::cout << "mex: applying tensor contraction " << std::endl;
+
+    ct_config h_ctc;
+    ct_config* d_ctc = getDeviceTensorContractConfig(&h_ctc,prhs[0],prhs[1],prhs[2],prhs[3]);
+
+    print_ct_config("Host ctc", &h_ctc);
+
+    print_device_ctc("Device tmp ctc",d_ctc);
+
+    operate(&h_ctc, d_ctc, prhs, plhs, contract);
+
+
+  }else{
+    std::cout << "mex: wrong number of arguments " << std::endl;
+  }
+
 
 }
 
 
 void print( const mxArray *prhs[], float* output, int total_size){
-  std::cout << "\ntotal_size " << total_size << std::endl; 
+  std::cout << "\ntotal_size " << total_size << std::endl;
 
   std::cout << std::endl << std::endl << "input A:" << std::endl;
   for (int i=0; i<total_size ; i++){
