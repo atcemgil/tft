@@ -29,7 +29,13 @@ int threads=512;
 
 // contract product: performs matrix multiplication if elements are 2 dimensional
 // C = A * B
-/// requires four input arguments A, A_cardinalities, B, B_cardinalities
+// requires five input arguments A, A_cardinalities, B, B_cardinalities, C_cardinalities
+// objects (A,B,C) must have same number of dimensions
+
+
+
+
+
 
 
 
@@ -146,7 +152,7 @@ void print_ct_config(char* txt, ct_config* ctc){
   for ( i=0; i< ctc->ndims; i++){
     std::cout << ctc->cardinalities[i] << " ";
   }
-  std::cout << "\Element number: " << ctc->element_number << std::endl;
+  std::cout << "\nElement number: " << ctc->element_number << std::endl;
   std::cout << std::endl << std::endl << std::endl;
 }
 
@@ -272,20 +278,18 @@ ct_config* getDeviceTensorContractConfig(ct_config* h_ctc, const mxArray* tensor
 
   for (size_t i=0; i<h_ctc->ndims; i++){
     tmpcard1[i] = ((float*)mxGetData(tensor1_card))[i];
-    tmptotalcard1 *= ((float*)mxGetData(tensor1_card))[i];
+    if ( ((float*)mxGetData(tensor1_card))[i] != 0 )
+      tmptotalcard1 *= ((float*)mxGetData(tensor1_card))[i];
 
     tmpcard2[i] = ((float*)mxGetData(tensor2_card))[i];
-    tmptotalcard2 *= ((float*)mxGetData(tensor2_card))[i];
+    if ( ((float*)mxGetData(tensor2_card))[i] != 0 )
+      tmptotalcard2 *= ((float*)mxGetData(tensor2_card))[i];
   }
-
-  
-  float* tmpcard;
-  if (tmptotalcard1 > tmptotalcard2){ tmpcard = tmpcard1; }
-  else { tmpcard = tmpcard2; }
 
   if (tmptotalcard1 != tmptotalcard2){
     std::cout << "input arguments have different number of elements, exiting" << std::endl;
   }
+  std::cout << "element number <- " << tmptotalcard1 << std::endl;
   h_ctc->element_number = tmptotalcard1;
 
   for (size_t i=0; i<h_ctc->ndims; i++){
@@ -343,15 +347,48 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
 
   // output tensor C
   ct h_ot_C;
+  dev_ct_ptrs d_C;
+  float* m_C;
+  size_t m_C_mem_size=1;
   // prepare MATLAB storage
   // calculate total cardinalities for all objects
-  mwSize argMatDims[h_ctc->ndims];
-  for (size_t i=0; i<h_ctc->ndims; i++){
-    argMatDims[i] = h_ctc->cardinalities[i];
+  if(operation == hadamard){
+    mwSize argMatDims[h_ctc->ndims];
+    for (size_t i=0; i<h_ctc->ndims; i++){
+      argMatDims[i] = h_ctc->cardinalities[i];
+    }
+
+    plhs[0] = mxCreateNumericArray(h_ctc->ndims,argMatDims,mxSINGLE_CLASS,mxREAL);
+    m_C = (float*) mxGetPr(plhs[0]);
+    d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0]);
+  }else if (operation == contract){
+    size_t non_zero_dim_number=0;
+    for (size_t i=0; i<h_ctc->ndims; i++){
+      float tmpdimcard = ((float*)mxGetData(prhs[4]))[i];
+      if(tmpdimcard != 0) {
+	non_zero_dim_number++;
+	m_C_mem_size *= tmpdimcard;
+      }
+    }
+    mwSize argMatDims[non_zero_dim_number];
+    std::cout << "C tensor init argMatDims with size " << non_zero_dim_number << std::endl;
+    for (size_t i=0; i<h_ctc->ndims; i++){
+      float val=((float*)mxGetData(prhs[4]))[i];
+      std::cout << "C tensor argMatDims[" << i << "] = " << val << " ";
+      if ( val != 0){ // skip dimensions with 0 cardinality
+	std::cout << " assign " << std::endl;
+	argMatDims[i] = val;
+      }else{
+	std::cout << " not assign " << std::endl;
+      }
+    }
+
+    plhs[0] = mxCreateNumericArray(h_ctc->ndims,argMatDims,mxSINGLE_CLASS,mxREAL);
+
+    m_C = (float*) mxGetPr(plhs[0]);
+    d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0], prhs[4]);
   }
-  plhs[0] = mxCreateNumericArray(h_ctc->ndims,argMatDims,mxSINGLE_CLASS,mxREAL);
-  float* m_C = (float*) mxGetPr(plhs[0]);
-  dev_ct_ptrs d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0]);
+
 
   bool printdata=true;
   print_ct("Host A",&h_it_A,false,printdata);
@@ -404,7 +441,10 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   cutilCheckError(cutDeleteTimer(timer));
 
   // copy result from device to host
-  cutilSafeCall(cudaMemcpy(m_C, d_C.data, h_ot_C.mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
+  if(operation==hadamard)
+    cutilSafeCall(cudaMemcpy(m_C, d_C.data, h_ot_C.mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
+  else if(operation==contract)
+    cutilSafeCall(cudaMemcpy(m_C, d_C.data, m_C_mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
 
   // clean up memory
   //free(h_A);
@@ -446,7 +486,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     operate(&h_ctc, d_ctc, prhs, plhs, hadamard);
 
-  }else if(nrhs==4){
+  }else if(nrhs==5){
     // tensor contraction operation
     std::cout << "mex: applying tensor contraction " << std::endl;
 

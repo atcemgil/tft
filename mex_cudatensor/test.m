@@ -5,7 +5,7 @@ mex -largeArrayDims cudatensor.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.c
 X=single(magic(2))
 
 %C=cudatensor(X,X);
-C=cudatensor(X,single([2 2 0]),X,single([0 2 2]) );
+C=cudatensor(X,single([2 2 0]),X,single([0 2 2]), single([2 0 2]) );
 
 display('matlab result is')
 display(C)
