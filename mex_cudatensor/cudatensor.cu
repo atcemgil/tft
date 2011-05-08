@@ -212,6 +212,7 @@ dev_ct_ptrs prepareDeviceTensor(ct_config* h_ctc, ct_config* d_ctc, ct* h_ct,
 
   // assign h_ct host data
   size_t elnum = (size_t) mxGetNumberOfElements(data);
+  std::cout << " prepareDeviceTensor elnum " << elnum << std::endl;
   h_ct->mem_size= sizeof(float) * elnum;
   h_ct->data = (float*)malloc( h_ct->mem_size );
   memcpy(h_ct->data, (float*)mxGetData(data), h_ct->mem_size);
@@ -349,7 +350,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   ct h_ot_C;
   dev_ct_ptrs d_C;
   float* m_C;
-  size_t m_C_mem_size=1;
+  //size_t m_C_mem_size=1;
   // prepare MATLAB storage
   // calculate total cardinalities for all objects
   if(operation == hadamard){
@@ -357,35 +358,44 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
     for (size_t i=0; i<h_ctc->ndims; i++){
       argMatDims[i] = h_ctc->cardinalities[i];
     }
-
     plhs[0] = mxCreateNumericArray(h_ctc->ndims,argMatDims,mxSINGLE_CLASS,mxREAL);
     m_C = (float*) mxGetPr(plhs[0]);
     d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0]);
-  }else if (operation == contract){
+  }
+
+  else if (operation == contract){
     size_t non_zero_dim_number=0;
     for (size_t i=0; i<h_ctc->ndims; i++){
+      std::cout << " non_zero_dim_number loop " << i ;      
       float tmpdimcard = ((float*)mxGetData(prhs[4]))[i];
       if(tmpdimcard != 0) {
 	non_zero_dim_number++;
-	m_C_mem_size *= tmpdimcard;
+	std::cout  << " tmpdimcard " << tmpdimcard << std::endl;
+	//m_C_mem_size *= tmpdimcard;
       }
     }
+
     mwSize argMatDims[non_zero_dim_number];
+    size_t argMatDims_ind=0;
     std::cout << "C tensor init argMatDims with size " << non_zero_dim_number << std::endl;
+    //<< " m_C_mem_size " << m_C_mem_size << std::endl;
+
     for (size_t i=0; i<h_ctc->ndims; i++){
       float val=((float*)mxGetData(prhs[4]))[i];
       std::cout << "C tensor argMatDims[" << i << "] = " << val << " ";
       if ( val != 0){ // skip dimensions with 0 cardinality
 	std::cout << " assign " << std::endl;
-	argMatDims[i] = val;
+	argMatDims[argMatDims_ind] = val;
+	argMatDims_ind++;
       }else{
 	std::cout << " not assign " << std::endl;
       }
     }
 
-    plhs[0] = mxCreateNumericArray(h_ctc->ndims,argMatDims,mxSINGLE_CLASS,mxREAL);
-
+    plhs[0] = mxCreateNumericArray(non_zero_dim_number,argMatDims,mxSINGLE_CLASS,mxREAL);
+    std::cout << "SELAM  " <<  (size_t) mxGetNumberOfElements(plhs[0]) << std::endl;
     m_C = (float*) mxGetPr(plhs[0]);
+
     d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0], prhs[4]);
   }
 
@@ -444,7 +454,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   if(operation==hadamard)
     cutilSafeCall(cudaMemcpy(m_C, d_C.data, h_ot_C.mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
   else if(operation==contract)
-    cutilSafeCall(cudaMemcpy(m_C, d_C.data, m_C_mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
+    cutilSafeCall(cudaMemcpy(m_C, d_C.data, h_ot_C.mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
 
   // clean up memory
   //free(h_A);
