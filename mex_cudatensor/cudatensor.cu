@@ -7,6 +7,7 @@
 #include "mex.h"
 #include "cublas.h"
 #include "cutil_inline.h"
+
 #include <iostream>
 #include <algorithm>
 
@@ -56,7 +57,7 @@ struct ct_config{
   // total size of the related objects
   // maximum of cardinality of input objects
   // cardinality for an object is found by multiplying object's cardinalities of each dimension
-  size_t element_number;
+  size_t total_cardinality;
 
   // index of the dimension to contract over
   //size_t contract_dim;
@@ -104,7 +105,7 @@ tensorHadamard( ct* C, ct* A, ct* B)
   size_t threadsPerblock = blockDim.x * blockDim.y * blockDim.z;
   size_t thread_id = bx * threadsPerblock + tx;
 
-  if ( thread_id  < A->config->element_number ){
+  if ( thread_id  < A->config->total_cardinality ){
     C->data[thread_id] = A->data[thread_id] * B->data[thread_id];
   }
 }
@@ -124,8 +125,47 @@ tensorContract( ct* C, ct* A, ct* B )
   size_t threadsPerblock = blockDim.x * blockDim.y * blockDim.z;
   size_t thread_id = bx * threadsPerblock + tx;
 
-  if ( thread_id  < A->config->element_number ){
-    C->data[thread_id] += A->data[thread_id] * B->data[thread_id];
+  // assumes same total cardinality for all objects
+  size_t tot_card = A->config->total_cardinality;
+
+  if ( thread_id  < A->config->total_cardinality ){
+
+    size_t index_A=0;
+    size_t t_id_rem = thread_id;
+    for (size_t ind_card=0; ind_card < tot_card; ind_card++){
+      if (t_id_rem == 0 ) break;
+
+      if (A->cardinalities[ind_card] != 0) {
+	index_A += (t_id_rem % A->cardinalities[ind_card] ) * A->cardinalities[ind_card] ;
+	t_id_rem = (size_t) (t_id_rem / A->cardinalities[ind_card] );
+      }
+    }
+
+    size_t index_B=0;
+    t_id_rem = thread_id;
+    for (size_t ind_card=0; ind_card < tot_card; ind_card++){
+      if (t_id_rem == 0 ) break;
+
+      if (B->cardinalities[ind_card] != 0) {
+	index_B += (t_id_rem % B->cardinalities[ind_card]) * B->cardinalities[ind_card];
+	t_id_rem = (size_t) (t_id_rem / B->cardinalities[ind_card] );
+      }
+    }
+
+
+    size_t index_C=0;
+    t_id_rem = thread_id;
+    for (size_t ind_card=0; ind_card < tot_card; ind_card++){
+      if (t_id_rem == 0 ) break;
+
+      if (C->cardinalities[ind_card] != 0) {
+	index_C += (t_id_rem % C->cardinalities[ind_card]) * C->cardinalities[ind_card] ;
+	t_id_rem = (size_t) (t_id_rem / C->cardinalities[ind_card] );
+      }
+    }
+
+
+    C->data[index_C] += A->data[index_A] * B->data[index_B];
   }
 }
 
@@ -152,7 +192,7 @@ void print_ct_config(char* txt, ct_config* ctc){
   for ( i=0; i< ctc->ndims; i++){
     std::cout << ctc->cardinalities[i] << " ";
   }
-  std::cout << "\nElement number: " << ctc->element_number << std::endl;
+  std::cout << "\nTotal cardinality: " << ctc->total_cardinality << std::endl;
   std::cout << std::endl << std::endl << std::endl;
 }
 
@@ -173,7 +213,7 @@ void print_ct(char* txt, ct* ct, bool print_config=false, bool printdata=false){
 
   if (printdata){
     std::cout << "Data" << std::endl;
-    for (size_t i=0; i< ct->config->element_number; i++){
+    for (size_t i=0; i< ct->config->total_cardinality; i++){
       std::cout << ct->data[i] << " ";
     }
   }
@@ -258,10 +298,10 @@ ct_config* prepareDeviceTensorConfig(ct_config* h_ctc, const mxArray* sampleObje
   h_ctc->ndims = mxGetNumberOfDimensions(sampleObject);
   h_ctc->cardinalities = (size_t*) malloc(sizeof(size_t)*h_ctc->ndims);
   const mwSize *dims = mxGetDimensions(sampleObject);
-  h_ctc->element_number = 1;
+  h_ctc->total_cardinality = 1;
   for (size_t i=0; i<h_ctc->ndims; i++){
     h_ctc->cardinalities[i] = dims[i];
-    h_ctc->element_number *= dims[i];
+    h_ctc->total_cardinality *= dims[i];
   }
   return ctcToDevice(h_ctc);
 }
@@ -269,7 +309,7 @@ ct_config* prepareDeviceTensorConfig(ct_config* h_ctc, const mxArray* sampleObje
 ct_config* getDeviceTensorContractConfig(ct_config* h_ctc, const mxArray* tensor1, const mxArray* tensor1_card, const mxArray* tensor2, const mxArray* tensor2_card){
   h_ctc->ndims = mxGetNumberOfElements(tensor1_card); // assumes both objects of same size
   h_ctc->cardinalities = (size_t*) malloc(sizeof(size_t)*h_ctc->ndims);
-  h_ctc->element_number = 1;
+  h_ctc->total_cardinality = 1;
 
   float tmpcard1[h_ctc->ndims];
   float tmptotalcard1=1;
@@ -291,7 +331,7 @@ ct_config* getDeviceTensorContractConfig(ct_config* h_ctc, const mxArray* tensor
     std::cout << "input arguments have different number of elements, exiting" << std::endl;
   }
   std::cout << "element number <- " << tmptotalcard1 << std::endl;
-  h_ctc->element_number = tmptotalcard1;
+  h_ctc->total_cardinality = tmptotalcard1;
 
   for (size_t i=0; i<h_ctc->ndims; i++){
     h_ctc->cardinalities[i] = std::max( ((float*)mxGetData(tensor1_card))[i] , 
@@ -417,6 +457,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   if (operation == hadamard){
     tensorHadamard<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
   }else if (operation == contract){
+    tensorContract<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
   }
 
   cudaThreadSynchronize();
@@ -434,6 +475,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
     if (operation == hadamard){
       tensorHadamard<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
     }else if (operation == contract){
+      tensorContract<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
     }
   }
 
