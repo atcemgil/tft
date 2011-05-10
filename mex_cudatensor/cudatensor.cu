@@ -19,7 +19,7 @@
 //dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
 //dim3 grid(WC / threads.x, HC / threads.y);
 int blocks=BLOCK_SIZE;
-int threads=512;
+int threads=128;
 
 
 // Tensor .* operation. Multiply corresponding entries of tensors A,B of same size
@@ -127,59 +127,80 @@ tensorContract( ct* C, ct* A, ct* B )
   size_t ndims = A->config->ndims;
 
   if ( thread_id  < tot_card && block_id == 0){
-    //cuPrintf("Value is: %d\n", thread_id);
 
-    size_t index_A=0;
+    //size_t uclu[3];
+    //for (size_t i=0; i<3; i++) {uclu[i]=0; }
 
-    size_t uclu[3];
-    for (size_t card_index=0; card_index < ndims; card_index++){
-      
-    }
+    int index_number_A=0;
+    int index_number_B=0;
+    int index_number_C=0;
 
+    for (size_t obj=0; obj<3; obj++){
+      ct* p;
+      if      (obj==0)  p = A;
+      else if (obj==1)  p = B;
+      else if (obj==2)  p = C;
 
-    /*
-    size_t t_id_rem = thread_id;
-    size_t ind_card_discard = 0;
-    for (size_t ind_card=0; ind_card < ndims; ind_card++){
-      //cuPrintf("ind_card: %d\n", ind_card);
-      if (A->cardinalities[ind_card] == 0){
-        ind_card_discard++;
-      }else{
-	//cuPrintf("ind_card_dis: %d\n", ind_card_discard);
-        if (t_id_rem == 0 ) break;
+      size_t t_id_rem = thread_id;
+      size_t cumulative_offset_ind = 1;
+      size_t cumulative_offset_elnum = 1;
+      size_t cur_card_index=0;
+      for (size_t card_index=0; card_index < ndims; card_index++){
+        if ( t_id_rem == 0 ) break;
 
-        if (A->cardinalities[ind_card] != 0) {
-          size_t current_dim_card = A->cardinalities[ind_card];
-          size_t rem = t_id_rem % current_dim_card;
+        //uclu[card_index] = (t_id_rem % p->config->cardinalities[card_index]) * cumulative_offset_ind;
+        cur_card_index = (t_id_rem % p->config->cardinalities[card_index]) * cumulative_offset_ind;
 
-	  size_t kek=(0 + ind_card_discard);
-	  //cuPrintf("bune %d\n",kek);
-          if (ind_card == (0+ind_card_discard))
-            index_A += rem;
-          else
-            index_A += rem * A->cardinalities[ind_card-1];
+        t_id_rem = (size_t) t_id_rem / p->config->cardinalities[card_index];
 
+        if (p->cardinalities[card_index] != 0){
+	  // int olmazsa patliyor?
+	  if      (obj==0)  index_number_A += (int)cur_card_index * (int)cumulative_offset_elnum; 
+	  else if (obj==1)  index_number_B += (int)cur_card_index * (int)cumulative_offset_elnum;
+	  else if (obj==2)  index_number_C += (int)cur_card_index * (int)cumulative_offset_elnum;
 
-          t_id_rem = (size_t) (t_id_rem / current_dim_card );
-
+          // increment cumulative offset with current dimension cardinality for next loop
+          // -1 for cardinalities are indexed from 1
+          cumulative_offset_ind *= p->config->cardinalities[card_index] - 1 ;
+          cumulative_offset_elnum *= p->config->cardinalities[card_index] ;
         }
       }
     }
-    */
+
+    size_t tmpB = B->data[index_number_B];
+    size_t tmpA= A->data[index_number_A];
+    size_t tmpC= C->data[index_number_C];
+    cuPrintf("C[%d] %d += A[%d] %d * B[%d] %d\n",  index_number_C, tmpC,  index_number_A, tmpA, index_number_B, tmpB);
+
+    //~/arastir/cuda2/cudainstall/3.2/sdk/C/src/reduction/doc/reduction.pdf
+    // extern __shared__ int sdata[];
+    // // each thread loads one element from global to shared mem
+    // unsigned int tid = threadIdx.x;
+    // unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    // sdata[tid] = C->data[i];
+    // __syncthreads();
+
+    // sdata[index_number_C] += A->data[index_number_A] * B->data[index_number_B];
+
+    C->data[index_number_C] += A->data[index_number_A] * B->data[index_number_B];
+    //__syncthreads();
 
 
+    // size_t tmpS= sdata[tid];
+    // cuPrintf("C %d\n",tmpS);
 
-
-
-
-
-    cuPrintf("A %d\n", index_A);
-    //cuPrintf("B %d\n", index_B);
-    //cuPrintf("C %d \n", index_C);
-    //C->data[0] += A->data[index_A];
+    //tmpC= C->data[index_number_C];
+    //cuPrintf("C %d\n",tmpC);
+    //cuPrintf("uclu %d %d %d index_number %d\n", uclu[0], uclu[1], uclu[2], (int)index_number);
+    //cuPrintf("A %d B %d C %d\n", index_number_A, index_number_B, index_number_C);
   }
 }
 
+
+__global__ void
+assignCudatensorConfig( ct_config* ctc, size_t* cards ){
+  ctc->cardinalities = cards;
+}
 
 __global__ void
 assignCudatensor( ct* c, ct_config* ctc, size_t* cards, size_t mem_size, float* data){
@@ -300,9 +321,16 @@ dev_ct_ptrs prepareDeviceTensor(ct_config* h_ctc, ct_config* d_ctc, ct* h_ct,
 
 ct_config* ctcToDevice(ct_config* h_ctc){
   // transfer to device
+  size_t* tmp_card;
+  cutilSafeCall(cudaMalloc((void**)&tmp_card, sizeof(size_t)*h_ctc->ndims));
+  cutilSafeCall(cudaMemcpy(tmp_card, h_ctc->cardinalities, sizeof(size_t)*h_ctc->ndims ,cudaMemcpyHostToDevice));
+
   ct_config* d_ctc;
   cutilSafeCall(cudaMalloc((void**) &d_ctc, sizeof(ct_config) ));
   cutilSafeCall(cudaMemcpy( d_ctc , h_ctc, sizeof(ct_config), cudaMemcpyHostToDevice) );
+
+  assignCudatensorConfig<<<1,1>>>(d_ctc, tmp_card);
+
   return d_ctc;
 }
 
@@ -364,7 +392,7 @@ ct_config* getDeviceTensorContractConfig(ct_config* h_ctc, const mxArray* tensor
 void print_device_ctc(char* txt, ct_config* d_ctc){
   ct_config tmp_ctc;
   cutilSafeCall(cudaMemcpy(&tmp_ctc, d_ctc, sizeof(ct_config), cudaMemcpyDeviceToHost));
-  print_ct_config(txt,&tmp_ctc);
+  //print_ct_config(txt,&tmp_ctc); // must return pointer set from config copy operation and use that
 }
 
 void print_device_ct(char* txt,dev_ct_ptrs* dcp, ct* host_ct){
