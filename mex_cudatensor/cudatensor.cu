@@ -117,7 +117,7 @@ tensorHadamard( ct* C, ct* A, ct* B)
 
 // multiply corresponding elements and contract along specified dimension
 __global__ void
-tensorContract( ct* C, ct* A, ct* B )
+tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 {
   size_t thread_id = threadIdx.x + (threadIdx.y * blockDim.x) + (threadIdx.x * threadIdx.y * blockDim.y);
   size_t block_id = blockIdx.x + (blockIdx.y * gridDim.x);
@@ -135,11 +135,11 @@ tensorContract( ct* C, ct* A, ct* B )
     int index_number_B=0;
     int index_number_C=0;
 
-    for (size_t obj=0; obj<3; obj++){
+    for (size_t obj=0; obj<2; obj++){
       ct* p;
       if      (obj==0)  p = A;
       else if (obj==1)  p = B;
-      else if (obj==2)  p = C;
+      //else if (obj==2)  p = C;
 
       size_t t_id_rem = thread_id;
       size_t cumulative_offset_ind = 1;
@@ -157,7 +157,7 @@ tensorContract( ct* C, ct* A, ct* B )
 	  // int olmazsa patliyor?
 	  if      (obj==0)  index_number_A += (int)cur_card_index * (int)cumulative_offset_elnum; 
 	  else if (obj==1)  index_number_B += (int)cur_card_index * (int)cumulative_offset_elnum;
-	  else if (obj==2)  index_number_C += (int)cur_card_index * (int)cumulative_offset_elnum;
+	  //else if (obj==2)  index_number_C += (int)cur_card_index * (int)cumulative_offset_elnum;
 
           // increment cumulative offset with current dimension cardinality for next loop
           // -1 for cardinalities are indexed from 1
@@ -169,8 +169,8 @@ tensorContract( ct* C, ct* A, ct* B )
 
     size_t tmpB = B->data[index_number_B];
     size_t tmpA= A->data[index_number_A];
-    size_t tmpC= C->data[index_number_C];
-    cuPrintf("C[%d] %d += A[%d] %d * B[%d] %d\n",  index_number_C, tmpC,  index_number_A, tmpA, index_number_B, tmpB);
+    size_t tmpC_full= C_full->data[thread_id];
+    cuPrintf("C[%d] %d += A[%d] %d * B[%d] %d\n",  thread_id, tmpC_full,  index_number_A, tmpA, index_number_B, tmpB);
 
     //~/arastir/cuda2/cudainstall/3.2/sdk/C/src/reduction/doc/reduction.pdf
     // extern __shared__ int sdata[];
@@ -182,8 +182,49 @@ tensorContract( ct* C, ct* A, ct* B )
 
     // sdata[index_number_C] += A->data[index_number_A] * B->data[index_number_B];
 
-    C->data[index_number_C] += A->data[index_number_A] * B->data[index_number_B];
-    //__syncthreads();
+
+
+    //cuPrintf("C_full->data[%d] = %d ", thread_id, tmpA * tmpB);
+    C_full->data[thread_id] = A->data[index_number_A] * B->data[index_number_B];
+
+
+    __syncthreads();
+
+    // contract on dimensions with zero cardinality
+    size_t cum_card=1;
+    for (size_t card_index=0; card_index<ndims; card_index++){
+      size_t current_card=C->cardinalities[card_index];
+
+      if( current_card == 0 ) {
+	// contract on this dimension
+
+	size_t C_ind=0;
+	for (size_t C_full_ind=0; C_full_ind < tot_card-1;){
+
+	  size_t tmp1 = C->data[C_ind];
+	  size_t tmp2 = C_full->data[C_full_ind];
+	  size_t tmp3 = C_full->data[C_full_ind + cum_card];
+	  cuPrintf("C[%d] %d +=  C_full[%d] %d + C_full[%d] %d \n", C_ind, tmp1, C_full_ind, tmp2 , C_full_ind+cum_card , tmp3);
+
+	  C->data[C_ind] = C_full->data[C_full_ind] + C_full->data[C_full_ind+cum_card];
+
+	  C_ind++;
+	  if (C_full_ind % cum_card == (cum_card-1) ){
+	    C_full_ind += cum_card+1;
+	  }else{
+	    C_full_ind++;
+	  }
+	}
+
+	// size_t C_full_ind=0;
+	// for (size_t C_elnum=0; C_elnum< tot_card/2; C_elnum++){
+	//   C->data[C_elnum] = C_full->data[C_full_ind] + C_full->data[C_full_ind+cum_card];
+	//   C_full_ind += cum_card;
+	//}
+      }
+
+      cum_card *= current_card;
+    }
 
 
     // size_t tmpS= sdata[tid];
@@ -257,7 +298,7 @@ void print_ct(char* txt, ct* ct, bool print_config=false, bool printdata=false){
 dev_ct_ptrs prepareDeviceTensor(ct_config* h_ctc, ct_config* d_ctc, ct* h_ct,
                                 const mxArray* data, const mxArray* tensor_card = NULL){
 
-  // generate h_ct
+ // generate h_ct
 
   h_ct->config = h_ctc;
   h_ct->cardinalities = (size_t*) malloc(sizeof(size_t)*h_ctc->ndims);
@@ -426,20 +467,37 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
 
   if (operation==hadamard){
     // we are doing hadamard multiplication, all tensors have same cardinalities
+    std::cout << "d_A prepareDeviceTensor " << std::endl;
     d_A=prepareDeviceTensor(h_ctc, d_ctc, &h_it_A, prhs[0]);
+    std::cout << "d_B prepareDeviceTensor " << std::endl;
     d_B=prepareDeviceTensor(h_ctc, d_ctc, &h_it_B, prhs[1]);
   }else if (operation==contract){
     // we are doing tensor contraction, tensors may have different cardinalities
+    std::cout << "d_A prepareDeviceTensor " << std::endl;
     d_A=prepareDeviceTensor(h_ctc, d_ctc, &h_it_A, prhs[0], prhs[1]);
+    std::cout << "d_B prepareDeviceTensor " << std::endl;
     d_B=prepareDeviceTensor(h_ctc, d_ctc, &h_it_B, prhs[2], prhs[3]);
   }
 
   // output tensor C
   ct h_ot_C;
+  ct h_ot_C_full;
+  //ct_config h_ctc_full;
+  //ct_config d_ctc_full;
+
   dev_ct_ptrs d_C;
+  dev_ct_ptrs d_C_full;
+  mxArray* full_data = mxCreateNumericArray(h_ctc->ndims,h_ctc->cardinalities,mxSINGLE_CLASS,mxREAL);
+  mxArray* full_cardinalities = mxCreateNumericArray(h_ctc->ndims,h_ctc->cardinalities,mxSINGLE_CLASS,mxREAL);
+  float* f_c_ptr = (float*)mxGetData(full_cardinalities);
+  for(size_t i=0; i<h_ctc->ndims; i++ ){
+    f_c_ptr[i]=h_ctc->cardinalities[i];
+  }
+
+
+  // prepare MATLAB storage
   float* m_C;
   //size_t m_C_mem_size=1;
-  // prepare MATLAB storage
   // calculate total cardinalities for all objects
   if(operation == hadamard){
     mwSize argMatDims[h_ctc->ndims];
@@ -448,43 +506,49 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
     }
     plhs[0] = mxCreateNumericArray(h_ctc->ndims,argMatDims,mxSINGLE_CLASS,mxREAL);
     m_C = (float*) mxGetPr(plhs[0]);
+    std::cout << "d_C prepareDeviceTensor " << std::endl;
     d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0]);
   }
 
   else if (operation == contract){
     size_t non_zero_dim_number=0;
     for (size_t i=0; i<h_ctc->ndims; i++){
-      std::cout << " non_zero_dim_number loop " << i ;
+      //std::cout << " non_zero_dim_number loop " << i ;
       float tmpdimcard = ((float*)mxGetData(prhs[4]))[i];
       if(tmpdimcard != 0) {
         non_zero_dim_number++;
-        std::cout  << " tmpdimcard " << tmpdimcard << std::endl;
+        //std::cout  << " tmpdimcard " << tmpdimcard << std::endl;
         //m_C_mem_size *= tmpdimcard;
       }
     }
 
     mwSize argMatDims[non_zero_dim_number];
     size_t argMatDims_ind=0;
-    std::cout << "C tensor init argMatDims with size " << non_zero_dim_number << std::endl;
+    //std::cout << "C tensor init argMatDims with size " << non_zero_dim_number << std::endl;
     //<< " m_C_mem_size " << m_C_mem_size << std::endl;
 
     for (size_t i=0; i<h_ctc->ndims; i++){
       float val=((float*)mxGetData(prhs[4]))[i];
-      std::cout << "C tensor argMatDims[" << i << "] = " << val << " ";
+      //std::cout << "C tensor argMatDims[" << i << "] = " << val << " ";
       if ( val != 0){ // skip dimensions with 0 cardinality
-        std::cout << " assign " << std::endl;
+        //std::cout << " assign " << std::endl;
         argMatDims[argMatDims_ind] = val;
         argMatDims_ind++;
       }else{
-        std::cout << " not assign " << std::endl;
+        //std::cout << " not assign " << std::endl;
       }
     }
 
     plhs[0] = mxCreateNumericArray(non_zero_dim_number,argMatDims,mxSINGLE_CLASS,mxREAL);
-    std::cout << "SELAM  " <<  (size_t) mxGetNumberOfElements(plhs[0]) << std::endl;
+    //std::cout << "SELAM  " <<  (size_t) mxGetNumberOfElements(plhs[0]) << std::endl;
     m_C = (float*) mxGetPr(plhs[0]);
 
+    std::cout << "d_C prepareDeviceTensor " << std::endl;
     d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0], prhs[4]);
+
+    std::cout << "SELAAM bu " << h_ctc->element_number << std::endl;
+    std::cout << "d_C_full prepareDeviceTensor " << std::endl;
+    d_C_full=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C_full, full_data, full_cardinalities);
   }
 
 
@@ -492,11 +556,14 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   print_ct("Host A",&h_it_A,false,printdata);
   print_ct("Host B",&h_it_B,false,printdata);
   print_ct("Host C",&h_ot_C,false,printdata);
+  print_ct("Host C_full",&h_ot_C_full,false,printdata);
 
 
   print_device_ct("Device A",&d_A, &h_it_A);
   print_device_ct("Device B",&d_B, &h_it_B);
   print_device_ct("Device C",&d_C, &h_ot_C);
+
+  print_device_ct("Device C_full",&d_C_full, &h_ot_C_full);
 
 
   cudaPrintfInit();
@@ -527,7 +594,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   if (operation == hadamard){
     tensorHadamard<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
   }else if (operation == contract){
-    tensorContract<<< blocks, threads >>>(d_C.ct, d_A.ct, d_B.ct);
+    tensorContract<<< blocks, threads >>>(d_C_full.ct, d_C.ct, d_A.ct, d_B.ct);
   }
   //}
 
@@ -545,10 +612,21 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   cutilCheckError(cutDeleteTimer(timer));
 
   // copy result from device to host
-  if(operation==hadamard)
+  float h_C_full_data[h_ctc->total_cardinality];
+
+  if(operation==hadamard){
     cutilSafeCall(cudaMemcpy(m_C, d_C.data, h_ot_C.mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
-  else if(operation==contract)
+  }
+  else if(operation==contract){
     cutilSafeCall(cudaMemcpy(m_C, d_C.data, h_ot_C.mem_size, cudaMemcpyDeviceToHost) ); // assumes same size
+    cutilSafeCall(cudaMemcpy(h_C_full_data, d_C_full.data, h_ot_C_full.mem_size, cudaMemcpyDeviceToHost) );
+  }
+
+  // print C_full 
+  for (size_t i=0; i<h_ctc->total_cardinality; i++){
+    std::cout << "C_full[" << i << "] = " << h_C_full_data[i] << std::endl;
+  }
+
 
   // clean up memory
   //free(h_A);
@@ -561,6 +639,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   //cutilSafeCall(cudaFree(d_it_B));
   //cutilSafeCall(cudaFree(d_it_A)); //->C
 
+  print_device_ct("Result\nDevice C",&d_C_full, &h_ot_C);
   print_device_ct("Result\nDevice C",&d_C, &h_ot_C);
 
   cudaPrintfDisplay(stdout, true);

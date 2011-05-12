@@ -2,11 +2,24 @@
 
 mex -largeArrayDims cudatensor.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.cpp.o cutil/cutil.cpp.o cutil/multithreading.cpp.o cutil/param.cpp.o cutil/stopwatch.cpp.o cutil/stopwatch_linux.cpp.o   -L /usr/local/cuda/lib64 -lcudart -lcufft -L /usr/local/cuda/lib64/
 
-X=single(magic(2))
+dim=3
+
+X=single(magic(dim))
+%X=single(round(rand(2)*100))
 
 %C=cudatensor(X,X);
-C=cudatensor(X,single([2 2 0]),X,single([0 2 2]), single([2 0 2]) );
+C=cudatensor(X,single([dim dim 0]),X,single([0 dim dim]), single([dim 0 dim]) );
 
-display('matlab result is')
+display('mex result is')
 display(C)
+
+display('matlab kendi result is')
+display(X*X)
+
+if sum(sum(C==X*X)) == (dim*dim) 
+	display('olleeey')
+else
+	display('öff')
+end
+
 exit
