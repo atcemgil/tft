@@ -128,8 +128,10 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 
   if ( thread_id  < tot_card && block_id == 0){
 
-    //size_t uclu[3];
-    //for (size_t i=0; i<3; i++) {uclu[i]=0; }
+    //extern __shared__ int C_shared[];
+
+    size_t uclu[3];
+    for (size_t i=0; i<3; i++) {uclu[i]=0; }
 
     int index_number_A=0;
     int index_number_B=0;
@@ -148,8 +150,9 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
       for (size_t card_index=0; card_index < ndims; card_index++){
         if ( t_id_rem == 0 ) break;
 
-        //uclu[card_index] = (t_id_rem % p->config->cardinalities[card_index]) * cumulative_offset_ind;
-        cur_card_index = (t_id_rem % p->config->cardinalities[card_index]) * cumulative_offset_ind;
+	//cuPrintf("card_index %d t_id_rem %d cumulative_offset_ind %d\n",card_index, t_id_rem, cumulative_offset_ind);
+        uclu[card_index] = (t_id_rem % p->config->cardinalities[card_index]);// * cumulative_offset_ind;
+        cur_card_index   = (t_id_rem % p->config->cardinalities[card_index]);// * cumulative_offset_ind;
 
         t_id_rem = (size_t) t_id_rem / p->config->cardinalities[card_index];
 
@@ -161,7 +164,7 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 
           // increment cumulative offset with current dimension cardinality for next loop
           // -1 for cardinalities are indexed from 1
-          cumulative_offset_ind *= p->config->cardinalities[card_index] - 1 ;
+          //cumulative_offset_ind *= p->config->cardinalities[card_index] - 1 ;
           cumulative_offset_elnum *= p->config->cardinalities[card_index] ;
         }
       }
@@ -170,7 +173,7 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
     size_t tmpB = B->data[index_number_B];
     size_t tmpA= A->data[index_number_A];
     size_t tmpC_full= C_full->data[thread_id];
-    cuPrintf("C[%d] %d += A[%d] %d * B[%d] %d\n",  thread_id, tmpC_full,  index_number_A, tmpA, index_number_B, tmpB);
+    //cuPrintf("C[%d] %d += A[%d] %d * B[%d] %d\n",  thread_id, tmpC_full,  index_number_A, tmpA, index_number_B, tmpB);
 
     //~/arastir/cuda2/cudainstall/3.2/sdk/C/src/reduction/doc/reduction.pdf
     // extern __shared__ int sdata[];
@@ -178,7 +181,8 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
     // unsigned int tid = threadIdx.x;
     // unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     // sdata[tid] = C->data[i];
-    // __syncthreads();
+
+     __syncthreads();
 
     // sdata[index_number_C] += A->data[index_number_A] * B->data[index_number_B];
 
@@ -187,8 +191,15 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
     //cuPrintf("C_full->data[%d] = %d ", thread_id, tmpA * tmpB);
     C_full->data[thread_id] = A->data[index_number_A] * B->data[index_number_B];
 
+    // size_t tmpC_shared = C_shared[index_number_C];
+    // cuPrintf("C_shared[%d] %d += %d * %d\n", index_number_C, tmpC_shared, tmpA,tmpB);
+    // C_shared[index_number_C] += A->data[index_number_A] * B->data[index_number_B];
+    // __syncthreads();
 
-    __syncthreads();
+    // if(thread_id < 4){
+    //   C->data[thread_id] = C_shared[thread_id];
+    // }
+
 
     // contract on dimensions with zero cardinality
     size_t cum_card=1;
@@ -201,26 +212,25 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 	size_t C_ind=0;
 	for (size_t C_full_ind=0; C_full_ind < tot_card-1;){
 
-	  size_t tmp1 = C->data[C_ind];
-	  size_t tmp2 = C_full->data[C_full_ind];
-	  size_t tmp3 = C_full->data[C_full_ind + cum_card];
-	  cuPrintf("C[%d] %d +=  C_full[%d] %d + C_full[%d] %d \n", C_ind, tmp1, C_full_ind, tmp2 , C_full_ind+cum_card , tmp3);
+	  //C->data[C_ind] = C_full->data[C_full_ind] + C_full->data[C_full_ind+cum_card]; //???? iki tane olur mu??!? -> OLMAZ!
+	  size_t tmp=0;
+	  for (size_t el=0; el<cum_card; el++){
+	    size_t increment = el * (cum_card);
+	    size_t tmpcf = C_full->data[C_full_ind + increment];
+	    if(thread_id==0)
+	      cuPrintf("C_full_ind %d: tmp %d += C_full->data[ %d + %d ] %d \n", C_full_ind, tmp , C_full_ind, increment , tmpcf);
 
-	  C->data[C_ind] = C_full->data[C_full_ind] + C_full->data[C_full_ind+cum_card];
+	    tmp += tmpcf;
+	  }
+	  C->data[C_ind] = tmp;
 
 	  C_ind++;
 	  if (C_full_ind % cum_card == (cum_card-1) ){
-	    C_full_ind += cum_card+1;
+	    C_full_ind += cum_card * (cum_card-1) + 1;
 	  }else{
 	    C_full_ind++;
 	  }
 	}
-
-	// size_t C_full_ind=0;
-	// for (size_t C_elnum=0; C_elnum< tot_card/2; C_elnum++){
-	//   C->data[C_elnum] = C_full->data[C_full_ind] + C_full->data[C_full_ind+cum_card];
-	//   C_full_ind += cum_card;
-	//}
       }
 
       cum_card *= current_card;
@@ -232,7 +242,7 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 
     //tmpC= C->data[index_number_C];
     //cuPrintf("C %d\n",tmpC);
-    //cuPrintf("uclu %d %d %d index_number %d\n", uclu[0], uclu[1], uclu[2], (int)index_number);
+    cuPrintf("uclu %d %d %d index_number_A %d index_number_B %d\n", uclu[0], uclu[1], uclu[2], (int)index_number_A, index_number_B);
     //cuPrintf("A %d B %d C %d\n", index_number_A, index_number_B, index_number_C);
   }
 }

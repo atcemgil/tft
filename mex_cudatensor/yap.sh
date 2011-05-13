@@ -3,4 +3,6 @@ do
   echo  -*-*-*-*-*-*-*-*-*
 done
 rm cudatensor.o cudatensor.mexa64;  
-matlab -nodesktop -nosplash -r "test"
+rm /tmp/kek
+matlab -nodesktop -nosplash -r "test" &> /tmp/kek
+less /tmp/kek
