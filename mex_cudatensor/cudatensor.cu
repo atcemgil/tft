@@ -19,7 +19,7 @@
 //dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
 //dim3 grid(WC / threads.x, HC / threads.y);
 int blocks=BLOCK_SIZE;
-int threads=128;
+int threads=256;
 
 
 // Tensor .* operation. Multiply corresponding entries of tensors A,B of same size
@@ -576,7 +576,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   print_device_ct("Device C_full",&d_C_full, &h_ot_C_full);
 
 
-  cudaPrintfInit();
+  //cudaPrintfInit();
 
   // allocate device memory for result
   // kernel warmup
@@ -633,9 +633,9 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   }
 
   // print C_full 
-  for (size_t i=0; i<h_ctc->total_cardinality; i++){
-    std::cout << "C_full[" << i << "] = " << h_C_full_data[i] << std::endl;
-  }
+  // for (size_t i=0; i<h_ctc->total_cardinality; i++){
+  //   std::cout << "C_full[" << i << "] = " << h_C_full_data[i] << std::endl;
+  // }
 
 
   // clean up memory
@@ -649,11 +649,11 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   //cutilSafeCall(cudaFree(d_it_B));
   //cutilSafeCall(cudaFree(d_it_A)); //->C
 
-  print_device_ct("Result\nDevice C",&d_C_full, &h_ot_C);
+  print_device_ct("Result\nDevice C",&d_C_full, &h_ot_C_full);
   print_device_ct("Result\nDevice C",&d_C, &h_ot_C);
 
-  cudaPrintfDisplay(stdout, true);
-  cudaPrintfEnd();
+  //cudaPrintfDisplay(stdout, true);
+  //cudaPrintfEnd();
 
   cudaThreadExit();
 
