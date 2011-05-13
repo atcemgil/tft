@@ -217,8 +217,8 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 	  for (size_t el=0; el<cum_card; el++){
 	    size_t increment = el * (cum_card);
 	    size_t tmpcf = C_full->data[C_full_ind + increment];
-	    if(thread_id==0)
-	      cuPrintf("C_full_ind %d: tmp %d += C_full->data[ %d + %d ] %d \n", C_full_ind, tmp , C_full_ind, increment , tmpcf);
+	    //if(thread_id==0)
+	      //cuPrintf("C_full_ind %d: tmp %d += C_full->data[ %d + %d ] %d \n", C_full_ind, tmp , C_full_ind, increment , tmpcf);
 
 	    tmp += tmpcf;
 	  }
@@ -242,7 +242,7 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 
     //tmpC= C->data[index_number_C];
     //cuPrintf("C %d\n",tmpC);
-    cuPrintf("uclu %d %d %d index_number_A %d index_number_B %d\n", uclu[0], uclu[1], uclu[2], (int)index_number_A, index_number_B);
+    //cuPrintf("uclu %d %d %d index_number_A %d index_number_B %d\n", uclu[0], uclu[1], uclu[2], (int)index_number_A, index_number_B);
     //cuPrintf("A %d B %d C %d\n", index_number_A, index_number_B, index_number_C);
   }
 }
