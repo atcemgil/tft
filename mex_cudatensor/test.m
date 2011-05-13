@@ -1,8 +1,9 @@
+function testcuda (dim)
 !/usr/local/cuda/bin/nvcc -c cudatensor.cu -arch sm_11 -Xcompiler -fPIC -I /opt/matlab/extern/include -I /home/can2/NVIDIA_GPU_Computing_SDK/C/common/inc/
 
 mex -largeArrayDims cudatensor.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.cpp.o cutil/cutil.cpp.o cutil/multithreading.cpp.o cutil/param.cpp.o cutil/stopwatch.cpp.o cutil/stopwatch_linux.cpp.o   -L /usr/local/cuda/lib64 -lcudart -lcufft -L /usr/local/cuda/lib64/
 
-dim=3
+%dim=3
 
 X=single(magic(dim))
 %X=single(round(rand(2)*100))
@@ -23,3 +24,5 @@ else
 end
 
 exit
+
+end
