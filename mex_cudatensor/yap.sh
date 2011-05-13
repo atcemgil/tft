@@ -4,5 +4,5 @@ do
 done
 rm cudatensor.o cudatensor.mexa64;  
 rm /tmp/kek
-matlab -nodesktop -nosplash -r "test" &> /tmp/kek
+matlab -nodesktop -nosplash -r "test($1)" &> /tmp/kek
 less /tmp/kek
