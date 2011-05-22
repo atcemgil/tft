@@ -13,13 +13,13 @@
 
 #include "cuPrintf.cu"
 
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 400
 
 // setup execution parameters
 //dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
 //dim3 grid(WC / threads.x, HC / threads.y);
 int blocks=BLOCK_SIZE;
-int threads=256;
+int threads=400;
 
 
 // Tensor .* operation. Multiply corresponding entries of tensors A,B of same size
@@ -119,14 +119,16 @@ tensorHadamard( ct* C, ct* A, ct* B)
 __global__ void
 tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 {
-  size_t thread_id = threadIdx.x + (threadIdx.y * blockDim.x) + (threadIdx.x * threadIdx.y * blockDim.y);
-  size_t block_id = blockIdx.x + (blockIdx.y * gridDim.x);
+  size_t thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+
+  //size_t thread_id = threadIdx.x + (threadIdx.y * blockDim.x) + (threadIdx.x * threadIdx.y * blockDim.y);
+  //size_t block_id = blockIdx.x + (blockIdx.y * gridDim.x);
 
   // assumes same total dimensions and cardinalities for all objects
   size_t tot_card = A->config->total_cardinality;
   size_t ndims = A->config->ndims;
 
-  if ( thread_id  < tot_card && block_id == 0){
+  if ( thread_id  < tot_card ){
 
     //extern __shared__ int C_shared[];
 
@@ -211,8 +213,6 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 
 	size_t C_ind=0;
 	for (size_t C_full_ind=0; C_full_ind < tot_card-1;){
-
-	  //C->data[C_ind] = C_full->data[C_full_ind] + C_full->data[C_full_ind+cum_card]; //???? iki tane olur mu??!? -> OLMAZ!
 	  size_t tmp=0;
 	  for (size_t el=0; el<cum_card; el++){
 	    size_t increment = el * (cum_card);
@@ -649,7 +649,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
   //cutilSafeCall(cudaFree(d_it_B));
   //cutilSafeCall(cudaFree(d_it_A)); //->C
 
-  print_device_ct("Result\nDevice C",&d_C_full, &h_ot_C_full);
+  print_device_ct("Result\nDevice C full",&d_C_full, &h_ot_C_full);
   print_device_ct("Result\nDevice C",&d_C, &h_ot_C);
 
   //cudaPrintfDisplay(stdout, true);

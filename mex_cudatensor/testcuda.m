@@ -2,10 +2,10 @@
 
 mex -largeArrayDims cudatensor.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.cpp.o cutil/cutil.cpp.o cutil/multithreading.cpp.o cutil/param.cpp.o cutil/stopwatch.cpp.o cutil/stopwatch_linux.cpp.o   -L /usr/local/cuda/lib64 -lcudart -lcufft
 
-dim=6
+dim=34
 
-X=single(magic(dim))
-%X=single(round(rand(dim)*100))
+%X=single(magic(dim))
+X=single(round(rand(dim)*100))
 
 %C=cudatensor(X,X);
 C=cudatensor(X,single([dim dim 0]),X,single([0 dim dim]), single([dim 0 dim]) );
@@ -20,6 +20,12 @@ if sum(sum(C==X*X)) == (dim*dim)
 	display('olleeey')
 else
 	display('öff')
+        display('boyutlar')
+        (dim*dim)
+        display('farklı hane sayisi')
+        (dim*dim) - sum(sum(C==X*X))
+        display('farklı hanelerin toplami')
+        sum( C( (C~=X*X) ) - X( (C~=X*X) ) )
 end
 
 exit
