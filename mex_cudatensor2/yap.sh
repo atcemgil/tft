@@ -3,7 +3,7 @@ do
   echo  -*-*-*-*-*-*-*-*-*
 done
 
-cd /home/can2/code/mex_cudatensor
+cd /home/can2/code/mex_cudatensor2
 
 rm cudatensor.o cudatensor.mexa64;  
 rm /tmp/kek

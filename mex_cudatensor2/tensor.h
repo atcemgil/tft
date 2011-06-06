@@ -25,7 +25,6 @@ struct ct_config{
 
 // cuda tensor object
 struct ct{
-
   // related configuration object
   ct_config* config;
 
@@ -40,8 +39,9 @@ struct ct{
   // points to the values of this tensor
   double* data;
 
-  // current index pointer
-  double* cur_ind;
+  // current index value, used to reference double* data
+  // has same dimension as the cardinalities (config->ndims)
+  size_t* cur_ind;
 };
 
 
