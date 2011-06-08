@@ -2,14 +2,14 @@
 
 mex -largeArrayDims cudatensor2.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.cpp.o cutil/cutil.cpp.o cutil/multithreading.cpp.o cutil/param.cpp.o cutil/stopwatch.cpp.o cutil/stopwatch_linux.cpp.o   -L /usr/local/cuda/lib64 -lcudart -lcufft
 
+rand('state',0);
+
 dim=2
 
-X=magic(dim)
-%X=round(rand(dim)*100)
+A=magic(dim)
+B=round(rand(dim,dim,dim)*10)
 
-%C=cudatensor(X,X);
-%C=cudatensor2(X,[dim dim 0],X,[0 dim dim], [dim 0 dim] );
-C=cudatensor2(X,[0 dim dim],X,[dim dim dim], [dim dim dim] );
+C=cudatensor2(A,[0 dim dim],B,[dim dim dim], [dim dim dim] );
 
 display('mex result is')
 display(C)
