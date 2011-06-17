@@ -1,7 +1,6 @@
 /*
  * author: ck
  * 26.04.2011
- * devised from sgemm.cu of Brian Dushaw
  */
 
 #include "mex.h"
@@ -19,7 +18,8 @@
 //dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
 //dim3 grid(WC / threads.x, HC / threads.y);
 int blocks=BLOCK_SIZE;
-int threads=400;
+//int threads=400;
+int threads=100;
 
 
 // Tensor .* operation. Multiply corresponding entries of tensors A,B of same size
@@ -132,8 +132,8 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 
     //extern __shared__ int C_shared[];
 
-    size_t uclu[3];
-    for (size_t i=0; i<3; i++) {uclu[i]=0; }
+    //size_t uclu[3];
+    //for (size_t i=0; i<3; i++) {uclu[i]=0; }
 
     int index_number_A=0;
     int index_number_B=0;
@@ -153,7 +153,7 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
         if ( t_id_rem == 0 ) break;
 
 	//cuPrintf("card_index %d t_id_rem %d cumulative_offset_ind %d\n",card_index, t_id_rem, cumulative_offset_ind);
-        uclu[card_index] = (t_id_rem % p->config->cardinalities[card_index]);// * cumulative_offset_ind;
+        //uclu[card_index] = (t_id_rem % p->config->cardinalities[card_index]);// * cumulative_offset_ind;
         cur_card_index   = (t_id_rem % p->config->cardinalities[card_index]);// * cumulative_offset_ind;
 
         t_id_rem = (size_t) t_id_rem / p->config->cardinalities[card_index];
@@ -189,7 +189,6 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
     // sdata[index_number_C] += A->data[index_number_A] * B->data[index_number_B];
 
 
-
     //cuPrintf("C_full->data[%d] = %d ", thread_id, tmpA * tmpB);
     C_full->data[thread_id] = A->data[index_number_A] * B->data[index_number_B];
 
@@ -205,10 +204,12 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 
     // contract on dimensions with zero cardinality
     size_t cum_card=1;
+    bool foundone=false;
     for (size_t card_index=0; card_index<ndims; card_index++){
       size_t current_card=C->cardinalities[card_index];
 
       if( current_card == 0 ) {
+	foundone=true;
 	// contract on this dimension
 
 	size_t C_ind=0;
@@ -217,8 +218,8 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
 	  for (size_t el=0; el<cum_card; el++){
 	    size_t increment = el * (cum_card);
 	    size_t tmpcf = C_full->data[C_full_ind + increment];
-	    //if(thread_id==0)
-	      //cuPrintf("C_full_ind %d: tmp %d += C_full->data[ %d + %d ] %d \n", C_full_ind, tmp , C_full_ind, increment , tmpcf);
+	    if(thread_id==0)
+	      cuPrintf("C_full_ind %d: tmp %d += C_full->data[ %d + %d ] %d \n", C_full_ind, tmp , C_full_ind, increment , tmpcf);
 
 	    tmp += tmpcf;
 	  }
@@ -234,6 +235,10 @@ tensorContract( ct* C_full, ct* C, ct* A, ct* B )
       }
 
       cum_card *= current_card;
+    }
+
+    if (foundone == false){
+      C->data[thread_id] = C_full->data[thread_id];
     }
 
 
@@ -556,7 +561,7 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
     std::cout << "d_C prepareDeviceTensor " << std::endl;
     d_C=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C, plhs[0], prhs[4]);
 
-    std::cout << "SELAAM bu " << h_ctc->element_number << std::endl;
+    //std::cout << "SELAAM bu " << h_ctc->element_number << std::endl;
     std::cout << "d_C_full prepareDeviceTensor " << std::endl;
     d_C_full=prepareDeviceTensor(h_ctc, d_ctc, &h_ot_C_full, full_data, full_cardinalities);
   }
@@ -659,9 +664,9 @@ void operate(ct_config* h_ctc, ct_config* d_ctc, const mxArray *prhs[], mxArray 
 
 
   // required to avoid memory leak?
-  delete h_ctc->cardinalities;
-  delete h_it_A.cardinalities;
-  delete h_it_B.cardinalities;
+  //delete h_ctc->cardinalities;
+  //delete h_it_A.cardinalities;
+  //delete h_it_B.cardinalities;
 }
 
 

@@ -9,5 +9,7 @@ rm cudatensor.o cudatensor.mexa64;
 rm /tmp/kek
 
 matlab -nodesktop -nosplash -r "testcuda"&> /tmp/kek
+#matlab -nodesktop -nosplash -r "testtensor"&> /tmp/kek
 less /tmp/kek
 #cat /tmp/kek
+reset

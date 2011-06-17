@@ -150,11 +150,11 @@ void prepareHostTensor(ct_config* h_ctc, ct* h_ct, const mxArray* m_data, const 
 
 
 
-// Multiply incoming vector pair by pair and write the result in second input vector
-__global__ void pairmul( double* pairmul, size_t pairmul_elnum, double* pairmul_result ){
+// Multiply incoming vector pair by pair, sum elements with mod SG_SIZE and write the result in second input vector
+__global__ void pairmulsum( double* pairmul, size_t pairmul_elnum, double* pairmul_result ){
   size_t thread_id = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if ( thread_id < pairmul_elnum/2  ) { // odd number of elements?
+  if ( thread_id < pairmul_elnum/2 ) { // odd number of elements?
     pairmul_result[thread_id] = pairmul[(thread_id+1)*2-2] * pairmul[(thread_id+1)*2-1];
     cuPrintf("pairmul_result[%d] = pairmul[%d] * pairmul[%d]\n", thread_id, (thread_id+1)*2-2, (thread_id+1)*2-1);
   }
@@ -221,7 +221,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
   std::cout << "mex: found " << nrhs << " number of arguments " << std::endl;
   if (nrhs!=5){
-    std::cout << "mex: cudatensor2 requires 5 arguments. A, dimensions of A, B, dimensions of B, dimensions of C " << std::endl;
+    std::cout << "mex: cudatensor3 requires 5 arguments. A, dimensions of A, B, dimensions of B, dimensions of C " << std::endl;
     return;
   }
 
