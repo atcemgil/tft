@@ -1,32 +1,6 @@
-
-// cuda tensor operation configuration object
-struct ct_config{
-  // defines how many dimensions are there
-  size_t ndims;
-
-  // defines the maximum possible size of each dimension
-  //   for all tensors using this configuration
-  // must be allocated dynamically as an array of type size_t
-  // size of the array must be equal to ndims
-  size_t* cardinalities;
-
-  // total size of the related objects
-  // maximum of cardinality of input objects
-  // cardinality for an object is found by multiplying object's cardinalities of each dimension
-  size_t total_cardinality;
-
-  // number of elements in the data
-  size_t element_number;
-
-  // index of the dimension to contract over
-  //size_t contract_dim;
-};
-
-
 // cuda tensor object
 struct ct{
-  // related configuration object
-  ct_config* config;
+  size_t ndims;
 
   // defines size of each dimension for this tensor
   // must be allocated dynamically as an array of type size_t
@@ -39,66 +13,41 @@ struct ct{
   // size of the corresponding data
   size_t mem_size;
 
+  // number of elements in the data
+  size_t element_number;
+
   // points to the values of this tensor
   double* data;
 };
 
+// data pointers required to perform the operations
+// used as a convenient storage on the host side
+struct dev_ptrs{
 
+  size_t* d_full_cardinalities;
 
+  size_t* d_strides_A;
+  size_t* d_strides_B;
+  size_t* d_strides_F;
+  size_t* d_strides_C;
 
+  double* d_data_A;
+  double* d_data_B;
+  double* d_data_C;
+  double* d_data_F;
 
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// STORAGE
-
-// non zero value indicates incrementation error
-// 1 : increment beyond capacity
-//  int increment_error;
-
-
-// current index value, used to reference double* data
-// has same dimension as the cardinalities (config->ndims)
-//size_t* cur_ind;
-
-
-// zero cardinality indices are incremented in this index
-// this is not used in any pointer operation
-//size_t* cur_anti_ind;
-
-
-/*
-// compact structure carying pointers to elements of a cudatensor on the device
-struct dev_ct_ptrs{
-  ct* ct;
-  ct_config* ctc;
-  size_t* cardinalities;
-  float* data;
+  // holds index combinations of dimensions with zero cardinality on result tensor
+  // contraction operation loops over this array
+  //
+  // structure: assume we have the following cardinalities
+  //            [ 2 2 0 2 2 0 2 ]
+  //            we have 2 indices to loop through on contraction (2 and 5)
+  //            therefore we need a vector such as the following:
+  //            (assuming missing indices have cardinality 2 in other tensors)
+  //            [ 0 0   0 1    1 0    1 1 ]
+  //            in order to be able to sum through all elements in the full tensor
+  // 
+  // Using this structure kernels can loop through the full tensor to locate elements to contract
+  // with the number of zero cardinality dimensions available.
+  size_t* d_zero_cardinality_dim_tuples_C;
 };
-*/
-
-/*
-// proxy to current index array
-inline size_t get_ct_ind(ct* h_ct, size_t dim){
-  if(h_ct->cardinalities[dim] == 0){
-    return h_ct->cur_anti_ind[dim];
-  }else{
-    return h_ct->cur_ind[dim];
-  }
-}
-inline void set_ct_ind(ct* h_ct, size_t dim, size_t val){
-  if(h_ct->cardinalities[dim] == 0){
-    h_ct->cur_anti_ind[dim] = val;
-  }else{
-    h_ct->cur_ind[dim] = val;
-  }
-}
-inline void inc_ct_ind(ct* h_ct, size_t dim){
-  if(h_ct->cardinalities[dim] == 0){
-    h_ct->cur_anti_ind[dim]++;
-  }else{
-    h_ct->cur_ind[dim]++;
-  }
-}
-*/
