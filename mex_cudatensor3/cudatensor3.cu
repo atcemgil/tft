@@ -124,7 +124,39 @@ void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_ca
 }
 
 
-std::vector<size_t> 
+// Recursive function which generates all permutations of a given list
+void gen_range_permutation_helper(std::vector<size_t> iter_dims, std::vector<size_t> cur_perm, std::vector<size_t>* acc){
+  if ( iter_dims.size() == 0 ){
+    acc->insert(acc->end(), cur_perm.begin(), cur_perm.end());
+  }else{
+    // pick one dimension from iter_dims and iterate for each element in its cardinality
+    size_t one_dim = iter_dims.front();
+    // remove that dim for the remaining recursions
+    iter_dims.erase(iter_dims.begin());
+
+    for ( size_t i=0; i<one_dim ; i++){
+      std::vector<size_t> tmp_vec (cur_perm.begin(), cur_perm.end());
+      tmp_vec.push_back(i);
+      gen_range_permutation_helper( iter_dims, tmp_vec, acc );
+    }
+  }
+}
+
+// generates range-permutation of numbers given in permutation_list
+// Example
+// (2 3) -> ( 0,0,   0,1,  0,2,   1,0,   1,1,  1,2 )
+size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnum){
+
+  std::vector<size_t> empty_list;
+  std::vector<size_t> acc;
+
+  gen_range_permutation_helper(permutation_list, empty_list, &acc);
+
+  size_t* acc_array = (size_t*) malloc(sizeof(size_t)*acc.size());
+  std::copy(acc.begin(), acc.end(), acc_array);
+  (*elnum) = acc.size();
+  return acc_array;
+}
 
 
 
@@ -160,24 +192,19 @@ dev_ptrs prepareDeviceParameters(size_t* h_full_cardinalities, size_t ndims, ct*
 
 
   std::vector<size_t> zero_cardinality_dims;
-  for ( size_t dim=0; dim<ndims; dim++){
+  for ( size_t dim=0; dim<ndims; dim++ ){
     if ( h_C->cardinalities[dim] == 0 ){
       zero_cardinality_dims.push_back(dim);
     }
   }
 
-  std::vector<size_t> h_zero_cardinality_dim_tuples_C;
-  for ( std::vector<size_t>::iterator it=myvector.begin() ; it < myvector.end(); it++ ){
-    
-  }
+  size_t h_zero_cardinality_dim_tuples_C_elnum;
+  size_t* h_zero_cardinality_dim_tuples_C = gen_range_permutation(zero_cardinality_dims, &h_zero_cardinality_dim_tuples_C_elnum);
 
+  cutilSafeCall(cudaMalloc((void**)&(dp.d_zero_cardinality_dim_tuples_C), sizeof(size_t)*h_zero_cardinality_dim_tuples_C_elnum));
+  cutilSafeCall(cudaMemcpy(dp.d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
+                           sizeof(size_t)*h_zero_cardinality_dim_tuples_C_elnum, cudaMemcpyHostToDevice));
 
-
-  //cutilSafeCall(cudaMalloc((void**)&(dp.d_zero_cardinality_dims_C), sizeof(size_t)*zero_dim_num));
-  //cutilSafeCall(cudaMemcpy(dp.d_zero_cardinality_dims_C, h_zero_cardinality_dims_C, 
-			   sizeof(size_t)*zero_dim_num, cudaMemcpyHostToDevice));
-
-  
   return dp;
 }
 
@@ -201,7 +228,7 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
                               double* d_A, double* d_B, double* d_F, size_t F_element_number){
 
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-  size_t* d_inds_F = (size_t*) malloc(sizeof(size_t)*ndims);
+  size_t d_inds_F;// = (size_t*) malloc(sizeof(size_t)*ndims);
 
   if (tid < F_element_number){
 
@@ -216,15 +243,15 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
     for ( size_t dim=ndims-1; ; dim--){
 
       if ( tid / d_strides_F[dim] > 0 ){
-	d_inds_F[dim] = tid / d_strides_F[dim];
-	tid -= d_inds_F[dim]*d_strides_F[dim];
+        d_inds_F = tid / d_strides_F[dim];
+        tid -= d_inds_F*d_strides_F[dim];
       }else{
-	d_inds_F[dim] = 0;
+        d_inds_F = 0;
       }
 
-      F_ind += d_strides_F[dim] * d_inds_F[dim];
-      A_ind += d_strides_A[dim] * d_inds_F[dim];
-      B_ind += d_strides_B[dim] * d_inds_F[dim];
+      F_ind += d_strides_F[dim] * d_inds_F;
+      A_ind += d_strides_A[dim] * d_inds_F;
+      B_ind += d_strides_B[dim] * d_inds_F;
 
       if(dim == 0) break;
     }
@@ -233,82 +260,76 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
     cuPrintf("tid %d: d_F[%d] = d_A[%d] * d_B[%d]\n", tid, F_ind, A_ind, B_ind);
 
   }
-
-
-  /*
-  // make operation for all element in all dimensions
-  for ( size_t tot_card=0; tot_card < h_ctc.total_cardinality; tot_card++){
-  std::cout << "pairmul gen: tot_card " << tot_card << std::endl;
-
-  h_pairmul[cur_pairmul_ind] = get_element(&h_A, global_index, "h_A");
-  cur_pairmul_ind++;
-
-  h_pairmul[cur_pairmul_ind] = get_element(&h_B, global_index, "h_B");
-  cur_pairmul_ind++;
-
-  increment_cur_index(&h_ctc, global_index);
-  }
-  */
 }
 
 
 // for each element of d_C (tid corresponds to a single iteration)
 //    loop over every zero cardinality dimension summing in tmp_sum
 //    store tmp_sum as corresponding element of d_C
-__global__ void contractFintoC(size_t* d_cards_F, size_t ndims, 
-			       size_t* d_strides_F, size_t* d_strides_C,
-			       double* d_F, double* d_C,
-			       size_t C_element_number, 
+__global__ void contractFintoC(size_t* d_cards_F, size_t ndims,
+                               size_t* d_strides_F, size_t* d_strides_C,
+                               double* d_F, double* d_C,
+                               size_t C_element_number,
 
-			       size_t* d_zero_cardinality_dim_tuples_C, 
-			       size_t zero_cardinality_dim_num_C,
-			       size_t zero_cardinality_dim_tuple_size_C) {
+                               size_t* d_zero_cardinality_dim_tuples_C,
+                               size_t zero_cardinality_dim_tuple_size_C,
+                               size_t d_zero_cardinality_dim_tuples_C_element_size) {
 
-    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t* d_inds_C = (size_t*) malloc(sizeof(size_t)*ndims);
+  size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if ( tid < C_element_number ){
+  size_t* d_inds_C = (size_t*) malloc(sizeof(size_t)*ndims);
 
-      // calculate index for this tid
-      size_t C_ind=0;
-      for ( size_t dim=ndims-1; ; dim--){
-	if ( tid / d_strides_F[dim] > 0 ){
-	  d_inds_C[dim] = tid / d_strides_C[dim];
-	  tid -= d_inds_C[dim]*d_strides_C[dim];
-	}else{
-	  d_inds_C[dim] = 0;
-	}
 
-	C_ind += d_strides_C[dim] * d_inds_C[dim];
+  if ( tid < C_element_number ){
 
-	if(dim == 0) break;
+    // calculate index for this tid
+    size_t C_ind=0;
+    for ( size_t dim=ndims-1; ; dim--){
+      if ( tid / d_strides_C[dim] > 0 ){
+        d_inds_C[dim] = tid / d_strides_C[dim];
+        tid -= d_inds_C[dim]*d_strides_C[dim];
+      }else{
+        d_inds_C[dim] = 0;
       }
 
-      //d_F[F_ind] = d_A[A_ind] * d_B[B_ind];
-      //cuPrintf("tid %d: d_F[%d] = d_A[%d] * d_B[%d]\n", tid, F_ind, A_ind, B_ind);
+      C_ind += d_strides_C[dim] * d_inds_C[dim];
 
-
-
-      // calculate contraction value for this index of output tensor C
-      double tmp_sum=0;
-      // iterate once for every zero cardinality dimension
-      for(size_t dim; dim<zero_cardinality_dim_num_C; dim++){
-
-	// iterate once for each cardinality on this dimension
-	for(size_t missing_index=0; 
-	    missing_index < d_cards_F[ d_zero_cardinality_dims_C[dim] ]; 
-	    missing_index++){
-	  
-	  // got a complete C index 
-	  //     a missing_index value for one of the zero cardinality indices of C
-	  //     (if more then one zero card. index -> other indices are zero)
-	  // therefore an index value for the full tensor F
-	  tmp_sum += 
-	}
-      }
-
-      // store this element of d_C
+      if(dim == 0) break;
     }
+
+
+    // calculate contraction value for this index of output tensor C
+    double tmp_sum=0;
+
+    // d_zero_cardinality_dim_tuples_C contains tuples of size zero_cardinality_dim_tuple_size_C
+    // these correspond to the set of all possible indices over zero cardinality indices of tensor C
+
+    for ( size_t iter=0;
+          iter < d_zero_cardinality_dim_tuples_C_element_size;
+          iter += zero_cardinality_dim_tuple_size_C ){
+
+      size_t F_ind = 0;
+      for ( size_t dim=0 ; dim<ndims; dim++){
+        if ( d_cards_C[dim] == 0 ){
+          F_ind += d_strides_F[dim] * d_zero_cardinality_dim_tuples_C_element_size[iter+dim];
+        }else{
+          F_ind += d_strides_F[dim] * d_inds_C[dim];
+        }
+      }
+
+      tmp_sum += d_F[F_ind];
+    }
+
+
+
+    //d_F[F_ind] = d_A[A_ind] * d_B[B_ind];
+    //cuPrintf("tid %d: d_F[%d] = d_A[%d] * d_B[%d]\n", tid, F_ind, A_ind, B_ind);
+
+
+
+    // store this element of d_C
+    d_C[C_ind] = tmp_sum;
+  }
 }
 
 
@@ -458,6 +479,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   cudaPrintfInit();
 
   std::cout << " Running kernels " << std::endl << std::endl;
+
   //pairmul<<<100,100>>>(d_pairmul, C_elnum*2, d_pairmul_result);
 
   // generate the full output
