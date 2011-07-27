@@ -50,4 +50,10 @@ struct dev_ptrs{
   // Using this structure kernels can loop through the full tensor to locate elements to contract
   // with the number of zero cardinality dimensions available.
   size_t* d_zero_cardinality_dim_tuples_C;
+
+  // each tuple contains this many elements
+  size_t zero_cardinality_dim_tuple_size_C;
+
+  // total size of d_zero_cardinality_dim_tuples_C
+  size_t zero_cardinality_dim_tuples_C_element_number;
 };

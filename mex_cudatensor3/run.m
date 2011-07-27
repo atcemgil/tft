@@ -9,7 +9,7 @@ dim=2
 A=magic(dim)
 B=round(rand(dim,dim,dim)*10)
 
-tic; C=cudatensor3(A,[0 dim dim],B,[dim dim dim], [dim dim dim] ); toc;
+tic; C=cudatensor3(A,[0 dim dim],B,[dim dim dim], [dim dim 0] ); toc;
 
 display('mex result is')
 display(C)
