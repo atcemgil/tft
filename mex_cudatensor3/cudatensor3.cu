@@ -220,19 +220,20 @@ dev_ptrs prepareDeviceParameters(size_t* h_full_cardinalities, size_t ndims, ct*
 
 
   std::vector<size_t> zero_cardinality_dims;
-  std::vector<size_t> non_zero_cardinality_dims;
+  //std::vector<size_t> non_zero_cardinality_dims;
   for ( size_t dim=0; dim<ndims; dim++ ){
-    if ( h_C->cardinalities[dim] == 0 ){
+    if ( h_C->cardinalities[dim] == 0 && h_F->cardinalities[dim] != 0 ){
       zero_cardinality_dims.push_back(h_F->cardinalities[dim]);
-    }else{
-      non_zero_cardinality_dims.push_back(h_F->cardinalities[dim]);
     }
+    // else{
+    //   non_zero_cardinality_dims.push_back(h_F->cardinalities[dim]);
+    // }
   }
 
-  std::cout << "non_zero_cardinality_dims" << std::endl;
-  for ( size_t j=0; j<non_zero_cardinality_dims.size(); j++){
-    std::cout << non_zero_cardinality_dims.at(j) << std::endl;
-  }
+  // std::cout << "non_zero_cardinality_dims" << std::endl;
+  // for ( size_t j=0; j<non_zero_cardinality_dims.size(); j++){
+  //   std::cout << non_zero_cardinality_dims.at(j) << std::endl;
+  // }
 
 
   std::cout << "zero_cardinality_dims" << std::endl;
@@ -370,6 +371,10 @@ __global__ void contractFintoC(size_t ndims,
 
       size_t F_ind = 0;
       for ( size_t dim=0 ; dim<ndims; dim++){
+	if ( d_strides_F[dim] == 0 ){
+	  continue;
+	}
+
         if ( d_strides_C[dim] == 0 ){
           F_ind += d_strides_F[dim] * d_zero_cardinality_dim_tuples_C[iter];
 	  //cuPrintf();
@@ -520,6 +525,14 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   }
 
   plhs[0] = mxCreateNumericArray(non_zero_dim_number,argMatDims,mxDOUBLE_CLASS,mxREAL);
+
+  // mwSize alldims[ndims];
+  // for (size_t i=0; i<ndims; i++){  
+  //   alldims[i]=((double*)mxGetData(m_C_card))[i];
+  // }
+
+  // plhs[0] = mxCreateNumericArray(ndims,alldims,mxDOUBLE_CLASS,mxREAL);
+
   double* m_C = (double*) mxGetPr(plhs[0]);
 
   ///////////////////////////////////////////////////////////////////////////////////////////
@@ -568,8 +581,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   // if no contraction is required, result is already stored in F, return that
   bool got_zeros = false;
   for ( size_t dim=0; dim<ndims; dim++){
-    if ( h_C.cardinalities[dim] == 0 ){
-      //std::cout << " GOT ZEROS found zero on h_C dimension " << dim << std::endl;
+    if ( h_C.cardinalities[dim] == 0 && h_F.cardinalities[dim] != 0){
+      std::cout << " GOT ZEROS found zero on h_C dimension " << dim << std::endl;
       got_zeros = true;
       break;
     }
