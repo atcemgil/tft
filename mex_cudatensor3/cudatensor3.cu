@@ -60,7 +60,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   // assign cardinalities for the tensor objects and init cur_ind values
   size_t cum_sum=1;
   for (size_t i=0; i<h_ct->ndims; i++){
-    if ( tensor_card[i] != 0 ){ 
+    if ( tensor_card[i] != 0 ){
       elnum *= tensor_card[i];
     }
 
@@ -153,7 +153,7 @@ void gen_range_permutation_helper(std::vector<size_t> iter_dims, std::vector<siz
       tmp_vec.push_back(i);
       std::cout << " tmp_vec " << std::endl;
       for ( size_t j=0; j<tmp_vec.size(); j++){
-	std::cout << tmp_vec.at(j) << std::endl;
+        std::cout << tmp_vec.at(j) << std::endl;
       }
       gen_range_permutation_helper( iter_dims, tmp_vec, acc );
     }
@@ -244,9 +244,9 @@ dev_ptrs prepareDeviceParameters(size_t* h_full_cardinalities, size_t ndims, ct*
 
   dp.zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
   size_t* h_zero_cardinality_dim_tuples_C = gen_range_permutation(zero_cardinality_dims,
-								  &(dp.zero_cardinality_dim_tuples_C_element_number));
-  cutilSafeCall(cudaMalloc((void**)&(dp.d_zero_cardinality_dim_tuples_C), 
-			   sizeof(size_t)*dp.zero_cardinality_dim_tuples_C_element_number));
+                                                                  &(dp.zero_cardinality_dim_tuples_C_element_number));
+  cutilSafeCall(cudaMalloc((void**)&(dp.d_zero_cardinality_dim_tuples_C),
+                           sizeof(size_t)*dp.zero_cardinality_dim_tuples_C_element_number));
   cutilSafeCall(cudaMemcpy(dp.d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
                            sizeof(size_t)*dp.zero_cardinality_dim_tuples_C_element_number, cudaMemcpyHostToDevice));
 
@@ -333,12 +333,12 @@ __global__ void contractFintoC(size_t ndims,
     size_t C_ind=0;
     for ( size_t dim=ndims-1; ; dim--){
       if (d_strides_C[dim] != 0){
-	if ( tid / d_strides_C[dim] > 0 ){
-	  d_inds_C[dim] = tid / d_strides_C[dim];
-	  tid -= d_inds_C[dim]*d_strides_C[dim];
-	}else{
-	  d_inds_C[dim] = 0;
-	}
+        if ( tid / d_strides_C[dim] > 0 ){
+          d_inds_C[dim] = tid / d_strides_C[dim];
+          tid -= d_inds_C[dim]*d_strides_C[dim];
+        }else{
+          d_inds_C[dim] = 0;
+        }
       }
 
 
@@ -348,13 +348,13 @@ __global__ void contractFintoC(size_t ndims,
       // size_t tmp1= d_inds_C[dim];
       // cuPrintf("dim %d C_ind %d d_strides_C %d d_inds_C %d\n",dim, C_ind, tmp, tmp1);
 
-      
+
       if(dim == 0) break;
     }
 
     // for(size_t i=0; i<ndims; i++){
-    // 	size_t tmp=d_inds_C[i];
-    // 	cuPrintf("d_inds_C %d\n",tmp);
+    //  size_t tmp=d_inds_C[i];
+    //  cuPrintf("d_inds_C %d\n",tmp);
     //   }
 
 
@@ -371,26 +371,26 @@ __global__ void contractFintoC(size_t ndims,
 
       size_t F_ind = 0;
       for ( size_t dim=0 ; dim<ndims; dim++){
-	if ( d_strides_F[dim] == 0 ){
-	  continue;
-	}
+        if ( d_strides_F[dim] == 0 ){
+          continue;
+        }
 
         if ( d_strides_C[dim] == 0 ){
           F_ind += d_strides_F[dim] * d_zero_cardinality_dim_tuples_C[iter];
-	  //cuPrintf();
+          //cuPrintf();
 
-	  size_t tmp = d_strides_F[dim] * d_zero_cardinality_dim_tuples_C[iter];
-	  size_t tmp1 = d_strides_F[dim];
-	  size_t tmp2 = d_zero_cardinality_dim_tuples_C[iter];
-	  //cuPrintf("F_ind val %d, stride %d, inds %d\n",tmp, tmp1, tmp2 );
+          size_t tmp = d_strides_F[dim] * d_zero_cardinality_dim_tuples_C[iter];
+          size_t tmp1 = d_strides_F[dim];
+          size_t tmp2 = d_zero_cardinality_dim_tuples_C[iter];
+          //cuPrintf("F_ind val %d, stride %d, inds %d\n",tmp, tmp1, tmp2 );
 
-	  iter++;
+          iter++;
         }else{
           F_ind += d_strides_F[dim] * d_inds_C[dim];
-	  size_t tmp = d_strides_F[dim] * d_inds_C[dim];
-	  size_t tmp1 = d_strides_F[dim];
-	  size_t tmp2 = d_inds_C[dim];
-	  //cuPrintf("F_ind else val %d, stride %d, inds %d\n",tmp, tmp1, tmp2 );
+          size_t tmp = d_strides_F[dim] * d_inds_C[dim];
+          size_t tmp1 = d_strides_F[dim];
+          size_t tmp2 = d_inds_C[dim];
+          //cuPrintf("F_ind else val %d, stride %d, inds %d\n",tmp, tmp1, tmp2 );
         }
       }
 
@@ -465,8 +465,8 @@ void increment_cur_index(size_t ndims, size_t* h_full_cardinalities, size_t* glo
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
   std::cout << "mex: found " << nrhs << " number of arguments " << std::endl;
-  if (nrhs!=5){
-    std::cout << "mex: cudatensor3 requires 5 arguments. A, dimensions of A, B, dimensions of B, dimensions of C " << std::endl;
+  if (nrhs!=6){
+    std::cout << "mex: cudatensor3 requires 5 arguments. A, dimensions of A, B, dimensions of B, dimensions of C, optype " << std::endl;
     return;
   }
 
@@ -477,6 +477,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   const mxArray* m_B_card = prhs[3];
 
   const mxArray* m_C_card = prhs[4];
+
+  double optype = prhs[5];
 
   // assume same size cardinalities for all objects
   size_t ndims = mxGetNumberOfElements(m_A_card);
@@ -527,7 +529,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   plhs[0] = mxCreateNumericArray(non_zero_dim_number,argMatDims,mxDOUBLE_CLASS,mxREAL);
 
   // mwSize alldims[ndims];
-  // for (size_t i=0; i<ndims; i++){  
+  // for (size_t i=0; i<ndims; i++){
   //   alldims[i]=((double*)mxGetData(m_C_card))[i];
   // }
 
@@ -538,91 +540,101 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   ///////////////////////////////////////////////////////////////////////////////////////////
 
 
-  // prepare host and device memory for tensors  ///////////////////////////////////////////
+  if ( optype== 1 ) {
 
-  ct h_A, h_B, h_C, h_F;
-  prepareHostTensor(&h_A, m_A_data, m_A_card, "Host A");
-  prepareHostTensor(&h_B, m_B_data, m_B_card, "Host B");
-  // NULL initiates data with zero
-  prepareHostTensorFromCpp(&h_F, NULL, h_full_cardinalities, ndims, "Host F");
+    // prepare host and device memory for tensors  ///////////////////////////////////////////
 
-  // read C cardinalities from matlab side
-  size_t* tmp_arr = (size_t*) malloc(sizeof(size_t)*ndims);
-  for ( size_t i=0; i<ndims; i++) tmp_arr[i] = (size_t) (((double*) mxGetData(m_C_card))[i]);
+    ct h_A, h_B, h_C, h_F;
+    prepareHostTensor(&h_A, m_A_data, m_A_card, "Host A");
+    prepareHostTensor(&h_B, m_B_data, m_B_card, "Host B");
+    // NULL initiates data with zero
+    prepareHostTensorFromCpp(&h_F, NULL, h_full_cardinalities, ndims, "Host F");
 
-  prepareHostTensorFromCpp(&h_C, NULL, tmp_arr, ndims, "Host C");
+    // read C cardinalities from matlab side
+    size_t* tmp_arr = (size_t*) malloc(sizeof(size_t)*ndims);
+    for ( size_t i=0; i<ndims; i++) tmp_arr[i] = (size_t) (((double*) mxGetData(m_C_card))[i]);
 
-  dev_ptrs dp = prepareDeviceParameters(h_full_cardinalities, ndims, &h_A, &h_B, &h_C, &h_F);
+    prepareHostTensorFromCpp(&h_C, NULL, tmp_arr, ndims, "Host C");
 
-
-  ///////////////////////////////////////////////////////////////////////////////////////////
-
-
-  // run kernels //////////////////////////////////////////////////////////////////////////////
+    dev_ptrs dp = prepareDeviceParameters(h_full_cardinalities, ndims, &h_A, &h_B, &h_C, &h_F);
 
 
-  unsigned int timer = 0;
-  cutilCheckError(cutCreateTimer(&timer));
-  cutilCheckError(cutStartTimer(timer));
+    ///////////////////////////////////////////////////////////////////////////////////////////
 
-  cudaPrintfInit();
 
-  std::cout << " Running kernels " << std::endl << std::endl;
+    // run kernels //////////////////////////////////////////////////////////////////////////////
 
-  //pairmul<<<100,100>>>(d_pairmul, C_elnum*2, d_pairmul_result);
 
-  // generate the full output
-  genFullResult<<<1,100>>>(dp.d_full_cardinalities, ndims, dp.d_strides_A, dp.d_strides_B, dp.d_strides_F, dp.d_data_A, dp.d_data_B, dp.d_data_F, h_F.element_number);
+    unsigned int timer = 0;
+    cutilCheckError(cutCreateTimer(&timer));
+    cutilCheckError(cutStartTimer(timer));
 
-  // test full result
-  cutilSafeCall(cudaMemcpy(h_F.data, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
-  print_ct("genFullResult", &h_F,true);
+    cudaPrintfInit();
 
-  // if no contraction is required, result is already stored in F, return that
-  bool got_zeros = false;
-  for ( size_t dim=0; dim<ndims; dim++){
-    if ( h_C.cardinalities[dim] == 0 && h_F.cardinalities[dim] != 0){
-      std::cout << " GOT ZEROS found zero on h_C dimension " << dim << std::endl;
-      got_zeros = true;
-      break;
+    std::cout << " Running kernels " << std::endl << std::endl;
+
+    //pairmul<<<100,100>>>(d_pairmul, C_elnum*2, d_pairmul_result);
+
+    // generate the full output
+    genFullResult<<<1,100>>>(dp.d_full_cardinalities, ndims, dp.d_strides_A, dp.d_strides_B, dp.d_strides_F, dp.d_data_A, dp.d_data_B, dp.d_data_F, h_F.element_number);
+
+    // test full result
+    cutilSafeCall(cudaMemcpy(h_F.data, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
+    print_ct("genFullResult", &h_F,true);
+
+    // if no contraction is required, result is already stored in F, return that
+    bool got_zeros = false;
+    for ( size_t dim=0; dim<ndims; dim++){
+      if ( h_C.cardinalities[dim] == 0 && h_F.cardinalities[dim] != 0){
+        std::cout << " GOT ZEROS found zero on h_C dimension " << dim << std::endl;
+        got_zeros = true;
+        break;
+      }
     }
-  }
 
-  if ( got_zeros ){
-    // contract on required dimensions
-    std::cout << "performing contaction" << std::endl;
-    contractFintoC<<<1,10>>>(ndims, 
-			    dp.d_strides_F, dp.d_strides_C, 
-			    dp.d_data_F, dp.d_data_C,
-			    h_C.element_number, 
-			    dp.d_zero_cardinality_dim_tuples_C, 
-			    dp.zero_cardinality_dim_tuple_size_C, 
-			    dp.zero_cardinality_dim_tuples_C_element_number);
-  }
-
-
-  // check if kernel execution generated and error
-  cutilCheckMsg("Kernel execution failed");
-  cudaThreadSynchronize();
-  // stop and destroy timer
-  cutilCheckError(cutStopTimer(timer));
-  cutilCheckError(cutDeleteTimer(timer));
-
-  cudaPrintfDisplay(stdout, true);
-  cudaPrintfEnd();
+    if ( got_zeros ){
+      // contract on required dimensions
+      std::cout << "performing contaction" << std::endl;
+      contractFintoC<<<1,10>>>(ndims,
+                               dp.d_strides_F, dp.d_strides_C,
+                               dp.d_data_F, dp.d_data_C,
+                               h_C.element_number,
+                               dp.d_zero_cardinality_dim_tuples_C,
+                               dp.zero_cardinality_dim_tuple_size_C,
+                               dp.zero_cardinality_dim_tuples_C_element_number);
+    }
 
 
-  if ( got_zeros ){
-    cutilSafeCall(cudaMemcpy(m_C, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
-    cutilSafeCall(cudaMemcpy(h_C.data, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
-    print_ct("result on C side (after)", &h_C,true);
+    // check if kernel execution generated and error
+    cutilCheckMsg("Kernel execution failed");
+    cudaThreadSynchronize();
+    // stop and destroy timer
+    cutilCheckError(cutStopTimer(timer));
+    cutilCheckError(cutDeleteTimer(timer));
+
+    cudaPrintfDisplay(stdout, true);
+    cudaPrintfEnd();
+
+
+    if ( got_zeros ){
+      cutilSafeCall(cudaMemcpy(m_C, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
+      cutilSafeCall(cudaMemcpy(h_C.data, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
+      print_ct("result on C side (after)", &h_C,true);
+    }else{
+      cutilSafeCall(cudaMemcpy(m_C, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
+    }
+
+    std::cout << "plhs elnum " << mxGetNumberOfElements(plhs[0]) << std::endl;
+    std::cout << "C_elnum " << C_elnum << std::endl;
+
+    cudaThreadExit();
+    ///////////////////////////////////////////////////////////////////////////////////////////
+
   }else{
-    cutilSafeCall(cudaMemcpy(m_C, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
+
+    // operate on CPU
+    
+    
+
   }
-
-  std::cout << "plhs elnum " << mxGetNumberOfElements(plhs[0]) << std::endl;
-  std::cout << "C_elnum " << C_elnum << std::endl;
-
-  cudaThreadExit();
-  ///////////////////////////////////////////////////////////////////////////////////////////
 }
