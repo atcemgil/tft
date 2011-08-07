@@ -11,8 +11,7 @@ function [C, full_result] = tensormul(A,A_card,B,B_card,C_card, VERBOSITY, prev_
     dims=numel(A_card);
 
     max_cardinalities = max(A_card,B_card);
-    % if A,B do not have data on a dimension, then C can not have it either
-    %max_cardinalities = max(max_cardinalities,C_card);
+    max_cardinalities = max(max_cardinalities,C_card);
     
     % matlab does not like zero indices
     max_cardinalities( max_cardinalities == 0 ) = 1;
