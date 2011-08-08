@@ -87,7 +87,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   if (data == NULL){
     //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
     h_ct->data = (double*) malloc(h_ct->mem_size);
-    for (size_t i=0; i<h_ct->element_number; i++ ) h_ct->data[i]=(double)i;
+    for (size_t i=0; i<h_ct->element_number; i++ ) h_ct->data[i]=(double)0;
   }else{
     h_ct->data = (double*)malloc( h_ct->mem_size );
     memcpy(h_ct->data, data, h_ct->mem_size);
@@ -184,8 +184,8 @@ size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnu
 }
 
 
-
-dev_ptrs prepareDeviceParameters(size_t* h_full_cardinalities, size_t ndims, ct* h_A, ct* h_B, ct* h_C, ct* h_F){
+dev_ptrs prepareDeviceParameters(size_t* h_full_cardinalities, size_t ndims, ct* h_A, ct* h_B, ct* h_C, ct* h_F,
+                                 size_t zero_cardinality_dims_elnum, size_t h_zero_cardinality_dim_tuples_C_element_number, size_t* h_zero_cardinality_dim_tuples_C){
   dev_ptrs dp;
 
   cutilSafeCall(cudaMalloc((void**)&(dp.d_full_cardinalities), sizeof(size_t)*ndims));
@@ -219,32 +219,12 @@ dev_ptrs prepareDeviceParameters(size_t* h_full_cardinalities, size_t ndims, ct*
   cutilSafeCall(cudaMemcpy(dp.d_data_C, h_C->data, h_C->mem_size, cudaMemcpyHostToDevice));
 
 
-  std::vector<size_t> zero_cardinality_dims;
-  //std::vector<size_t> non_zero_cardinality_dims;
-  for ( size_t dim=0; dim<ndims; dim++ ){
-    if ( h_C->cardinalities[dim] == 0 && h_F->cardinalities[dim] != 0 ){
-      zero_cardinality_dims.push_back(h_F->cardinalities[dim]);
-    }
-    // else{
-    //   non_zero_cardinality_dims.push_back(h_F->cardinalities[dim]);
-    // }
-  }
-
-  // std::cout << "non_zero_cardinality_dims" << std::endl;
-  // for ( size_t j=0; j<non_zero_cardinality_dims.size(); j++){
-  //   std::cout << non_zero_cardinality_dims.at(j) << std::endl;
-  // }
 
 
-  std::cout << "zero_cardinality_dims" << std::endl;
-  for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
-    std::cout << zero_cardinality_dims.at(j) << std::endl;
-  }
+  dp.zero_cardinality_dim_tuple_size_C = zero_cardinality_dims_elnum;
+  dp.zero_cardinality_dim_tuples_C_element_number = h_zero_cardinality_dim_tuples_C_element_number;
 
 
-  dp.zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
-  size_t* h_zero_cardinality_dim_tuples_C = gen_range_permutation(zero_cardinality_dims,
-                                                                  &(dp.zero_cardinality_dim_tuples_C_element_number));
   cutilSafeCall(cudaMalloc((void**)&(dp.d_zero_cardinality_dim_tuples_C),
                            sizeof(size_t)*dp.zero_cardinality_dim_tuples_C_element_number));
   cutilSafeCall(cudaMemcpy(dp.d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
@@ -415,11 +395,27 @@ double get_element(ct* h_ct, size_t* global_index, char* str=""){
   size_t cur_ind=0;
   for (size_t dim=0; dim<h_ct->ndims; dim++){
     std::cout << global_index[dim] << " ";
-    cur_ind += h_ct->strides[dim] * global_index[dim];
+    if(h_ct->strides[dim] != 0 )
+      cur_ind += h_ct->strides[dim] * global_index[dim];
   }
   std::cout << " index " << cur_ind << " val " << h_ct->data[cur_ind]
             << std::endl;
   return h_ct->data[cur_ind];
+}
+
+
+void set_element(ct* h_ct, size_t* global_index, double val, char* str=""){
+  std::cout << "set_element: " << str << " cur_ind ";
+  size_t cur_ind=0;
+  for (size_t dim=0; dim<h_ct->ndims; dim++){
+    std::cout << global_index[dim] << " ";
+    if(h_ct->strides[dim] != 0 )
+      cur_ind += h_ct->strides[dim] * global_index[dim];
+  }
+  std::cout << " index " << cur_ind << " prev val " << h_ct->data[cur_ind]
+            << " new val " << val
+            << std::endl;
+  h_ct->data[cur_ind] = val;
 }
 
 
@@ -428,7 +424,7 @@ double get_element(ct* h_ct, size_t* global_index, char* str=""){
 void increment_cur_index(size_t ndims, size_t* h_full_cardinalities, size_t* global_index){
   for (size_t dim=0; dim<ndims; dim++){
     // if we have NOT reached limit of this dimension
-    if( global_index[dim] != (h_full_cardinalities[dim]-1) ){
+    if( global_index[dim] != (h_full_cardinalities[dim]-1) && h_full_cardinalities[dim] != 0 ){
       // increment this dimension
       global_index[dim]++;
       break;
@@ -436,7 +432,8 @@ void increment_cur_index(size_t ndims, size_t* h_full_cardinalities, size_t* glo
       // we have reached limit of this dimension
 
       // if next dimension is at limit as well, skip this dimension, operation will take place in next dimension
-      if( dim != (ndims-1) && global_index[dim+1] == (h_full_cardinalities[dim+1]-1)){
+      if( dim != (ndims-1) &&
+          (global_index[dim+1] == (h_full_cardinalities[dim+1]-1) || h_full_cardinalities[dim+1] == 0 ) ){
         //std::cout << "skip" << std::endl;
         continue;
       }else{
@@ -478,7 +475,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
   const mxArray* m_C_card = prhs[4];
 
-  double optype = prhs[5];
+  const mxArray* optype = prhs[5];
 
   // assume same size cardinalities for all objects
   size_t ndims = mxGetNumberOfElements(m_A_card);
@@ -491,7 +488,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                  ((double *)mxGetData(m_B_card))[i] ) ,
                                        ((double *)mxGetData(m_C_card))[i] );
   }
-
 
 
   // prepare output tensor in matlab  //////////////////////////////////////////////////////
@@ -539,24 +535,68 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
+  // prepare host memory for tensors  ///////////////////////////////////////////////////////
 
-  if ( optype== 1 ) {
+  ct h_A, h_B, h_C, h_F;
+  prepareHostTensor(&h_A, m_A_data, m_A_card, "Host A");
+  prepareHostTensor(&h_B, m_B_data, m_B_card, "Host B");
+  // NULL initiates data with zero
+  prepareHostTensorFromCpp(&h_F, NULL, h_full_cardinalities, ndims, "Host F");
 
-    // prepare host and device memory for tensors  ///////////////////////////////////////////
+  // read C cardinalities from matlab side
+  size_t* tmp_arr = (size_t*) malloc(sizeof(size_t)*ndims);
+  for ( size_t i=0; i<ndims; i++) tmp_arr[i] = (size_t) (((double*) mxGetData(m_C_card))[i]);
 
-    ct h_A, h_B, h_C, h_F;
-    prepareHostTensor(&h_A, m_A_data, m_A_card, "Host A");
-    prepareHostTensor(&h_B, m_B_data, m_B_card, "Host B");
-    // NULL initiates data with zero
-    prepareHostTensorFromCpp(&h_F, NULL, h_full_cardinalities, ndims, "Host F");
+  prepareHostTensorFromCpp(&h_C, NULL, tmp_arr, ndims, "Host C");
 
-    // read C cardinalities from matlab side
-    size_t* tmp_arr = (size_t*) malloc(sizeof(size_t)*ndims);
-    for ( size_t i=0; i<ndims; i++) tmp_arr[i] = (size_t) (((double*) mxGetData(m_C_card))[i]);
 
-    prepareHostTensorFromCpp(&h_C, NULL, tmp_arr, ndims, "Host C");
 
-    dev_ptrs dp = prepareDeviceParameters(h_full_cardinalities, ndims, &h_A, &h_B, &h_C, &h_F);
+  // prepare range permutation vector //////////////////////////////////////////////////////
+  std::vector<size_t> zero_cardinality_dims;
+  //std::vector<size_t> non_zero_cardinality_dims;
+  for ( size_t dim=0; dim<ndims; dim++ ){
+    if ( h_C.cardinalities[dim] == 0 && h_F.cardinalities[dim] != 0 ){
+      zero_cardinality_dims.push_back(h_F.cardinalities[dim]);
+    }
+    // else{
+    //   non_zero_cardinality_dims.push_back(h_F.cardinalities[dim]);
+    // }
+  }
+
+  // std::cout << "non_zero_cardinality_dims" << std::endl;
+  // for ( size_t j=0; j<non_zero_cardinality_dims.size(); j++){
+  //   std::cout << non_zero_cardinality_dims.at(j) << std::endl;
+  // }
+
+
+  std::cout << "zero_cardinality_dims" << std::endl;
+  for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
+    std::cout << zero_cardinality_dims.at(j) << std::endl;
+  }
+
+
+  size_t h_zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
+
+
+  size_t h_zero_cardinality_dim_tuples_C_element_number; // set by gen_range_permutation
+
+  size_t* h_zero_cardinality_dim_tuples_C =
+    gen_range_permutation(zero_cardinality_dims,
+                          &(h_zero_cardinality_dim_tuples_C_element_number));
+
+
+
+
+
+
+  if ( ((double*)mxGetData(optype))[0] == 0 ) {
+
+    // prepare device memory for tensors  /////////////////////////////////////////////////////
+
+    dev_ptrs dp = prepareDeviceParameters(h_full_cardinalities, ndims, &h_A, &h_B, &h_C, &h_F,
+                                          h_zero_cardinality_dim_tuple_size_C,
+                                          h_zero_cardinality_dim_tuples_C_element_number,
+                                          h_zero_cardinality_dim_tuples_C);
 
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -630,11 +670,121 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     cudaThreadExit();
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-  }else{
 
-    // operate on CPU
-    
-    
 
+
+  }else{  // operate on CPU
+
+
+
+    // generate full tensor
+    size_t global_index[ndims];
+    for ( size_t i=0; i<ndims; i++)
+      global_index[i] = 0;
+
+    for ( size_t F_ind = 0; F_ind < h_F.element_number; F_ind++){
+      set_element(&h_F, global_index,
+                  get_element(&h_A,global_index) * get_element(&h_B, global_index) );
+
+      increment_cur_index(ndims, h_full_cardinalities, global_index);
+    }
+
+    print_ct("C: generate full tensor", &h_F,true);
+
+
+
+    // if no contraction is required, result is already stored in F, return that
+    bool got_zeros = false;
+    for ( size_t dim=0; dim<ndims; dim++){
+      if ( h_C.cardinalities[dim] == 0 && h_F.cardinalities[dim] != 0){
+        std::cout << " GOT ZEROS found zero on h_C dimension " << dim << std::endl;
+        got_zeros = true;
+        break;
+      }
+    }
+
+    if ( got_zeros ){
+
+
+      // contract on necessary dimensions
+      size_t C_index[ndims];
+      for ( size_t i=0; i<ndims; i++)
+        C_index[i] = 0;
+
+      for ( size_t C_ind = 0; C_ind < h_C.element_number; C_ind++){
+        std::cout << "C_ind " <<  C_ind << std::endl;
+
+        // calculate contraction value for this index of output tensor C
+
+        // d_zero_cardinality_dim_tuples_C contains tuples of size zero_cardinality_dim_tuple_size_C
+        // these correspond to the set of all possible indices over zero cardinality indices of tensor C
+
+        std:: cout << "h_zero_cardinality_dim_tuples_C_element_number "
+                   << h_zero_cardinality_dim_tuples_C_element_number
+                   << std::endl;
+
+        for ( size_t iter=0;
+              iter < h_zero_cardinality_dim_tuples_C_element_number; ){
+          //std::cout << " iter  " << iter << std::endl;
+
+          size_t F_ind = 0;
+          for ( size_t dim=0 ; dim<ndims; dim++){
+            //std::cout << " iter:dim " << dim << std::endl;
+            //std::cout << " h_F.strides[dim] " << h_F.strides[dim] << std::endl;
+            if ( h_F.strides[dim] == 0 ){
+              continue;
+            }
+
+            if ( h_C.strides[dim] == 0 ){
+              F_ind += h_F.strides[dim] * h_zero_cardinality_dim_tuples_C[iter];
+
+              // std::cout << "F_ind val " << h_F.strides[dim] * h_zero_cardinality_dim_tuples_C[iter]
+              //              << " h_F.strides[dim] " << h_F.strides[dim]
+              //              << " h_zero_cardinality_dim_tuples_C[iter] " << h_zero_cardinality_dim_tuples_C[iter]
+              //              << " stride " << h_F.strides[dim]
+              //              << " inds " << h_zero_cardinality_dim_tuples_C[iter]
+              //              << std::endl;
+
+              iter++;
+            }else{
+              F_ind += h_F.strides[dim] * C_index[dim];
+              // size_t tmp = h_F.strides[dim] * C_index[dim];
+              // size_t tmp1 = h_F.strides[dim];
+              // size_t tmp2 = C_index[dim];
+              // std::cout << "F_ind else val " << h_F.strides[dim] * C_index[dim]
+              //              << " h_F.strides[dim] " << h_F.strides[dim]
+              //              << " C_index[dim] " << C_index[dim]
+              //              << " stride " << h_F.strides[dim]
+              //              << " inds " << C_index[dim]
+              //              << std::endl;
+            }
+
+            //std::cout << " F_ind " <<  F_ind << std::endl;
+          }
+
+          //std::cout << "F_ind " << F_ind << " d_F[F_ind] " << h_F.data[F_ind] << std::endl;
+          h_C.data[C_ind] += h_F.data[F_ind];
+
+        }
+
+        // store this element of d_C
+        std::cout << "C_ind " << C_ind
+                  << std::endl;
+
+	get_element(&h_C, C_index);
+        increment_cur_index(ndims, h_C.cardinalities, C_index);
+	
+      }
+
+
+
+      memcpy(m_C, h_C.data, h_C.mem_size);
+      std::cout << "plhs elnum " << mxGetNumberOfElements(plhs[0]) << std::endl;
+      std::cout << "C_elnum " << C_elnum << std::endl;
+    }else{
+      memcpy(m_C, h_F.data, h_F.mem_size);
+    }
+    print_ct("C: contraction result", &h_C, true);
   }
+
 }
