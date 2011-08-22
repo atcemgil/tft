@@ -4,11 +4,14 @@ mex -largeArrayDims cudatensor3.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.
 
 rand('state',0);
 
-dim=100;
+dim=300;
 
 A=magic(dim);
 B=round(rand(dim,dim,dim)*10);
 
+% GPU code
+tic; C=cudatensor3(A,[0 dim dim],B,[dim dim dim], [dim dim 0], 0); toc;
+% C code
 tic; C=cudatensor3(A,[0 dim dim],B,[dim dim dim], [dim dim 0], 1); toc;
 
 display('mex result is')
