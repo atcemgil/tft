@@ -4,10 +4,10 @@ mex -largeArrayDims cudatensor3.o cutil/bank_checker.cpp.o cutil/cmd_arg_reader.
 
 rand('state',0);
 
-dim=2
+dim=100;
 
-A=magic(dim)
-B=round(rand(dim,dim,dim)*10)
+A=magic(dim);
+B=round(rand(dim,dim,dim)*10);
 
 tic; C=cudatensor3(A,[0 dim dim],B,[dim dim dim], [dim dim 0], 1); toc;
 
