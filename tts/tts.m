@@ -35,9 +35,10 @@
 function [] = tts(opnumber)
 % tts function
 
-    TEST=3;
+    TEST=2;
     % by specifying TEST=1 and a test folder, can perform checks
     %               TEST=2 can perform tests with the cudatensor3 output
+    %               TEST=3 can perform tests with the C code output
 
     TEST_FOLDER='set4/'; % do not forget the last /
 
@@ -61,12 +62,15 @@ function [] = tts(opnumber)
 
 
 
-
-
-
     if TEST~=0
-        display('test mode:');
+        display(['test mode:' num2str(TEST));
         display(['sourcing test set from folder: ' TEST_FOLDER]);
+        if TEST == 1
+            display('testing folder contents with matlab output')
+        elseif TEST == 2
+            display('testing folder contents with GPU output')
+        elseif TEST == 3
+            display('testing folder contents with C code output')
     end
 
     if OUTPUT==1
