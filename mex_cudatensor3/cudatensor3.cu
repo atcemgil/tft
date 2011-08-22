@@ -21,6 +21,9 @@
 #define COUT false
 #define PRINT_CT false
 
+#define NUM_BLOCKS 53000
+#define THREADS_FOR_BLOCK 512
+
 void print_ct(char* txt, ct* ct, bool printdata=false){ //bool print_config=false,
 
   std::cout << txt << std::endl;
@@ -270,7 +273,7 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
     // for each element of the full result tensor
     //      multiply corresponding elements of input tensors A and B
 
-    //cuPrintf("tid %d \n",tid);
+    cuPrintf("tid %d \n",tid);
 
     size_t F_ind=0;
     size_t A_ind=0;
@@ -630,10 +633,10 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if ( COUT ) std::cout << " Running kernels " << std::endl << std::endl;
 
-    //pairmul<<<100,100>>>(d_pairmul, C_elnum*2, d_pairmul_result);
+    //pairmul<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(d_pairmul, C_elnum*2, d_pairmul_result);
 
     // generate the full output
-    genFullResult<<<1,100>>>(dp.d_full_cardinalities, ndims, dp.d_strides_A, dp.d_strides_B, dp.d_strides_F, dp.d_data_A, dp.d_data_B, dp.d_data_F, h_F.element_number);
+    genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(dp.d_full_cardinalities, ndims, dp.d_strides_A, dp.d_strides_B, dp.d_strides_F, dp.d_data_A, dp.d_data_B, dp.d_data_F, h_F.element_number);
 
     // test full result
     cutilSafeCall(cudaMemcpy(h_F.data, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
@@ -652,13 +655,13 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if ( got_zeros ){
       // contract on required dimensions
       if ( COUT ) std::cout << "performing contaction" << std::endl;
-      contractFintoC<<<1,10>>>(ndims,
-                               dp.d_strides_F, dp.d_strides_C,
-                               dp.d_data_F, dp.d_data_C,
-                               h_C.element_number,
-                               dp.d_zero_cardinality_dim_tuples_C,
-                               dp.zero_cardinality_dim_tuple_size_C,
-                               dp.zero_cardinality_dim_tuples_C_element_number);
+      contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
+						       dp.d_strides_F, dp.d_strides_C,
+						       dp.d_data_F, dp.d_data_C,
+						       h_C.element_number,
+						       dp.d_zero_cardinality_dim_tuples_C,
+						       dp.zero_cardinality_dim_tuple_size_C,
+						       dp.zero_cardinality_dim_tuples_C_element_number);
     }
 
 

@@ -35,7 +35,7 @@
 function [] = tts(opnumber)
 % tts function
 
-    TEST=3;
+    TEST=2;
     % by specifying TEST=1 and a test folder, can perform checks
     %               TEST=2 can perform tests with the cudatensor3 output
     %               TEST=3 can perform tests with the C code output
