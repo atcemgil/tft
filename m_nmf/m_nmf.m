@@ -19,9 +19,9 @@ function [Z1, Z2] = m_nmf(iter, Z1, Z2, M, X, diff_limit)
         A = X./X_hat;
         A = M.*A;
         D1 = A' * Z1;
-        D2 = M * Z1;
+        D2 = M' * Z1;
         D1 = D1 ./ D2;
-        Z2 = Z2 .* D1;
+        Z2 = Z2 .* D1';
 
         if get_mean_diff(X,Z1*Z2) < diff_limit
             return
