@@ -13,9 +13,11 @@ for dim=test_range
     B=round(rand(dim,dim,dim)*10);
 
     % GPU code
-    tic; C_gpu_code=cudatensor3(A,[0 dim dim],B,[dim dim dim], [dim dim 0], 0); t_gpu(i)=toc;
+    tic; C_gpu_code=cudatensor3(A,[0 dim dim],B,[dim dim dim], ...
+                                [dim dim 0], 0, 1); t_gpu(i)=toc;
     % C code
-    tic; C_c_code=cudatensor3(A,[0 dim dim],B,[dim dim dim], [dim dim 0], 1); t_c(i)=toc;
+    tic; C_c_code=cudatensor3(A,[0 dim dim],B,[dim dim dim], ...
+                              [dim dim 0], 1, 1); t_c(i)=toc;
 
     diff = C_gpu_code ~= C_c_code;
     diff_sum=0;

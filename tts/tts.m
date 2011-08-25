@@ -35,7 +35,7 @@
 function [] = tts(opnumber)
 % tts function
 
-    TEST=2;
+    TEST=3;
     % by specifying TEST=1 and a test folder, can perform checks
     %               TEST=2 can perform tests with the cudatensor3 output
     %               TEST=3 can perform tests with the C code output
@@ -127,11 +127,11 @@ function [] = tts(opnumber)
                     elseif TEST == 2
                         % perform operation on gpu
                         addpath('../mex_cudatensor3')
-                        tic; op=cudatensor3(A,A_crd,B,B_crd,C_crd,0); toc;
+                        tic; op=cudatensor3(A,A_crd,B,B_crd,C_crd,0,1); toc;
                     elseif TEST == 3
                         % perform operation on cpu with C code
                         addpath('../mex_cudatensor3')
-                        tic; op=cudatensor3(A,A_crd,B,B_crd,C_crd,1); toc;
+                        tic; op=cudatensor3(A,A_crd,B,B_crd,C_crd,1,1); toc;
                     end
 
 
