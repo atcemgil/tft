@@ -1,5 +1,6 @@
-function [Z1, Z2] = m_nmf(iter, Z1, Z2, M, X, diff_limit)
+function [Z1, Z2, kl_data] = m_nmf(iter, Z1, Z2, M, X, diff_limit)
 
+    kl_data = zeros(iter,1);
     
     for i=1:iter
         % find new Z1 estimate
@@ -23,6 +24,8 @@ function [Z1, Z2] = m_nmf(iter, Z1, Z2, M, X, diff_limit)
         D1 = D1 ./ D2;
         Z2 = Z2 .* D1';
 
+        kl_data(i)=get_KL_div(X,Z1*Z2);
+        
         if get_mean_diff(X,Z1*Z2) < diff_limit
             return
         end
