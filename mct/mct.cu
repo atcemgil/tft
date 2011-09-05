@@ -491,7 +491,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
   if ( COUT ) std::cout << "mex: found " << nrhs << " number of arguments " << std::endl;
   if (nrhs!=7){
-    std::cout << "mex: cudatensor3 requires 5 arguments. A, dimensions of A, B, dimensions of B, dimensions of C, "
+    std::cout << "mex: mct requires 5 arguments. A, dimensions of A, B, dimensions of B, dimensions of C, "
               << " use_c_code(1 uses c,0 uses gpu), use_multiplication(1 uses multiplication, 0 uses division  "
               << std::endl;
     return;
