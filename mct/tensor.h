@@ -1,3 +1,8 @@
+#ifndef TENSOR_H
+#define TENSOR_H
+
+#include <cstring>
+
 // cuda tensor object
 struct ct{
   size_t ndims;
@@ -57,3 +62,5 @@ struct dev_ptrs{
   // total size of d_zero_cardinality_dim_tuples_C
   size_t zero_cardinality_dim_tuples_C_element_number;
 };
+
+#endif
