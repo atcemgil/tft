@@ -39,7 +39,7 @@ void print_ct(const char* txt, ct* ct, bool printdata){ //bool print_config=fals
 
 
 
-void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_card, char* txt){
+void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_card, const char* txt){
   h_ct->ndims = mxGetNumberOfElements(tensor_card); // assumes both objects of same size
   h_ct->cardinalities = (size_t*) malloc( sizeof(size_t) * mxGetNumberOfElements(tensor_card) );
   h_ct->strides = (size_t*) malloc( sizeof(size_t) * mxGetNumberOfElements(tensor_card) );
@@ -133,7 +133,7 @@ size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnu
 }
 
 
-void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, char* txt){
+void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, const char* txt){
   h_ct->ndims = ndims;
   h_ct->cardinalities = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
   h_ct->strides = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );

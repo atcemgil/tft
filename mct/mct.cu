@@ -15,9 +15,14 @@
 
 #include "mct_tensorop_utils.cuh"
 
+#include "mct_tensorop_gpu.cuh"
+#include "mct_tensorop_cpp.cuh"
+
 enum op_type {
-  tensor_op,
-  nmf_op,
+  tensor_gpu,
+  tensor_cpp,
+  nmf_gpu,
+  nmf_cpp,
   num_of_op_types
 };
 
@@ -43,12 +48,18 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   int status = mxGetString(prhs[0], op_name, buflen);
 
 
-  if (strcmp(op_name, "nmf") == 0){
-    std::cout << "selecting NMF operation" << std::endl;
-    opt=nmf_op;
-  }else if (strcmp(op_name, "tensor") == 0){
-    std::cout << "selecting tensor operation" << std::endl;
-    opt=tensor_op;
+  if (strcmp(op_name, "nmf_gpu") == 0){
+    std::cout << "selecting NMF operation on GPU" << std::endl;
+    opt=nmf_gpu;
+  }else if (strcmp(op_name, "nmf_cpp") == 0){
+    std::cout << "selecting tensor operation on CPU" << std::endl;
+    opt=nmf_cpp;
+  }else if (strcmp(op_name, "tensor_gpu") == 0){
+    std::cout << "selecting tensor operation on GPU" << std::endl;
+    opt=tensor_gpu;
+  }else if (strcmp(op_name, "tensor_cpp") == 0){
+    std::cout << "selecting tensor operation on CPU" << std::endl;
+    opt=tensor_cpp;
   }else{
     std::cout << "unknown operation: " << op_name << std::endl;
     // print help;
@@ -56,14 +67,14 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   }
 
 
-  if ( opt == nmf_op ){
+  if ( opt == nmf_gpu || opt == nmf_cpp ){
 
-  }else if ( opt == tensor_op ){
+  }else if ( opt == tensor_gpu || opt == tensor_cpp ){
 
-    if ( nrhs!= (7+1) ){
-      std::cout << "mct: tensor operation requires 7 arguments. "
-                << "A, dimensions of A, B, dimensions of B, dimensions of C, "
-                << " use_c_code(1 uses c,0 uses gpu), use_multiplication(1 uses multiplication, 0 uses division  "
+    if ( nrhs!= (6+1) ){
+      std::cout << "mct: tensor operation requires 6 arguments. "
+                << "A, dimensions of A, B, dimensions of B, dimensions of C,"
+                << " use_multiplication(1 uses multiplication, 0 uses division)"
                 << std::endl;
       return;
     }
@@ -76,9 +87,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     const mxArray* m_C_card = prhs[5];
 
-    size_t use_c_code = ((double*)mxGetData(prhs[6]))[0];
-
-    size_t use_multiplication = ((double *)mxGetData(prhs[7]))[0];
+    size_t use_multiplication = ((double *)mxGetData(prhs[6]))[0];
 
     // assume same size cardinalities for all objects
     size_t ndims = mxGetNumberOfElements(m_A_card);
@@ -166,8 +175,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // prepare host memory for tensors  ///////////////////////////////////////////////////////
 
     ct h_A, h_B, h_C, h_F;
-    prepareHostTensor(&h_A, m_A_data, m_A_card, "Host A");
-    prepareHostTensor(&h_B, m_B_data, m_B_card, "Host B");
+    prepareHostTensor(&h_A, m_A_data, m_A_card, (const char*) "Host A");
+    prepareHostTensor(&h_B, m_B_data, m_B_card, (const char*)"Host B");
     // NULL initiates data with zero
     prepareHostTensorFromCpp(&h_F, NULL, h_full_cardinalities, ndims, "Host F");
 
@@ -220,10 +229,10 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 
 
-    if ( use_c_code == 0 ) {
-      //mct_tensorop_gpu();
+    if ( opt == tensor_gpu ) {
+      mct_tensorop_gpu(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_full_cardinalities, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuple_size_C, use_multiplication);
     }else{  // operate on CPU
-      //mct_tensorop_c();
+      mct_tensorop_cpp(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_full_cardinalities, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
     }
   }
 }

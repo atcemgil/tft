@@ -5,8 +5,9 @@
  */
 
 #include "mct_tensorop_utils.cuh"
+#include "mct_tensorop_cpp.cuh"
 
-double get_element(const ct* h_ct, size_t* global_index, const char* str=""){
+double get_element(const ct* h_ct, size_t* global_index, const char* str){
   if ( COUT ) std::cout << "get_element: " << str << " cur_ind ";
   size_t cur_ind=0;
   for (size_t dim=0; dim<h_ct->ndims; dim++){
@@ -20,7 +21,7 @@ double get_element(const ct* h_ct, size_t* global_index, const char* str=""){
 }
 
 
-void set_element(ct* h_ct, size_t* global_index, double val, const char* str=""){
+void set_element(ct* h_ct, size_t* global_index, double val, const char* str){
   if ( COUT ) std::cout << "set_element: " << str << " cur_ind ";
   size_t cur_ind=0;
   for (size_t dim=0; dim<h_ct->ndims; dim++){
@@ -74,7 +75,7 @@ void increment_cur_index(size_t ndims, const size_t* h_full_cardinalities, size_
 
 
 
-void mct_tensorop_c(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, const size_t* h_full_cardinalities,size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C){
+void mct_tensorop_cpp(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, const size_t* h_full_cardinalities,size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C){
 
     if ( isHadamard ){
 
