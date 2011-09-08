@@ -5,6 +5,7 @@
  */
 
 #include "mct_tensorop_utils.cuh"
+#include <stdlib.h>
 
 void print_ct(const char* txt, ct* ct, bool printdata){ //bool print_config=false,
 
@@ -77,6 +78,66 @@ void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_ca
 
 
 
+void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, const char* txt, bool rand){
+  h_ct->ndims = ndims;
+  h_ct->cardinalities = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
+  h_ct->strides = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
+
+  size_t elnum=1;
+  // assign cardinalities for the tensor objects and init cur_ind values
+  size_t cum_sum=1;
+  for (size_t i=0; i<h_ct->ndims; i++){
+    if ( tensor_card[i] != 0 ){
+      elnum *= tensor_card[i];
+    }
+
+    h_ct->cardinalities[i] = tensor_card[i];
+    // std::cout << "TC dim "<< i << " cardinality assignment: "
+    //           << h_ct->cardinalities[i] << " <- " << tensor_card[i] << std::endl;
+
+    if ( h_ct->cardinalities[i] == 0){
+      h_ct->strides[i]=0;
+    }else{
+      h_ct->strides[i]=cum_sum;
+      cum_sum *= h_ct->cardinalities[i];
+    }
+  }
+
+  // assign h_ct host data
+  if ( txt != NULL && COUT == true){
+    std::cout << txt << std::endl;
+  }
+  if ( COUT ) std::cout << "prepareDeviceTensor elnum " << elnum << std::endl;
+  h_ct->mem_size= sizeof(double) * elnum;
+  h_ct->element_number = elnum;
+
+  if (data == NULL){
+    //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
+    h_ct->data = (double*) malloc(h_ct->mem_size);
+    for (size_t i=0; i<h_ct->element_number; i++ ) 
+      if (rand)
+	h_ct->data[i]= ((double) std::rand()) / (double)(RAND_MAX+1.0);
+      else
+	h_ct->data[i]=(double)0;
+
+  }else{
+    h_ct->data = (double*)malloc( h_ct->mem_size );
+    memcpy(h_ct->data, data, h_ct->mem_size);
+  }
+
+  if ( PRINT_CT ) print_ct("prepareDeviceTensor h_ct",h_ct,true);
+
+}
+
+
+
+
+
+
+
+
+
+
 // Recursive function which generates all permutations of a given list
 void gen_range_permutation_helper(std::vector<size_t> iter_dims, std::vector<size_t> cur_perm, std::vector<size_t>* acc){
   if ( iter_dims.size() == 0 ){
@@ -133,48 +194,5 @@ size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnu
 }
 
 
-void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, const char* txt){
-  h_ct->ndims = ndims;
-  h_ct->cardinalities = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
-  h_ct->strides = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
 
-  size_t elnum=1;
-  // assign cardinalities for the tensor objects and init cur_ind values
-  size_t cum_sum=1;
-  for (size_t i=0; i<h_ct->ndims; i++){
-    if ( tensor_card[i] != 0 ){
-      elnum *= tensor_card[i];
-    }
 
-    h_ct->cardinalities[i] = tensor_card[i];
-    // std::cout << "TC dim "<< i << " cardinality assignment: "
-    //           << h_ct->cardinalities[i] << " <- " << tensor_card[i] << std::endl;
-
-    if ( h_ct->cardinalities[i] == 0){
-      h_ct->strides[i]=0;
-    }else{
-      h_ct->strides[i]=cum_sum;
-      cum_sum *= h_ct->cardinalities[i];
-    }
-  }
-
-  // assign h_ct host data
-  if ( txt != NULL && COUT == true){
-    std::cout << txt << std::endl;
-  }
-  if ( COUT ) std::cout << "prepareDeviceTensor elnum " << elnum << std::endl;
-  h_ct->mem_size= sizeof(double) * elnum;
-  h_ct->element_number = elnum;
-
-  if (data == NULL){
-    //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
-    h_ct->data = (double*) malloc(h_ct->mem_size);
-    for (size_t i=0; i<h_ct->element_number; i++ ) h_ct->data[i]=(double)0;
-  }else{
-    h_ct->data = (double*)malloc( h_ct->mem_size );
-    memcpy(h_ct->data, data, h_ct->mem_size);
-  }
-
-  if ( PRINT_CT ) print_ct("prepareDeviceTensor h_ct",h_ct,true);
-
-}

@@ -166,8 +166,8 @@ __global__ void contractFintoC(size_t ndims,
         }
       }
 
-      double kek=d_F[F_ind];
 #if CUPRINTF == true
+      double kek=d_F[F_ind];
       cuPrintf("F_ind %d d_F[F_ind] %d\n", F_ind, kek);
 #endif
       tmp_sum += d_F[F_ind];

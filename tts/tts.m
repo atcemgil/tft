@@ -37,7 +37,7 @@ function [] = tts(opnumber)
 
     TEST=3;
     % by specifying TEST=1 and a test folder, can perform checks
-    %               TEST=2 can perform tests with the cudatensor3 output
+    %               TEST=2 can perform tests with the mct output
     %               TEST=3 can perform tests with the C code output
 
     TEST_FOLDER='set4/'; % do not forget the last /
@@ -126,12 +126,12 @@ function [] = tts(opnumber)
                             tensormul( A, A_crd, B, B_crd, C_crd, VERBOSITY , full_result );
                     elseif TEST == 2
                         % perform operation on gpu
-                        addpath('../mex_cudatensor3')
-                        tic; op=cudatensor3(A,A_crd,B,B_crd,C_crd,0,1); toc;
+                        addpath('../mct')
+                        tic; op=mct('tensor_gpu',A,A_crd,B,B_crd,C_crd,1); toc;
                     elseif TEST == 3
                         % perform operation on cpu with C code
-                        addpath('../mex_cudatensor3')
-                        tic; op=cudatensor3(A,A_crd,B,B_crd,C_crd,1,1); toc;
+                        addpath('../mct')
+                        tic; op=mct('tensor_cpp',A,A_crd,B,B_crd,C_crd,1); toc;
                     end
 
 

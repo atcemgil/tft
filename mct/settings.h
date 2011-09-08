@@ -9,7 +9,7 @@
 
 
 #define CUPRINTF false
-#define COUT false
+#define COUT true
 #define PRINT_CT false
 
 #define NUM_BLOCKS 53000
