@@ -11,7 +11,7 @@
 #include "mct_kernels.cuh"
 
 #if CUPRINTF == true
-#include "cuPrintf.cu"
+#include "cuPrintf.cuh"
 #endif
 
 
@@ -71,7 +71,7 @@ dev_ptrs prepareDeviceParameters(const size_t* h_full_cardinalities, size_t ndim
 }
 
 void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, const size_t* h_full_cardinalities,size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C, size_t h_zero_cardinality_dim_tuple_size_C, size_t use_multiplication){
-
+  /*
   // prepare device memory for tensors  /////////////////////////////////////////////////////
 
   dev_ptrs dp = prepareDeviceParameters(h_full_cardinalities, ndims, &h_A, &h_B, &h_C, &h_F,
@@ -169,7 +169,7 @@ void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, do
 
   cudaThreadExit();
   ///////////////////////////////////////////////////////////////////////////////////////////
-
+  */
 }
 
 
@@ -233,11 +233,16 @@ void transferToDevice(const size_t* h_full_cardinalities, size_t ndims){
 }
 
 
+
 // perform tensor operation with specified objects
 bool mct_tensorop_gpu_keys(bool isHadamard,
                            size_t use_multiplication,
                            size_t ndims,
-                           std::string A, std::string B, std::string C, std::string F){
+                           std::string A, std::string B, std::string C, std::string F,
+                           size_t swap_A_first, size_t swap_A_second,
+                           size_t swap_B_first, size_t swap_B_second){
+
+  //swap (transpose) interchanges given two dimensions of the corresponding object
 
   // check requested objects are registered
   if ( h_objs.find(A) == h_objs.end() ||
@@ -245,49 +250,11 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
        h_objs.find(C) == h_objs.end() ||
        h_objs.find(F) == h_objs.end() ){
     std::cout << "mct_tensorop_gpu_keys: all of requested keys should be registered "
-	      << " requested keys: A " << A << " B " << B << " C " << C << " F " << F
-	      << std::endl;
+              << " requested keys: A " << A << " B " << B << " C " << C << " F " << F
+              << std::endl;
     return false;
   }
 
-  // prepare range permutation vector //////////////////////////////////////////////////////
-  size_t zero_cardinality_dim_tuple_size_C = 0;
-  size_t zero_cardinality_dim_tuples_C_element_number = 0;
-  size_t* h_zero_cardinality_dim_tuples_C = NULL;
-  size_t* d_zero_cardinality_dim_tuples_C = NULL;
-
-  if ( isHadamard == false){
-    std::vector<size_t> zero_cardinality_dims;
-    for ( size_t dim=0; dim<ndims; dim++ ){
-      if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){
-        zero_cardinality_dims.push_back(h_objs[F]->cardinalities[dim]);
-      }
-    }
-
-    if ( COUT ) {
-      std::cout << "zero_cardinality_dims" << std::endl;
-      for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
-        std::cout << zero_cardinality_dims.at(j) << std::endl;
-      }
-    }
-
-    zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
-
-    h_zero_cardinality_dim_tuples_C =
-      gen_range_permutation(zero_cardinality_dims,
-                            &(zero_cardinality_dim_tuples_C_element_number));
-
-    // transfer to device
-    cutilSafeCall(cudaMalloc((void**)&(d_zero_cardinality_dim_tuples_C),
-                             sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number));
-    cutilSafeCall(cudaMemcpy(d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
-                             sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number, cudaMemcpyHostToDevice));
-
-  }
-
-  
-  
-  ////////////////////////////////////////////////////////////////////////////////////////
 
 
 #if CUPRINTF == true
@@ -302,14 +269,14 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
 
     if (use_multiplication == 1)
       hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(d_obj_data[A],
-						      d_obj_data[B],
-						      d_obj_data[C],
-						      h_objs[C]->element_number);
+                                                      d_obj_data[B],
+                                                      d_obj_data[C],
+                                                      h_objs[C]->element_number);
     else
       hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(d_obj_data[A],
-						      d_obj_data[B],
-						      d_obj_data[C],
-						      h_objs[C]->element_number);
+                                                      d_obj_data[B],
+                                                      d_obj_data[C],
+                                                      h_objs[C]->element_number);
 
   }else{
 
@@ -318,7 +285,9 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
                                                     d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
                                                     d_obj_data[A], d_obj_data[B], d_obj_data[F],
                                                     h_objs[F]->element_number,
-                                                    use_multiplication);
+                                                    use_multiplication, 
+						    swap_A_first, swap_A_second, 
+						    swap_B_first, swap_B_second);
 
     // test full result
     cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
@@ -334,7 +303,49 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
       }
     }
 
+
+
     if ( got_zeros ){
+
+      // prepare range permutation vector //////////////////////////////////////////////////////
+      size_t zero_cardinality_dim_tuple_size_C = 0;
+      size_t zero_cardinality_dim_tuples_C_element_number = 0;
+      size_t* h_zero_cardinality_dim_tuples_C = NULL;
+      size_t* d_zero_cardinality_dim_tuples_C = NULL;
+
+      if ( isHadamard == false){
+        std::vector<size_t> zero_cardinality_dims;
+        for ( size_t dim=0; dim<ndims; dim++ ){
+          if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){
+            zero_cardinality_dims.push_back(h_objs[F]->cardinalities[dim]);
+          }
+        }
+
+        if ( COUT ) {
+          std::cout << "zero_cardinality_dims" << std::endl;
+          for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
+            std::cout << zero_cardinality_dims.at(j) << std::endl;
+          }
+        }
+
+        zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
+
+        h_zero_cardinality_dim_tuples_C =
+          gen_range_permutation(zero_cardinality_dims,
+                                &(zero_cardinality_dim_tuples_C_element_number));
+
+        // transfer to device
+        cutilSafeCall(cudaMalloc((void**)&(d_zero_cardinality_dim_tuples_C),
+                                 sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number));
+        cutilSafeCall(cudaMemcpy(d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
+                                 sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number, cudaMemcpyHostToDevice));
+
+      }
+
+      ////////////////////////////////////////////////////////////////////////////////////////
+
+
+
       // contract on required dimensions
       if ( COUT ) std::cout << "performing contaction" << std::endl;
       contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
@@ -359,6 +370,7 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
+
   return true;
 }
 
@@ -369,8 +381,16 @@ void resetDevice(){
 
 
 void transferFromDevice(double* matlab_storage, std::string d_storage_key){
-  cutilSafeCall(cudaMemcpy(matlab_storage, 
-			   d_obj_data[d_storage_key],
-			   h_objs[d_storage_key]->mem_size,
-			   cudaMemcpyDeviceToHost));
+
+  if ( COUT )
+    std::cout << " transferFromDevice copying "
+              << " data mem size " << h_objs[d_storage_key]->mem_size
+              << " element number " << h_objs[d_storage_key]->element_number
+              << " for key " << d_storage_key
+              << std::endl;
+
+  cutilSafeCall(cudaMemcpy(matlab_storage,
+                           d_obj_data[d_storage_key],
+                           h_objs[d_storage_key]->mem_size,
+                           cudaMemcpyDeviceToHost));
 }

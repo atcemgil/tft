@@ -1,7 +1,10 @@
 format 'compact'
 
+display('compiling');
+
 !/usr/local/cuda/bin/nvcc -c -g  mct_tensorop_utils.cu mct_tensorop_cpp.cu mct_tensorop_gpu.cu mct_kernels.cu mct.cu -arch sm_13 -Xcompiler -fPIC -I /opt/matlab/extern/include -I /home/can2/nvidia/NVIDIA_GPU_Computing_SDK/C/common/inc/
 
+display('linking');
 mex -largeArrayDims ...
     mct.o mct_tensorop_utils.o mct_tensorop_cpp.o ...
     mct_tensorop_gpu.o mct_kernels.o ...
@@ -12,23 +15,35 @@ mex -largeArrayDims ...
     -L /usr/local/cuda/lib64 -lcudart -lcufft
 
 
+display('running');
 
 
 rand('state',0);
 
 dim=2;
 
-A=magic(dim);
-B=round(rand(dim,dim,dim)*10);
+A=round(rand(dim,dim)*5);
+B=round(rand(dim,dim)*5);
+M=ones(dim);
+
+X=A*B;
+display('target X');
+display(X);
 
 % GPU code
 display('GPU run');
-tic; [Z1_gpu Z2_gpu]=mct('nmf_gpu',A,[0 dim dim],B,[dim dim dim], [dim dim 0], 1); toc;
+tic; [Z1_gpu Z2_gpu]=mct('nmf_gpu',X, M); toc;
 display('GPU result');
-display(G);
+display('Z1 result');
+display(Z1_gpu);
+display('Z2 result');
+display(Z2_gpu);
+display('X result');
+display(Z1_gpu*Z2_gpu);
+exit
 % C code
 display('C code run')
-tic; [Z1_cpp Z2_cpp]=mct('nmf_cpp',A,[0 dim dim],B,[dim dim dim], [dim dim 0], 1); toc;
+tic; [Z1_cpp Z2_cpp]=mct('nmf_cpp',X, M); toc;
 display('CPU result');
 display(C);
 
