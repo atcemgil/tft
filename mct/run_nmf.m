@@ -17,18 +17,26 @@ mex -largeArrayDims ...
 
 display('running');
 
+S = RandStream('mt19937ar');
+RandStream.setDefaultStream(S);
 
-rand('state',0);
+I = 2;
+F = 2;
+T = 2;
 
-dim=2;
+A_true = 10*rand(F, I);
+B_true = 10*rand(I, T);
+L = A_true*B_true;
 
-A=round(rand(dim,dim)*5);
-B=round(rand(dim,dim)*5);
-M=ones(dim);
+X = poissrnd(L);
 
-X=A*B;
+M=ones(size(X));
+
+
 display('target X');
 display(X);
+
+
 
 % GPU code
 display('GPU run');

@@ -8,7 +8,7 @@
 #define MCT_SETTINGS_H
 
 
-#define CUPRINTF true
+#define CUPRINTF false
 #define COUT false
 #define PRINT_CT false
 

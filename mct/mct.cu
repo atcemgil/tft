@@ -299,6 +299,7 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
   print_ct("random Z1 init", &Z1, true);
   print_ct("random Z2 init", &Z2, true);
   print_ct("target X (cpp side)", &X, true);
+  print_ct("F (cpp side)", &F, true);
 
   
   ///////////////////////////////////////////////////////////////////////////////////////////
@@ -311,43 +312,98 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
   transferToDevice(full_cardinalities, ndims);
   
   ///////////////////////////////////////////////////////////////////////////////////////////
-  
+
+  /*
+  double tmpdata[4];
+  transferFromDevice(tmpdata, "Z1");
+  for (int i=0; i<4; i++)
+    std::cout << "tmpdata " << i << " " << tmpdata[i] << std::endl;
+  */
+
   // perform NMF operation //////////////////////////////////////////////////////////////////
 
-  for (int iter=0; iter<1; iter++){
+  for (int iter=0; iter<100; iter++){
     // z1 update
     mct_tensorop_gpu_keys(false, 1, ndims, "Z1", "Z2", "Xhat");
-    mct_tensorop_gpu_keys(true , 0, ndims, "X", "Xhat", "A");
-    mct_tensorop_gpu_keys(true , 1, ndims, "M", "A", "A");
+    transferFromDevice(Xhat.data, "Xhat");
+    //print_ct("test Xhat:", &Xhat, true);
 
-    //mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z2", "D1_z1");
-    //mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z2", "D2_z1");
-    mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z2", "D1_z1", "F", NOSWAP, NOSWAP, 1, 2);
-    mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z2", "D2_z1", "F", NOSWAP, NOSWAP, 1, 2);
+    mct_tensorop_gpu_keys(true , 0, ndims, "X", "Xhat", "A");
+    transferFromDevice(A.data, "A");
+    //print_ct("test A:", &A, true);
+
+    mct_tensorop_gpu_keys(true , 1, ndims, "M", "A", "A");
+    transferFromDevice(A.data, "A");
+    //print_ct("test A 2:", &A, true);
+
+
+    mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z2", "D1_z1");
+    //mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z2", "D1_z1", "F", NOSWAP, NOSWAP, 1, 2);
+    transferFromDevice(D1_z1.data, "D1_z1");
+    //print_ct("test D1_z1:", &D1_z1, true);
+
+    mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z2", "D2_z1");
+    //mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z2", "D2_z1", "F", NOSWAP, NOSWAP, 1, 2);
+    transferFromDevice(D2_z1.data, "D2_z1");
+    //print_ct("test D2_z1:", &D2_z1, true);
 
     mct_tensorop_gpu_keys(true , 0, ndims, "D1_z1", "D2_z1", "D1_z1");
+    transferFromDevice(D1_z1.data, "D1_z1");
+    //print_ct("test D1_z1:", &D1_z1, true);
+
     mct_tensorop_gpu_keys(true , 1, ndims, "Z1", "D1_z1", "Z1");
+    transferFromDevice(Z1.data, "Z1");
+    //print_ct("test Z1:", &Z1, true);
+
 
     // z2 update
     mct_tensorop_gpu_keys(false, 1, ndims, "Z1", "Z2", "Xhat");
-    mct_tensorop_gpu_keys(true , 0, ndims, "X", "Xhat", "A");
-    mct_tensorop_gpu_keys(true , 1, ndims, "M", "A", "A");
+    transferFromDevice(Xhat.data, "Xhat");
+    //print_ct("z2 test Xhat:", &Xhat, true);
 
-    //mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z1", "D1_z2");
-    //mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z1", "D2_z2");
-    mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z1", "D1_z2", "F", 0, 2, NOSWAP, NOSWAP);
-    mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z1", "D2_z2", "F", 0, 2, NOSWAP, NOSWAP);
+    mct_tensorop_gpu_keys(true , 0, ndims, "X", "Xhat", "A");
+    transferFromDevice(A.data, "A");
+    //print_ct("z2 test A:", &A, true);
+
+    mct_tensorop_gpu_keys(true , 1, ndims, "M", "A", "A");
+    transferFromDevice(A.data, "A");
+    //print_ct("z2 test A:", &A, true);
+
+
+
+
+    mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z1", "D1_z2");
+    transferFromDevice(Z1.data, "Z1");
+    //print_ct("z2 test D1_z2 Z1:", &Z1, true);
+
+    transferFromDevice(D1_z2.data, "D1_z2");
+    //print_ct("z2 test D1_z2:", &D1_z2, true);
+
+
+
+
+
+    mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z1", "D2_z2");
+    transferFromDevice(D2_z2.data, "D2_z2");
+    //print_ct("z2 test D2_z2:", &D2_z2, true);
+
 
     mct_tensorop_gpu_keys(true , 0, ndims, "D1_z2", "D2_z2", "D1_z2");
-    mct_tensorop_gpu_keys(true , 1, ndims, "Z2", "D1_z1", "Z2");
+    transferFromDevice(D1_z2.data, "D1_z2");
+    //print_ct("z2 test D1_z2:", &D1_z2, true);
+    
+    mct_tensorop_gpu_keys(true , 1, ndims, "Z2", "D1_z2", "Z2");
+    transferFromDevice(Z2.data, "Z2");
+    //print_ct("z2 test Z2:", &Z2, true);
 
-    //if (iter % 10 == 0 || iter==99 || iter == 98){ // ???
-      std::cout << "iter " << iter << std::endl;
-      transferFromDevice(Z1.data, "Z1");
-      print_ct("current Z1", &Z1, true);
-      transferFromDevice(Z2.data, "Z2");
-      print_ct("current Z2", &Z2, true);
-      //}
+    // if (iter % 10 == 0 || iter==99 || iter == 98){ // ???
+    //   std::cout << "iter " << iter << std::endl;
+    //   transferFromDevice(Z1.data, "Z1");
+    //   print_ct("current Z1", &Z1, true);
+    //   transferFromDevice(Z2.data, "Z2");
+    //   print_ct("current Z2", &Z2, true);
+    // }
+
   }
   
 
