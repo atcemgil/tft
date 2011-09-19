@@ -6,9 +6,9 @@ done
 cd /home/can2/code/mct
 
 rm *.o *.mexa64;  
-#rm /tmp/kek
+rm /tmp/kek
 
-matlab -nodesktop -nosplash -r "run_nmf"&> /tmp/kek
-#matlab -nodesktop -nosplash -r "run_nmf" 
+#matlab -nodesktop -nosplash -r "run_nmf"&> /tmp/kek
+matlab -nodesktop -nosplash -r "run" &> /tmp/kek
 
 less /tmp/kek

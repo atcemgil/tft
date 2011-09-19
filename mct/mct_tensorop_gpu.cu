@@ -77,7 +77,7 @@ dev_ptrs prepareDeviceParameters(size_t ndims,
 }
 
 void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C, size_t h_zero_cardinality_dim_tuple_size_C, size_t use_multiplication){
-  /*
+  
   // prepare device memory for tensors  /////////////////////////////////////////////////////
 
   dev_ptrs dp = prepareDeviceParameters(ndims, &h_A, &h_B, &h_C, &h_F,
@@ -175,7 +175,6 @@ void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, do
 
   cudaThreadExit();
   ///////////////////////////////////////////////////////////////////////////////////////////
-  */
 }
 
 
