@@ -46,10 +46,7 @@ __global__ void hadamard_div(double* d_A, double* d_B, double* d_C, size_t C_ele
 __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
                               size_t* d_strides_A, size_t* d_strides_B, size_t* d_strides_F,
                               double* d_A, double* d_B, double* d_F, size_t F_element_number,
-			      size_t use_multiplication,
-			      size_t swap_A_first, size_t swap_A_second,
-			      size_t swap_B_first, size_t swap_B_second
-			      ){
+			      size_t use_multiplication){
 
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   size_t d_inds_F;// = (size_t*) malloc(sizeof(size_t)*ndims);
@@ -76,40 +73,9 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
       }
 
       F_ind += d_strides_F[dim] * d_inds_F;
+      A_ind += d_strides_A[dim] * d_inds_F;
+      B_ind += d_strides_B[dim] * d_inds_F;
 
-
-      if ( swap_A_first != NOSWAP && (dim==swap_A_first || dim==swap_A_second)){
-	if (dim==swap_A_first){
-#if CUPRINTF == true
-	  cuPrintf("swapping A dim %d -> %d\n", dim, swap_A_second);
-#endif
-	  A_ind += d_strides_A[swap_A_second] * d_inds_F;
-	}
-	else{
-#if CUPRINTF == true
-	  cuPrintf("swapping A dim %d -> %d\n", dim, swap_A_first);
-#endif
-	  A_ind += d_strides_A[swap_A_first] * d_inds_F;
-	}
-      }else{
-	A_ind += d_strides_A[dim] * d_inds_F;
-      }
-
-      if ( swap_B_first != NOSWAP && (dim==swap_B_first || dim==swap_B_second)){
-	if (dim==swap_B_first){
-#if CUPRINTF == true
-	  cuPrintf("swapping B dim %d -> %d\n", dim, swap_B_second);
-#endif
-	  B_ind += d_strides_B[swap_B_second] * d_inds_F;
-	}else{
-#if CUPRINTF == true
-	  cuPrintf("swapping B dim %d -> %d\n", dim, swap_B_first);
-#endif
-	  B_ind += d_strides_B[swap_B_first] * d_inds_F;
-	}
-      }else{
-	B_ind += d_strides_B[dim] * d_inds_F;
-      }
 
 #if CUPRINTF == true 
       size_t tmp= d_strides_F[dim];

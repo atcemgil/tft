@@ -7,6 +7,19 @@
 #include "mct_tensorop_utils.cuh"
 #include <stdlib.h>
 
+// real definitions for global (extern) variables
+std::map<std::string,ct*> h_objs;
+size_t* h_full_cardinalities;
+
+void register_ct(std::string key, ct* obj){
+  h_objs[key] = obj;
+}
+
+void reset_ct(){
+  h_objs.clear();
+}
+
+
 void print_ct(const char* txt, ct* ct, bool printdata){ //bool print_config=false,
 
   std::cout << txt << std::endl;
@@ -194,5 +207,72 @@ size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnu
 }
 
 
+bool check_input_keys(std::string A, std::string B, std::string C, std::string F){
+  // check requested objects are registered
+  if ( h_objs.find(A) == h_objs.end() ||
+       h_objs.find(B) == h_objs.end() ||
+       h_objs.find(C) == h_objs.end() ||
+       h_objs.find(F) == h_objs.end() ){
+    std::cout << "mct_tensorop_gpu_keys: all of requested keys should be registered "
+              << " requested keys: A " << A << " B " << B << " C " << C << " F " << F
+              << std::endl;
+    return false;
+  }
 
+  return true;
+}
+
+
+
+void operate(std::vector<operation>* operation_chain){
+  std::vector<operation>::iterator it;
+
+  for ( it=operation_chain->begin() ; it < operation_chain->end(); it++ ){
+
+    std::string A = it->A;
+    std::string B = it->B;
+    
+    if ( it != operation_chain->begin() && // if this is not the first operation and
+	 (it-1)->result_in_F){ // previous operation's result was stored in F instead of C
+
+      //we must use F instead of C in next operation for any input named 
+      //same as previous operation's output object (C)
+
+      // example:
+      // in previous operation we had
+      // E * G = H
+      // but H was not stored in object pointed by C
+      // it was stored in object pointed by F to avoid copying
+
+      // thus if we are using H in current operation's input (A or B)
+      // we must not use the object pointed by C (H) in previous operation
+      // but instead use the object pointed by F in previous operation
+      
+      if ( it->A.compare( (it-1)->C ) == 0)
+	A = (it-1)->F;
+
+      if ( it->B.compare( (it-1)->C ) == 0)
+	B = (it-1)->F;
+
+    }
+
+    if (COUT_operate)
+      std::cout << "util: operate A " << A << " B " << B << " C " << it->C << " F " << it->F 
+		<< " chain size " << operation_chain->size() 
+		<< std::endl;
+    
+    (it->operate) (it->isHadamard, 
+		   it->use_multiplication, 
+		   it->ndims, 
+		   &(it->result_in_F), 
+		   A, B, it->C, 
+		   it->F);
+
+    if (COUT_operate)
+      std::cout << " util result: result_in_F " << it->result_in_F
+		<< std::endl;
+
+  }
+
+}
 

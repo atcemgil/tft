@@ -22,7 +22,6 @@
 
 #define REGISTER_CT(obj) register_ct(#obj, &obj)
 
-
 enum op_type {
   tensor_gpu,
   tensor_cpp,
@@ -64,7 +63,7 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_typ
   bool isHadamard=true;
 
   // full_cardinalities define maximum possible cardinalities for all dimensions
-  size_t* h_full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t));
+  h_full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
   for( size_t i=0; i<ndims; i++){
     double m_A_card_i = ((double *)mxGetData(m_A_card))[i];
     double m_B_card_i = ((double *)mxGetData(m_B_card))[i];
@@ -198,9 +197,9 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_typ
 
 
   if ( opt == tensor_gpu ) {
-    mct_tensorop_gpu(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_full_cardinalities, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuple_size_C, use_multiplication);
+    mct_tensorop_gpu(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuple_size_C, use_multiplication);
   }else{  // operate on CPU
-    mct_tensorop_cpp(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_full_cardinalities, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
+    mct_tensorop_cpp(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
   }
 
 }
@@ -212,6 +211,34 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_typ
 
 
 
+
+
+
+
+
+
+
+
+void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool use_multiplication, size_t ndims, std::string A, std::string B, std::string C, op_type opt, std::string F="F"){
+  operation oc;
+  oc.isHadamard = isHadamard;
+  oc.use_multiplication = use_multiplication;
+  oc.ndims = ndims;
+  oc.A = A;
+  oc.B = B;
+  oc.C = C;
+  oc.F = F;
+  oc.result_in_F = false;
+
+  if (opt == nmf_gpu){
+    oc.operate = &mct_tensorop_gpu_keys;
+  }else if (opt == nmf_cpp){
+    oc.operate = &mct_tensorop_cpp_keys;
+  }
+
+
+  operation_chain->push_back(oc);
+}
 
 
 
@@ -255,12 +282,17 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
   double* m_Z2 = (double*) mxGetPr(plhs[1]);
 
   // prepare host memory for tensors  ///////////////////////////////////////////////////////
+  size_t ndims = 3;
 
   // full_cardinalities define maximum possible cardinalities for all dimensions
-  size_t full_cardinalities[3] = { card, card, card}; 
+  //size_t full_cardinalities[3] = { card, card, card};
+
+  h_full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
+  h_full_cardinalities[0] = h_full_cardinalities[1] = h_full_cardinalities[2] = card;
+
   if(COUT)
     for (int i=0; i<3; i++)
-      std::cout << "full_cardinalities " << i << " " << full_cardinalities[i] << std::endl;
+      std::cout << "h_full_cardinalities " << i << " " << h_full_cardinalities[i] << std::endl;
 
 
   // initialize random seed for random initialization of objects
@@ -277,164 +309,157 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
     mxGetPr(m_X_card)[i] = X_card[i];
 
 
-  size_t ndims = 3;
-
   prepareHostTensor(&X, m_X_data, m_X_card, (const char*) "Host X");
   prepareHostTensor(&M, m_M_data, m_X_card, (const char*) "Host M");
   prepareHostTensorFromCpp(&A, NULL, X_card, ndims, (const char*) "Host A"); // init with 0
   prepareHostTensorFromCpp(&Xhat, NULL, X_card, ndims, (const char*) "Host Xhat");
-  prepareHostTensorFromCpp(&F, NULL, full_cardinalities, ndims, "Host F");
+  prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
 
   size_t Z1_card[3] = {card , card, 0};
   prepareHostTensorFromCpp(&Z1, NULL, Z1_card, ndims, (const char*) "Host Z1", true);
   size_t Z2_card[3] = {0 , card, card};
   prepareHostTensorFromCpp(&Z2, NULL, Z2_card, ndims, (const char*) "Host Z2", true);
 
-  prepareHostTensorFromCpp(&D1_z1, NULL, Z1_card, ndims, (const char*) "Host D1_z1", true);
-  prepareHostTensorFromCpp(&D1_z2, NULL, Z2_card, ndims, (const char*) "Host D1_z2", true);
+  // used first as C must be zeroed for cpp to work
+  prepareHostTensorFromCpp(&D1_z1, NULL, Z1_card, ndims, (const char*) "Host D1_z1"); 
+  prepareHostTensorFromCpp(&D1_z2, NULL, Z2_card, ndims, (const char*) "Host D1_z2");
 
-  prepareHostTensorFromCpp(&D2_z1, NULL, Z1_card, ndims, (const char*) "Host D2_z1", true);
-  prepareHostTensorFromCpp(&D2_z2, NULL, Z2_card, ndims, (const char*) "Host D2_z2", true);
+  prepareHostTensorFromCpp(&D2_z1, NULL, Z1_card, ndims, (const char*) "Host D2_z1");
+  prepareHostTensorFromCpp(&D2_z2, NULL, Z2_card, ndims, (const char*) "Host D2_z2");
 
-  print_ct("random Z1 init", &Z1, true);
-  print_ct("random Z2 init", &Z2, true);
-  print_ct("target X (cpp side)", &X, true);
-  print_ct("F (cpp side)", &F, true);
+  if(PRINT_CT){
+    print_ct("random Z1 init", &Z1, true);
+    print_ct("random Z2 init", &Z2, true);
+    print_ct("target X (cpp side)", &X, true);
+    print_ct("F (cpp side)", &F, true);
+  }
 
-  
   ///////////////////////////////////////////////////////////////////////////////////////////
 
 
-  // transfer objects to device /////////////////////////////////////////////////////////////
+  // register & transfer objects to device //////////////////////////////////////////////////
 
   REGISTER_CT(Z1); REGISTER_CT(Z2); REGISTER_CT(Xhat); REGISTER_CT(X); REGISTER_CT(D1_z1); REGISTER_CT(D1_z2); REGISTER_CT(D2_z1); REGISTER_CT(D2_z2); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
 
-  transferToDevice(full_cardinalities, ndims);
-  
+  if (opt==nmf_gpu)
+    transferToDevice(ndims);
+
   ///////////////////////////////////////////////////////////////////////////////////////////
 
-  /*
-  double tmpdata[4];
-  transferFromDevice(tmpdata, "Z1");
-  for (int i=0; i<4; i++)
-    std::cout << "tmpdata " << i << " " << tmpdata[i] << std::endl;
-  */
 
   // perform NMF operation //////////////////////////////////////////////////////////////////
 
-  for (int iter=0; iter<100; iter++){
-    // z1 update
-    mct_tensorop_gpu_keys(false, 1, ndims, "Z1", "Z2", "Xhat");
-    transferFromDevice(Xhat.data, "Xhat");
-    //print_ct("test Xhat:", &Xhat, true);
+  std::vector<operation> operation_chain;
+  // z1 update
+  oc_push_back(&operation_chain, false, 1, ndims, "Z1", "Z2", "Xhat", opt);
+  oc_push_back(&operation_chain, true , 0, ndims, "X", "Xhat", "A", opt);
+  oc_push_back(&operation_chain, true , 1, ndims, "M", "A", "A", opt);
+  oc_push_back(&operation_chain, false, 1, ndims, "A", "Z2", "D1_z1", opt);
+  oc_push_back(&operation_chain, false, 1, ndims, "M", "Z2", "D2_z1", opt);
+  oc_push_back(&operation_chain, true , 0, ndims, "D1_z1", "D2_z1", "D1_z1", opt);
+  oc_push_back(&operation_chain, true , 1, ndims, "Z1", "D1_z1", "Z1", opt);
 
-    mct_tensorop_gpu_keys(true , 0, ndims, "X", "Xhat", "A");
-    transferFromDevice(A.data, "A");
-    //print_ct("test A:", &A, true);
-
-    mct_tensorop_gpu_keys(true , 1, ndims, "M", "A", "A");
-    transferFromDevice(A.data, "A");
-    //print_ct("test A 2:", &A, true);
-
-
-    mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z2", "D1_z1");
-    //mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z2", "D1_z1", "F", NOSWAP, NOSWAP, 1, 2);
-    transferFromDevice(D1_z1.data, "D1_z1");
-    //print_ct("test D1_z1:", &D1_z1, true);
-
-    mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z2", "D2_z1");
-    //mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z2", "D2_z1", "F", NOSWAP, NOSWAP, 1, 2);
-    transferFromDevice(D2_z1.data, "D2_z1");
-    //print_ct("test D2_z1:", &D2_z1, true);
-
-    mct_tensorop_gpu_keys(true , 0, ndims, "D1_z1", "D2_z1", "D1_z1");
-    transferFromDevice(D1_z1.data, "D1_z1");
-    //print_ct("test D1_z1:", &D1_z1, true);
-
-    mct_tensorop_gpu_keys(true , 1, ndims, "Z1", "D1_z1", "Z1");
-    transferFromDevice(Z1.data, "Z1");
-    //print_ct("test Z1:", &Z1, true);
+  // z2 update
+  oc_push_back(&operation_chain, false, 1, ndims, "Z1", "Z2", "Xhat", opt);
+  oc_push_back(&operation_chain, true , 0, ndims, "X", "Xhat", "A", opt);
+  oc_push_back(&operation_chain, true , 1, ndims, "M", "A", "A", opt);
+  oc_push_back(&operation_chain, false, 1, ndims, "A", "Z1", "D1_z2", opt);
+  oc_push_back(&operation_chain, false, 1, ndims, "M", "Z1", "D2_z2", opt);
+  oc_push_back(&operation_chain, true , 0, ndims, "D1_z2", "D2_z2", "D1_z2", opt);
+  oc_push_back(&operation_chain, true , 1, ndims, "Z2", "D1_z2", "Z2", opt);
 
 
-    // z2 update
-    mct_tensorop_gpu_keys(false, 1, ndims, "Z1", "Z2", "Xhat");
-    transferFromDevice(Xhat.data, "Xhat");
-    //print_ct("z2 test Xhat:", &Xhat, true);
+  for (int iter=0; iter<30; iter++){
+    //if (opt == nmf_gpu)
 
-    mct_tensorop_gpu_keys(true , 0, ndims, "X", "Xhat", "A");
-    transferFromDevice(A.data, "A");
-    //print_ct("z2 test A:", &A, true);
+      operate(&operation_chain);
 
-    mct_tensorop_gpu_keys(true , 1, ndims, "M", "A", "A");
-    transferFromDevice(A.data, "A");
-    //print_ct("z2 test A:", &A, true);
+    /*    else{
+      ///////////////////////////////////////////////////////////////////// siil ////
+      std::vector<operation>::iterator it;
+      for ( it=operation_chain.begin() ; it < operation_chain.end(); it++ ){
+
+        size_t h_zero_cardinality_dim_tuple_size_C = 0;
+        size_t h_zero_cardinality_dim_tuples_C_element_number = 0;
+        size_t* h_zero_cardinality_dim_tuples_C = NULL;
+
+        if ( it->isHadamard == false){
+          std::vector<size_t> zero_cardinality_dims;
+          //std::vector<size_t> non_zero_cardinality_dims;
+          for ( size_t dim=0; dim<ndims; dim++ ){
+            if ( h_objs[it->C]->cardinalities[dim] == 0 && h_objs[it->F]->cardinalities[dim] != 0 ){
+              zero_cardinality_dims.push_back(h_objs[it->F]->cardinalities[dim]);
+            }
+            // else{
+            //   non_zero_cardinality_dims.push_back(h_objs[it->F]->cardinalities[dim]);
+            // }
+          }
+
+          // std::cout << "non_zero_cardinality_dims" << std::endl;
+          // for ( size_t j=0; j<non_zero_cardinality_dims.size(); j++){
+          //   std::cout << non_zero_cardinality_dims.at(j) << std::endl;
+          // }
+
+          if ( COUT ) {
+            std::cout << "zero_cardinality_dims" << std::endl;
+            for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
+              std::cout << zero_cardinality_dims.at(j) << std::endl;
+            }
+          }
+
+          h_zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
+
+
+          //h_zero_cardinality_dim_tuples_C_element_number; // set by gen_range_permutation
+
+          h_zero_cardinality_dim_tuples_C =
+            gen_range_permutation(zero_cardinality_dims,
+                                  &(h_zero_cardinality_dim_tuples_C_element_number));
+        }
+
+        mct_tensorop_cpp(it->isHadamard, *(h_objs[it->A]), *(h_objs[it->B]), *(h_objs[it->C]), NULL, *(h_objs[it->F]), ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
+      }
+    }
+    */
+
+    //////////////////////////////////////////////////////////////////////////////////
 
 
 
+    //    if (iter % 10 == 0 || iter==99 || iter == 98){
+    // std::cout << "iter " << iter << std::endl;
+    // if (opt == nmf_gpu) transferFromDevice(Z1.data, "Z1");
+    // print_ct("current Z1", &Z1, true);
 
-    mct_tensorop_gpu_keys(false, 1, ndims, "A", "Z1", "D1_z2");
-    transferFromDevice(Z1.data, "Z1");
-    //print_ct("z2 test D1_z2 Z1:", &Z1, true);
-
-    transferFromDevice(D1_z2.data, "D1_z2");
-    //print_ct("z2 test D1_z2:", &D1_z2, true);
-
-
-
-
-
-    mct_tensorop_gpu_keys(false, 1, ndims, "M", "Z1", "D2_z2");
-    transferFromDevice(D2_z2.data, "D2_z2");
-    //print_ct("z2 test D2_z2:", &D2_z2, true);
-
-
-    mct_tensorop_gpu_keys(true , 0, ndims, "D1_z2", "D2_z2", "D1_z2");
-    transferFromDevice(D1_z2.data, "D1_z2");
-    //print_ct("z2 test D1_z2:", &D1_z2, true);
-    
-    mct_tensorop_gpu_keys(true , 1, ndims, "Z2", "D1_z2", "Z2");
-    transferFromDevice(Z2.data, "Z2");
-    //print_ct("z2 test Z2:", &Z2, true);
-
-    // if (iter % 10 == 0 || iter==99 || iter == 98){ // ???
-    //   std::cout << "iter " << iter << std::endl;
-    //   transferFromDevice(Z1.data, "Z1");
-    //   print_ct("current Z1", &Z1, true);
-    //   transferFromDevice(Z2.data, "Z2");
-    //   print_ct("current Z2", &Z2, true);
-    // }
+    // if (opt == nmf_gpu) transferFromDevice(Z2.data, "Z2");
+    // print_ct("current Z2", &Z2, true);
+    //}
 
   }
-  
+
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
   // transfer results to matlab /////////////////////////////////////////////////////////////
 
-  transferFromDevice(m_Z1, "Z1");
-  transferFromDevice(m_Z2, "Z2");
-
-  /*
-  transferFromDevice(Z1.data, "Z1");
-  transferFromDevice(Z2.data, "Z2");
-  std::cout << "bu ne ya" << std::endl;
-  for (int i=0; i<4; i++)
-    {
-      std::cout << (((double*) mxGetData(plhs[0]))[i]) << std::endl;
-      std::cout << m_Z1[i] << std::endl;
-      std::cout << Z1.data[i] << std::endl;
-      std::cout << std::endl;
-    }
-  */
-
-  //if ( PRINT_CT ) print_ct("result on C side (after)", &h_C,true);
+  if ( opt == nmf_gpu){
+    transferFromDevice(m_Z1, "Z1");
+    transferFromDevice(m_Z2, "Z2");
+  }else if ( opt == nmf_cpp){
+    memcpy(m_Z1, Z1.data, Z1.mem_size);
+    memcpy(m_Z2, Z2.data, Z2.mem_size);
+  }
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
 
   // reset device
-  resetDevice();
+  if (opt == nmf_gpu)
+    resetDevice();
 }
+
+
+
 
 
 

@@ -15,10 +15,16 @@
 #endif
 
 
+std::map<std::string,size_t*> d_obj_strides;
+std::map<std::string,double*> d_obj_data;
+size_t* d_full_cardinalities;
+
+
+
 // old functions /////////////////////////////////////////////////////////////////////////
 
 
-dev_ptrs prepareDeviceParameters(const size_t* h_full_cardinalities, size_t ndims,
+dev_ptrs prepareDeviceParameters(size_t ndims,
                                  const ct* h_A, const ct* h_B, ct* h_C, ct* h_F,
                                  size_t zero_cardinality_dims_elnum,
                                  size_t h_zero_cardinality_dim_tuples_C_element_number,
@@ -70,11 +76,11 @@ dev_ptrs prepareDeviceParameters(const size_t* h_full_cardinalities, size_t ndim
   return dp;
 }
 
-void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, const size_t* h_full_cardinalities,size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C, size_t h_zero_cardinality_dim_tuple_size_C, size_t use_multiplication){
+void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C, size_t h_zero_cardinality_dim_tuple_size_C, size_t use_multiplication){
   /*
   // prepare device memory for tensors  /////////////////////////////////////////////////////
 
-  dev_ptrs dp = prepareDeviceParameters(h_full_cardinalities, ndims, &h_A, &h_B, &h_C, &h_F,
+  dev_ptrs dp = prepareDeviceParameters(ndims, &h_A, &h_B, &h_C, &h_F,
                                         h_zero_cardinality_dim_tuple_size_C,
                                         h_zero_cardinality_dim_tuples_C_element_number,
                                         h_zero_cardinality_dim_tuples_C,
@@ -192,22 +198,12 @@ void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, do
 
 
 
-#include <map>
-std::map<std::string,ct*> h_objs;
-std::map<std::string,size_t*> d_obj_strides;
-std::map<std::string,double*> d_obj_data;
-size_t* d_full_cardinalities;
-
-
-void register_ct(std::string key, ct* obj){
-  h_objs[key] = obj;
-}
-
-void transferToDevice(const size_t* h_full_cardinalities, size_t ndims){
+void transferToDevice(size_t ndims){
   std::map<std::string,ct*>::iterator it;
 
   // copy h_full_cardinalities to device manually
   cutilSafeCall(cudaMalloc((void**)&(d_full_cardinalities), sizeof(size_t)*ndims));
+
   cutilSafeCall(cudaMemcpy(d_full_cardinalities, h_full_cardinalities, sizeof(size_t)*ndims, cudaMemcpyHostToDevice));
 
   // copy registered objects to device
@@ -235,26 +231,17 @@ void transferToDevice(const size_t* h_full_cardinalities, size_t ndims){
 
 
 // perform tensor operation with specified objects
+// ct* result contains a pointer to the ct objects containing the result. It may be input C or F.
 bool mct_tensorop_gpu_keys(bool isHadamard,
-                           size_t use_multiplication,
+                           bool use_multiplication,
                            size_t ndims,
-                           std::string A, std::string B, std::string C, std::string F,
-                           size_t swap_A_first, size_t swap_A_second,
-                           size_t swap_B_first, size_t swap_B_second){
-
-  //swap (transpose) interchanges given two dimensions of the corresponding object
-
-  // check requested objects are registered
-  if ( h_objs.find(A) == h_objs.end() ||
-       h_objs.find(B) == h_objs.end() ||
-       h_objs.find(C) == h_objs.end() ||
-       h_objs.find(F) == h_objs.end() ){
-    std::cout << "mct_tensorop_gpu_keys: all of requested keys should be registered "
-              << " requested keys: A " << A << " B " << B << " C " << C << " F " << F
-              << std::endl;
+			   bool* result_in_F,
+                           std::string A, std::string B, std::string C,
+			   std::string F
+			   ){
+  if (check_input_keys(A,B,C,F) == false){
     return false;
   }
-
 
 
 #if CUPRINTF == true
@@ -278,6 +265,17 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
                                                       d_obj_data[C],
                                                       h_objs[C]->element_number);
 
+    if ( PRINT_CT ) {
+      transferFromDevice(h_objs[A]->data, A);
+      print_ct("tensorop gpu A", h_objs[A], true);
+      transferFromDevice(h_objs[B]->data, B);
+      print_ct("tensorop gpu B", h_objs[B], true);
+      transferFromDevice(h_objs[C]->data, C);
+      print_ct("tensorop gpu C ", h_objs[C], true);
+    }
+
+
+    *result_in_F=false;
   }else{
 
     // generate the full output
@@ -285,13 +283,20 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
                                                     d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
                                                     d_obj_data[A], d_obj_data[B], d_obj_data[F],
                                                     h_objs[F]->element_number,
-                                                    use_multiplication, 
-						    swap_A_first, swap_A_second, 
-						    swap_B_first, swap_B_second);
+                                                    use_multiplication);
 
     // test full result
     cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
-    if ( PRINT_CT ) print_ct("genFullResult", h_objs[F], true);
+    if ( PRINT_CT ) {
+      transferFromDevice(h_objs[A]->data, A);
+      print_ct("tensorop gpu A", h_objs[A], true);
+
+      transferFromDevice(h_objs[B]->data, B);
+      print_ct("tensorop gpu B", h_objs[B], true);
+
+      transferFromDevice(h_objs[F]->data, F);
+      print_ct("tensorop gpu F", h_objs[F], true);
+    }
 
     // if no contraction is required, result is already stored in F, return that
     got_zeros = false;
@@ -303,7 +308,7 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
       }
     }
 
-
+    *result_in_F=true;
 
     if ( got_zeros ){
 
@@ -355,6 +360,14 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
                                                        d_zero_cardinality_dim_tuples_C,
                                                        zero_cardinality_dim_tuple_size_C,
                                                        zero_cardinality_dim_tuples_C_element_number);
+
+    if ( PRINT_CT ) {
+      transferFromDevice(h_objs[C]->data, C);
+      print_ct("tensorop gpu C ", h_objs[C], true);
+    }
+
+
+      *result_in_F=false;
     }
   }
 
@@ -378,7 +391,6 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
 void resetDevice(){
   cudaDeviceReset();
 }
-
 
 void transferFromDevice(double* matlab_storage, std::string d_storage_key){
 

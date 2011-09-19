@@ -22,7 +22,7 @@ for dim=test_range
     diff = C_gpu_code ~= C_c_code;
     diff_sum=0;
     for j=1:dim
-        diff_sum = sum(diff);
+        diff_sum = diff_sum + sum(diff);
     end
 
     if diff_sum == 0
