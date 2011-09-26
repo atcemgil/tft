@@ -268,15 +268,13 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
 
   // prepare output tensor in matlab  //////////////////////////////////////////////////////
 
-  // assume working with square matrices
-  size_t card = (mxGetDimensions(m_X_data))[0];
-  mwSize argMatDims[2] = { card, card };
+  size_t card_dim0 = (mxGetDimensions(m_X_data))[0];
+  size_t card_dim1 = (mxGetDimensions(m_X_data))[1];
+  mwSize argMatDims_z1[2] = { card_dim0, card_dim1 };
+  mwSize argMatDims_z2[2] = { card_dim1, card_dim1 };
 
-  //argMatDims[0] = card;
-  //argMatDims[1] = card;
-
-  plhs[0] = mxCreateNumericArray(2,argMatDims,mxDOUBLE_CLASS,mxREAL);
-  plhs[1] = mxCreateNumericArray(2,argMatDims,mxDOUBLE_CLASS,mxREAL);
+  plhs[0] = mxCreateNumericArray(2,argMatDims_z1,mxDOUBLE_CLASS,mxREAL);
+  plhs[1] = mxCreateNumericArray(2,argMatDims_z2,mxDOUBLE_CLASS,mxREAL);
 
   double* m_Z1 = (double*) mxGetPr(plhs[0]);
   double* m_Z2 = (double*) mxGetPr(plhs[1]);
@@ -288,7 +286,9 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
   //size_t full_cardinalities[3] = { card, card, card};
 
   h_full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
-  h_full_cardinalities[0] = h_full_cardinalities[1] = h_full_cardinalities[2] = card;
+  h_full_cardinalities[0] = card_dim0;
+  h_full_cardinalities[1] = card_dim1;
+  h_full_cardinalities[2] = card_dim1;
 
   if(COUT)
     for (int i=0; i<3; i++)
@@ -304,7 +304,7 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
 
   mxArray* m_X_card = mxCreateNumericArray(1,&m_X_card_size,mxDOUBLE_CLASS,mxREAL);
 
-  size_t X_card[3] = {card, 0, card};
+  size_t X_card[3] = {card_dim0, 0, card_dim1};
   for (size_t i=0; i<3; i++)
     mxGetPr(m_X_card)[i] = X_card[i];
 
@@ -315,9 +315,9 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
   prepareHostTensorFromCpp(&Xhat, NULL, X_card, ndims, (const char*) "Host Xhat");
   prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
 
-  size_t Z1_card[3] = {card , card, 0};
+  size_t Z1_card[3] = {card_dim0 , card_dim1, 0};
   prepareHostTensorFromCpp(&Z1, NULL, Z1_card, ndims, (const char*) "Host Z1", true);
-  size_t Z2_card[3] = {0 , card, card};
+  size_t Z2_card[3] = {0 , card_dim1, card_dim1};
   prepareHostTensorFromCpp(&Z2, NULL, Z2_card, ndims, (const char*) "Host Z2", true);
 
   // used first as C must be zeroed for cpp to work

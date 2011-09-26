@@ -26,8 +26,8 @@ display('running');
 S = RandStream('mt19937ar');
 RandStream.setDefaultStream(S);
 
-I = 2;
-F = 2;
+I = 5;
+F = 3;
 T = 2;
 
 A_true = 10*rand(F, I);
