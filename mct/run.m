@@ -1,5 +1,9 @@
 format 'compact'
 
+for i=1:50
+  display('**');
+end
+
 !/usr/local/cuda/bin/nvcc -c -g  mct_tensorop_utils.cu mct_tensorop_cpp.cu mct_tensorop_gpu.cu mct_kernels.cu mct.cu -arch sm_13 -Xcompiler -fPIC -I /opt/matlab/extern/include -I /home/can2/nvidia/NVIDIA_GPU_Computing_SDK/C/common/inc/
 
 mex -largeArrayDims ...
@@ -13,19 +17,22 @@ mex -largeArrayDims ...
 
 rand('state',0);
 
-dim=5;
+dim=2;
 
-A=magic(dim);
-B=round(rand(dim,dim,dim)*10);
+A=round(rand(dim, 2*dim, 1)*10);
+B=round(rand(1, 2*dim, 3*dim)*10);
 
 % GPU code
 display('GPU run');
-tic; G=mct('tensor_gpu',A,[0 dim dim],B,[dim dim dim], [dim dim 0], 1); toc;
+G=0;
+tic; G=mct('tensor_gpu',A,[dim 2*dim 0],B,[0 dim 2*dim], [dim 0 3*dim], 1); toc;
 display('GPU result');
 display(G);
+
+
 % C code
 display('C code run')
-tic; C=mct('tensor_cpp',A,[0 dim dim],B,[dim dim dim], [dim dim 0], 1); toc;
+tic; C=mct('tensor_cpp',A,[dim 2*dim 0],B,[0 dim 2*dim], [dim 0 3*dim], 1); toc;
 display('CPU result');
 display(C);
 
@@ -48,5 +55,5 @@ else
 	display('OK: GPU and C code results match');
 end
 
-exit
+%exit
 

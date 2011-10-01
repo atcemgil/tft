@@ -118,7 +118,7 @@ void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, do
     genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(dp.d_full_cardinalities, ndims,
                                                     dp.d_strides_A, dp.d_strides_B, dp.d_strides_F,
                                                     dp.d_data_A, dp.d_data_B, dp.d_data_F,
-                                                    h_F.element_number,
+                                                    h_F.element_number, h_A.element_number, h_B.element_number, 
                                                     use_multiplication);
 
     // test full result
@@ -281,7 +281,7 @@ bool mct_tensorop_gpu_keys(bool isHadamard,
     genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(d_full_cardinalities, ndims,
                                                     d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
                                                     d_obj_data[A], d_obj_data[B], d_obj_data[F],
-                                                    h_objs[F]->element_number,
+                                                    h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number,
                                                     use_multiplication);
 
     // test full result

@@ -15,8 +15,15 @@ double get_element(const ct* h_ct, size_t* global_index, const char* str){
     if(h_ct->strides[dim] != 0 )
       cur_ind += h_ct->strides[dim] * global_index[dim];
   }
+
+  if ( cur_ind >= h_ct->element_number ) {
+    cur_ind=h_ct->element_number-1;
+    if ( COUT ) std::cout << std::endl << " warning: overriding to avoid h_ct overflow h_ct->element_number to " << cur_ind << std::endl;
+  }
+
   if ( COUT ) std::cout << " index " << cur_ind << " val " << h_ct->data[cur_ind]
                         << std::endl;
+
   return h_ct->data[cur_ind];
 }
 

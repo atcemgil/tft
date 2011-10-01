@@ -45,7 +45,8 @@ __global__ void hadamard_div(double* d_A, double* d_B, double* d_C, size_t C_ele
 // generates the full result tensor
 __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
                               size_t* d_strides_A, size_t* d_strides_B, size_t* d_strides_F,
-                              double* d_A, double* d_B, double* d_F, size_t F_element_number,
+                              double* d_A, double* d_B, double* d_F, 
+			      size_t F_element_number, size_t A_element_number, size_t B_element_number,
 			      size_t use_multiplication){
 
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -57,7 +58,7 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
     //      multiply corresponding elements of input tensors A and B
     
 #if CUPRINTF == true
-    cuPrintf("tid %d \n",tid);
+    cuPrintf("tid %d element numbers F %d A %d B %d \n",tid,F_element_number, A_element_number, B_element_number);
 #endif
 
     size_t F_ind=0;
@@ -85,10 +86,27 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
       if(dim == 0) break;
     }
 
+
+    if ( A_ind >= A_element_number ){
+#if CUPRINTF == true 
+      cuPrintf("A preventing index overflow index %d max %d\n",A_ind, A_element_number-1);
+#endif
+      A_ind = A_element_number-1;
+    }
+
+    if ( B_ind >= B_element_number ){
+#if CUPRINTF == true 
+      cuPrintf("B preventing index overflow index %d max %d\n",B_ind, B_element_number-1);
+#endif
+      B_ind = B_element_number-1;
+    }
+
+
     if (use_multiplication == 1)
       d_F[F_ind] = d_A[A_ind] * d_B[B_ind];
     else
       d_F[F_ind] = d_A[A_ind] / d_B[B_ind];
+
 
 #if CUPRINTF == true 
     double tmpval = 0;

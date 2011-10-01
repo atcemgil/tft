@@ -1,6 +1,6 @@
 format 'compact'
 rand('state',0);
-test_range=2:8:50;
+test_range=2:8:35;
 t_gpu=zeros(length(test_range),1);
 t_c=zeros(length(test_range),1);
 i=0;
@@ -39,8 +39,8 @@ for card=test_range
 end
 display(t_gpu);
 display(t_c);
-plot (test_range,t_c,'b-', test_range, t_gpu, 'r-')
+plot (test_range,t_c,'--', test_range, t_gpu, '-')
 legend('C code', 'GPU code')
-xlabel('one dimension cardinality')
+xlabel('Second dimension cardinality')
 ylabel('seconds')
 title('C code vs GPU code (NMF)')

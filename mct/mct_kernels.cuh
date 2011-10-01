@@ -5,7 +5,8 @@ __global__ void hadamard_mul(double* d_A, double* d_B, double* d_C, size_t C_ele
 __global__ void hadamard_div(double* d_A, double* d_B, double* d_C, size_t C_element_number);
 __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
                               size_t* d_strides_A, size_t* d_strides_B, size_t* d_strides_F,
-                              double* d_A, double* d_B, double* d_F, size_t F_element_number,
+                              double* d_A, double* d_B, double* d_F,
+			      size_t F_element_number, size_t A_element_number, size_t B_element_number,
 			      size_t use_multiplication);
 __global__ void contractFintoC(size_t ndims,
                                size_t* d_strides_F, size_t* d_strides_C,
