@@ -1,6 +1,6 @@
 format 'compact'
 rand('state',0);
-test_range=2:10:200;
+test_range=2:10:300;
 t_gpu=zeros(length(test_range),1);
 t_c=zeros(length(test_range),1);
 i=0;
@@ -12,7 +12,7 @@ for dim2=test_range
     display(['testing dim' num2str(dim2)]);
     A_card = [dim1 0 dim2 ];
     B_card = [dim1 dim1 dim1 ];
-    C_card = [dim1 dim1 0 dim1 ];
+    C_card = [dim1 dim1 0 ];
 
     A=round(rand(dim1, 1, dim2)*100);
     B=round(rand(dim1, dim1, dim1)*10);
