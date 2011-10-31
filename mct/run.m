@@ -55,5 +55,5 @@ else
 	display('OK: GPU and C code results match');
 end
 
-%exit
+exit
 
