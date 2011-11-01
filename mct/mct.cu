@@ -126,7 +126,14 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_typ
     }
   */
 
-  plhs[0] = mxCreateNumericArray(non_zero_dim_number,argMatDims,mxDOUBLE_CLASS,mxREAL);
+  if (non_zero_dim_number==0){
+    // contraction on all dimensions
+    // will result in a single number
+    mwSize argMatDim[1] = {1};
+    plhs[0] = mxCreateNumericArray(1,argMatDim,mxDOUBLE_CLASS,mxREAL);
+  }else{
+    plhs[0] = mxCreateNumericArray(non_zero_dim_number,argMatDims,mxDOUBLE_CLASS,mxREAL);
+  }
 
   // mwSize alldims[ndims];
   // for (size_t i=0; i<ndims; i++){
