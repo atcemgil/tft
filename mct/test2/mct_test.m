@@ -1,7 +1,11 @@
 function [] = mct_test()
+% mct test function
+    display('mct test');
 
     % all numbers must be different for proper card_C selection
-    V=[2 3 4];
+    %V=[2 3 4];
+    V=[2 3 4 5 6];
+        
 
     % all possible tensors cardinality sets using index set V
     cards = perms(V);
@@ -40,13 +44,14 @@ function [] = mct_test()
     opnum=0;
     illegal_count=0;
     error=0;
+    times=[];
 
     for card_A_ind=1:size(cards_AB,1)
         for card_B_ind=1:size(cards_AB,1)
             for card_C_ind=1:size(cards_C,1)
                 opnum = opnum + 1;
 
-                display(['opnum ' num2str(opnum) '\n\n']);
+                display([char(10) char(10) 'opnum ' num2str(opnum)]);
 
                 card_A = cards_AB(card_A_ind,:);
                 card_B = cards_AB(card_B_ind,:);
@@ -74,27 +79,33 @@ function [] = mct_test()
                 tic; [op_m, ~] = tensormul( A, card_A, B, card_B, card_C, ...
                                             VERBOSITY , [] ); time_m = toc;
 
-                display('output_m')
-                display(op_m)
+                if VERBOSITY > 0
+                    display('output_m')
+                    display(op_m)
+                end
 
                 % perform operation on gpu
                 tic; op_g=mct('tensor_gpu',A,card_A,B,card_B,card_C,1); ...
                           time_g=toc;
 
-                display('output_g')
-                display(op_g)
+                if VERBOSITY > 0
+                    display('output_g')
+                    display(op_g)
+                end
 
                 % perform operation on cpu with C code
                 tic; op_c=mct('tensor_cpp',A,card_A,B,card_B,card_C,1); time_c=toc;
 
-                display('output_c')
-                display(op_c)
+                if VERBOSITY > 0
+                    display('output_c')
+                    display(op_c)
+                
+                    display(['timings m ' num2str(time_m) ' g ' ...
+                             num2str(time_g) ' c ' num2str(time_c) ...
+                            ])
+                end
 
-
-                display(['timings m ' num2str(time_m) ' g ' ...
-                         num2str(time_g) ' c ' num2str(time_c) ...
-                        ])
-
+                times = [times ; [time_m time_c time_g]];
 
                 error = error + test_equality(op_m, op_c, opnum);
                 error = error + test_equality(op_c, op_g, opnum);
@@ -106,7 +117,19 @@ function [] = mct_test()
     display(['illegal_count ' num2str(illegal_count)])
     display(['valid _count ' num2str(opnum-illegal_count)])
     display(['errors ' num2str(error)])
-    exit
+
+    hist(times(:,1));
+    title('Matlab code');
+    xlabel('seconds')
+    figure
+    hist(times(:,2));
+    title('Sequential code');
+    xlabel('seconds')
+    figure
+    hist(times(:,3));
+    title('Parallel code');
+    xlabel('seconds')
+    %exit
 end
 
 
