@@ -3,13 +3,12 @@ function [] = mct_test()
     display('mct test');
 
     % all numbers must be different for proper card_C selection
-    %V=[2 3 4];
-    V=[2 3 4 5 6];
+    V=[2 3 4];
+    %V=[2 3 4 5];
         
 
     % all possible tensors cardinality sets using index set V
     cards = perms(V);
-    cards_AB = cards;
 
     % all possible output tensors using cards
     for c=1:size(cards,1)
@@ -33,6 +32,9 @@ function [] = mct_test()
     end
 
     cards_C = [cards ; zeros(1, length(V))];
+
+    cards_AB = cards_C;
+    cards_AB(cards_AB==0)=1;
 
     S = RandStream('mt19937ar');
     RandStream.setDefaultStream(S);
@@ -115,7 +117,7 @@ function [] = mct_test()
         end
     end
     display(['illegal_count ' num2str(illegal_count)])
-    display(['valid _count ' num2str(opnum-illegal_count)])
+    display(['valid count ' num2str(opnum-illegal_count)])
     display(['errors ' num2str(error)])
 
     hist(times(:,1));
