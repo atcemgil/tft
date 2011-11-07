@@ -12,6 +12,8 @@
 //#include <vector>
 
 #include <string.h>
+#include <sstream>
+
 
 #include "mct_tensorop_utils.cuh"
 
@@ -27,6 +29,8 @@ enum op_type {
   tensor_cpp,
   nmf_gpu,
   nmf_cpp,
+  pltf_gpu,
+  pltf_cpp,
   num_of_op_types
 };
 
@@ -235,17 +239,35 @@ void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool
   oc.B = B;
   oc.C = C;
   oc.F = F;
-  oc.result_in_F = false;
+  oc.result_in_F = false;  /// dikkat !!!
 
-  if (opt == nmf_gpu){
+  if (opt == nmf_gpu || opt == pltf_gpu){
     oc.operate = &mct_tensorop_gpu_keys;
-  }else if (opt == nmf_cpp){
+  }else if (opt == nmf_cpp || opt == pltf_cpp){
     oc.operate = &mct_tensorop_cpp_keys;
   }
 
-
   operation_chain->push_back(oc);
+
+
+
+  size_t* full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
+
+  for (size_t dim=0; dim<ndims; dim++){
+    size_t max_dim_card = 0;
+    if ( max_dim_card < h_objs[A]->cardinalities[dim] )
+      max_dim_card = h_objs[A]->cardinalities[dim];
+    if ( max_dim_card < h_objs[B]->cardinalities[dim] )
+      max_dim_card = h_objs[B]->cardinalities[dim];
+    if ( max_dim_card < h_objs[C]->cardinalities[dim] )
+      max_dim_card = h_objs[C]->cardinalities[dim];
+
+    full_cardinalities[dim] = max_dim_card;
+  }
 }
+
+
+
 
 
 
@@ -328,7 +350,7 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
   prepareHostTensorFromCpp(&Z2, NULL, Z2_card, ndims, (const char*) "Host Z2", true);
 
   // used first as C must be zeroed for cpp to work
-  prepareHostTensorFromCpp(&D1_z1, NULL, Z1_card, ndims, (const char*) "Host D1_z1"); 
+  prepareHostTensorFromCpp(&D1_z1, NULL, Z1_card, ndims, (const char*) "Host D1_z1");
   prepareHostTensorFromCpp(&D1_z2, NULL, Z2_card, ndims, (const char*) "Host D1_z2");
 
   prepareHostTensorFromCpp(&D2_z1, NULL, Z1_card, ndims, (const char*) "Host D2_z1");
@@ -375,58 +397,59 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
   oc_push_back(&operation_chain, true , 0, ndims, "D1_z2", "D2_z2", "D1_z2", opt);
   oc_push_back(&operation_chain, true , 1, ndims, "Z2", "D1_z2", "Z2", opt);
 
+  print_oc(&operation_chain);
 
   for (int iter=0; iter<30; iter++){
     //if (opt == nmf_gpu)
 
-      operate(&operation_chain);
+    operate(&operation_chain);
 
     /*    else{
-      ///////////////////////////////////////////////////////////////////// siil ////
-      std::vector<operation>::iterator it;
-      for ( it=operation_chain.begin() ; it < operation_chain.end(); it++ ){
+///////////////////////////////////////////////////////////////////// siil ////
+std::vector<operation>::iterator it;
+for ( it=operation_chain.begin() ; it < operation_chain.end(); it++ ){
 
-        size_t h_zero_cardinality_dim_tuple_size_C = 0;
-        size_t h_zero_cardinality_dim_tuples_C_element_number = 0;
-        size_t* h_zero_cardinality_dim_tuples_C = NULL;
+size_t h_zero_cardinality_dim_tuple_size_C = 0;
+size_t h_zero_cardinality_dim_tuples_C_element_number = 0;
+size_t* h_zero_cardinality_dim_tuples_C = NULL;
 
-        if ( it->isHadamard == false){
-          std::vector<size_t> zero_cardinality_dims;
-          //std::vector<size_t> non_zero_cardinality_dims;
-          for ( size_t dim=0; dim<ndims; dim++ ){
-            if ( h_objs[it->C]->cardinalities[dim] == 0 && h_objs[it->F]->cardinalities[dim] != 0 ){
-              zero_cardinality_dims.push_back(h_objs[it->F]->cardinalities[dim]);
-            }
-            // else{
-            //   non_zero_cardinality_dims.push_back(h_objs[it->F]->cardinalities[dim]);
-            // }
-          }
+if ( it->isHadamard == false){
+std::vector<size_t> zero_cardinality_dims;
+//std::vector<size_t> non_zero_cardinality_dims;
+for ( size_t dim=0; dim<ndims; dim++ ){
+if ( h_objs[it->C]->cardinalities[dim] == 0 && h_objs[it->F]->cardinalities[dim] != 0 ){
+zero_cardinality_dims.push_back(h_objs[it->F]->cardinalities[dim]);
+}
+// else{
+//   non_zero_cardinality_dims.push_back(h_objs[it->F]->cardinalities[dim]);
+// }
+}
 
-          // std::cout << "non_zero_cardinality_dims" << std::endl;
-          // for ( size_t j=0; j<non_zero_cardinality_dims.size(); j++){
-          //   std::cout << non_zero_cardinality_dims.at(j) << std::endl;
-          // }
+// std::cout << "non_zero_cardinality_dims" << std::endl;
+// for ( size_t j=0; j<non_zero_cardinality_dims.size(); j++){
+//   std::cout << non_zero_cardinality_dims.at(j) << std::endl;
+// }
 
-          if ( COUT ) {
-            std::cout << "zero_cardinality_dims" << std::endl;
-            for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
-              std::cout << zero_cardinality_dims.at(j) << std::endl;
-            }
-          }
+if ( COUT ) {
+std::cout << "zero_cardinality_dims" << std::endl;
+for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
+std::cout << zero_cardinality_dims.at(j) << std::endl;
+}
+}
 
-          h_zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
+h_zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
 
 
-          //h_zero_cardinality_dim_tuples_C_element_number; // set by gen_range_permutation
+//h_zero_cardinality_dim_tuples_C_element_number; // set by gen_range_permutation
 
-          h_zero_cardinality_dim_tuples_C =
-            gen_range_permutation(zero_cardinality_dims,
-                                  &(h_zero_cardinality_dim_tuples_C_element_number));
-        }
+h_zero_cardinality_dim_tuples_C =
+gen_range_permutation(zero_cardinality_dims,
+&(h_zero_cardinality_dim_tuples_C_element_number));
+}
 
-        mct_tensorop_cpp(it->isHadamard, *(h_objs[it->A]), *(h_objs[it->B]), *(h_objs[it->C]), NULL, *(h_objs[it->F]), ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
-      }
-    }
+mct_tensorop_cpp(it->isHadamard, *(h_objs[it->A]), *(h_objs[it->B]), *(h_objs[it->C]), NULL, *(h_objs[it->F]), ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
+}
+}
     */
 
     //////////////////////////////////////////////////////////////////////////////////
@@ -470,6 +493,367 @@ void nmfop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type o
 
 
 
+
+
+
+
+
+void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type opt){
+
+
+  if ( nrhs < (6+1) ){
+    std::cout << "mct: Factorization operation requires at least 6 arguments. " << std::endl
+              << "V, index set of factorization operation, example ['i', 'j', 'k']" << std::endl
+              << "cardinalities, cardinality for each index provided in V, example [2, 3, 4]" << std::endl
+              << "X, index set and data elements for the tensor to be factorized, example ['i','j'], X" << std::endl
+              << "Z_alpha, desired factor tensors, example ['i', 'j'], ['j', 'k'] " << std::endl
+              << std::endl << "Tensor objects are represented by the indices they use from the index set V." << std::endl
+              << "Specified index order must match given data dimension order."
+              << std::endl;
+    return;
+  }
+
+
+  // prepare model elements  //////////////////////////////////////////////////////
+
+  size_t factor_count = nrhs - 5;
+
+  m_tensor x_tensor;
+  x_tensor.cards_char = mxGetChars(prhs[3]);
+  x_tensor.factor_ndims = (size_t) mxGetNumberOfElements(prhs[3]);
+  const mxArray* x_tensor_data = prhs[4];
+
+  std::vector<m_tensor> model_elements;
+  for (size_t t=0; t<factor_count; t++){
+    m_tensor tmp_m_tensor;
+    tmp_m_tensor.cards_char = mxGetChars(prhs[ 5 + t ]);
+    tmp_m_tensor.factor_ndims = (size_t) mxGetNumberOfElements(prhs[5 + t]);
+    model_elements.push_back(tmp_m_tensor);
+  }
+
+  if(COUT) std::cout << "found " << model_elements.size() << " model elements" << std::endl;
+
+  if( nlhs != model_elements.size() ){
+    std::cout << "mct: this factorization requires " << model_elements.size() << " number of output arguments, given: " << nlhs << std::endl;
+    // print help;
+    return;
+  }
+
+
+  // prepare cards_numeric indices of model elements
+  // input arrives like so:
+  // A['i','k'], B['k', 'j'], C['i','j'] where V is ['i','k','j'] = [2 3 4]
+  // here we convert indices to internal format:
+  // A[2, 3, 0], B[0, 3, 4], C[2, 0, 4]
+  mxChar* V_char = mxGetChars(prhs[1]);
+  size_t ndims = mxGetNumberOfElements(prhs[1]);
+  double* V_numeric = (double*) mxGetData(prhs[2]);
+
+  for (size_t m=0; m<model_elements.size(); m++){
+    assign_m_tensor_cards_numeric(&(model_elements[m]), V_char, V_numeric, ndims);
+  }
+  assign_m_tensor_cards_numeric(&x_tensor, V_char, V_numeric, ndims);
+
+  if(COUT) print_model_elements(&model_elements, &x_tensor);
+
+  // now all tensors have correct internal cardinalities.
+  // all numeric cardinality arrays (m_tensor.char_numeric) are of same size as V
+  // -> ndims
+
+
+  // more input sanity check may be nice
+
+
+
+  // prepare output tensor in matlab  //////////////////////////////////////////////////////
+
+  std::vector<double*> output_data_ptr;
+
+
+  for (size_t t=0; t<model_elements.size(); t++){
+     // size_t non_zero_dims=0;
+     // for (size_t i=0; i<ndims; i++) {
+     //   if ( model_elements[t].cards_numeric[i] != 0){
+     // 	non_zero_dims++;
+     //   }
+     // }
+
+    //mwSize argMatDims[non_zero_dims];
+    //size_t j=0;
+    mwSize argMatDims[ndims];
+    for (size_t i=0; i<ndims; i++) {
+      size_t val = model_elements[t].cards_numeric[i];
+       if (val == 0) argMatDims[i] = 1; // MATLAB needs to get 1 instead of 0
+       else          argMatDims[i] = val;
+      // if (val != 0){
+      //  	argMatDims[j] = val;
+      // 	j++;
+      // }
+    }
+
+
+    plhs[t] = mxCreateNumericArray(ndims, argMatDims, mxDOUBLE_CLASS, mxREAL);
+    //plhs[t] = mxCreateNumericArray(non_zero_dims, argMatDims, mxDOUBLE_CLASS, mxREAL);
+
+    output_data_ptr.push_back( (double*) mxGetPr(plhs[t]) );
+  }
+
+
+  // prepare host memory for tensors  ///////////////////////////////////////////////////////
+
+  h_full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
+  h_full_cardinalities2 = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
+
+  for (size_t dim=0; dim<ndims; dim++){
+    size_t max_dim_card = 0;
+
+    for (size_t t=0; t<model_elements.size(); t++){
+      size_t tensor_dim_card = model_elements[t].cards_numeric[dim];
+      if ( max_dim_card < tensor_dim_card )
+        max_dim_card = tensor_dim_card;
+    }
+
+    size_t tensor_dim_card = x_tensor.cards_numeric[dim] ;
+    if ( max_dim_card < tensor_dim_card )
+      max_dim_card = tensor_dim_card;
+
+    h_full_cardinalities[dim] = max_dim_card;
+    h_full_cardinalities2[dim] = 5;
+  }
+
+
+  if(COUT)
+    for (int i=0; i<ndims; i++)
+      std::cout << "h_full_cardinalities " << i << " " << h_full_cardinalities[i] << std::endl;
+
+
+  // initialize random seed for random initialization of objects
+  //srand((unsigned)time(NULL));
+  srand(123);
+
+
+  std::vector<ct> Z_tensors;
+  std::vector<ct> D_tensors;
+  for (size_t t=0; t<model_elements.size(); t++){
+    ct tmp_ct;
+    ct tmp_ct_D1;
+    ct tmp_ct_D2;
+
+    size_t Z_card[ndims];
+    for (size_t i=0; i<ndims; i++) Z_card[i] = model_elements[t].cards_numeric[i];
+
+    std::stringstream z;
+    z << "Host Z" << t;
+    prepareHostTensorFromCpp(&tmp_ct, NULL, Z_card, ndims, z.str().c_str(), true);
+
+    std::stringstream d1;
+    d1 << "Host D1_Z" << t;
+    prepareHostTensorFromCpp(&tmp_ct_D1, NULL, Z_card, ndims, d1.str().c_str(), true);
+    std::stringstream d2;
+    d2 << "Host D2_Z" << t;
+    prepareHostTensorFromCpp(&tmp_ct_D2, NULL, Z_card, ndims, d2.str().c_str(), true);
+
+
+    Z_tensors.push_back(tmp_ct);
+    D_tensors.push_back(tmp_ct_D1);
+    D_tensors.push_back(tmp_ct_D2);
+  }
+
+
+
+  ct Xhat, X, A, F, M;
+
+  mwSize ndims_mwsize = ndims;
+  mxArray* m_X_card = mxCreateNumericArray(1, &ndims_mwsize, mxDOUBLE_CLASS, mxREAL);
+
+  size_t X_card[ndims];
+  for (size_t i=0; i<ndims; i++){
+    X_card[i] = x_tensor.cards_numeric[i];
+    mxGetPr(m_X_card)[i] = X_card[i];
+  }
+
+
+  prepareHostTensor(&X, x_tensor_data, m_X_card, (const char*) "Host X");
+
+  double M_data[X.mem_size];
+  for(size_t i=0; i<X.mem_size; i++) M_data[i]=1;
+  prepareHostTensorFromCpp(&M, M_data, X_card, ndims, (const char*) "Host M");
+
+  prepareHostTensorFromCpp(&A, NULL, X_card, ndims, (const char*) "Host A"); // init with 0
+  prepareHostTensorFromCpp(&Xhat, NULL, X_card, ndims, (const char*) "Host Xhat");
+  prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
+
+
+  // used first as C must be zeroed for cpp to work
+  //prepareHostTensorFromCpp(&D1_z1, NULL, Z1_card, ndims, (const char*) "Host D1_z1");
+  //prepareHostTensorFromCpp(&D1_z2, NULL, Z2_card, ndims, (const char*) "Host D1_z2");
+
+  //prepareHostTensorFromCpp(&D2_z1, NULL, Z1_card, ndims, (const char*) "Host D2_z1");
+  //prepareHostTensorFromCpp(&D2_z2, NULL, Z2_card, ndims, (const char*) "Host D2_z2");
+
+  /*
+    if(PRINT_CT){
+    print_ct("random Z1 init", &Z1, true);
+    print_ct("random Z2 init", &Z2, true);
+    print_ct("target X (cpp side)", &X, true);
+    print_ct("F (cpp side)", &F, true);
+    }
+  */
+
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+
+  // register & transfer objects to device //////////////////////////////////////////////////
+
+  for (size_t z=0; z<Z_tensors.size(); z++){
+    std::stringstream name;
+    name << 'Z' << z;
+    register_ct( name.str().c_str(), &(Z_tensors[z]) );
+
+    std::stringstream d_name1;
+    d_name1 << "D1_Z" << z;
+    register_ct( d_name1.str().c_str(), &D_tensors[z*2]);
+
+    std::stringstream d_name2;
+    d_name2 << "D2_Z" << z;
+    register_ct( d_name2.str().c_str(), &D_tensors[z*2+1]);
+  }
+
+  REGISTER_CT(Xhat); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
+
+  if (opt==pltf_gpu)
+    transferToDevice(ndims);
+
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+
+  // perform PLTF operation //////////////////////////////////////////////////////////////////
+
+
+
+  //  equalize dimensions, put 0 for non existent in correct order
+
+
+
+  std::vector<operation> operation_chain;
+
+  for ( size_t t=0; t<model_elements.size(); t++){
+    // zN update
+
+    // Z0 * Z1 -> Xhat
+    // Z2 * Xhat -> Xhat
+    // ...
+    //oc_push_back(&operation_chain, false, 1, ndims, "Z1", "Z2", "Xhat", opt);
+    for (size_t z=0; z<Z_tensors.size(); z++){
+      if (z==0) continue;
+      if (z==1) oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "Xhat", opt);
+      else{
+        std::stringstream Zn;
+        Zn << 'Z' << z;
+        oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "Xhat", "Xhat", opt);
+      }
+    }
+
+
+
+    oc_push_back(&operation_chain, true , 0, ndims, "X", "Xhat", "A", opt);
+    oc_push_back(&operation_chain, true , 1, ndims, "M", "A", "A", opt);
+
+    std::stringstream d1;
+    d1 << "D1_Z" << t;
+    size_t tmp_op_count=0;
+    for (size_t other_z=0; other_z < Z_tensors.size(); other_z++){
+      if (other_z == t) continue;
+
+      std::stringstream other_z_name;
+      other_z_name << "Z" << other_z;
+
+      if ( tmp_op_count == 0 )  oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), opt);
+      else                      oc_push_back(&operation_chain, false, 1, ndims, d1.str().c_str(), other_z_name.str().c_str(), d1.str().c_str(), opt);
+      tmp_op_count++;
+    }
+
+
+    std::stringstream d2;
+    d2 << "D2_Z" << t;
+    tmp_op_count=0;
+    for (size_t other_z=0; other_z < Z_tensors.size(); other_z++){
+      if (other_z == t) continue;
+
+      std::stringstream other_z_name;
+      other_z_name << "Z" << other_z;
+
+      if ( tmp_op_count == 0 )  oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), opt);
+      else                      oc_push_back(&operation_chain, false, 1, ndims, d2.str().c_str(), other_z_name.str().c_str(), d2.str().c_str(), opt);
+      tmp_op_count++;
+    }
+
+    oc_push_back(&operation_chain, true , 0, ndims, d1.str().c_str(), d2.str().c_str(), d1.str().c_str(), opt);
+
+    std::stringstream Zn;
+    Zn << 'Z' << t ;
+    oc_push_back(&operation_chain, true , 1, ndims, Zn.str().c_str(), d1.str().c_str(), Zn.str().c_str(), opt);
+  }
+
+  if (PRINT_CHAIN) print_oc(&operation_chain);
+
+
+  for (int iter=0; iter<30; iter++){
+    //if (opt == nmf_gpu)
+
+    operate(&operation_chain);
+
+    //////////////////////////////////////////////////////////////////////////////////
+
+
+
+    //    if (iter % 10 == 0 || iter==99 || iter == 98){
+    // std::cout << "iter " << iter << std::endl;
+    // if (opt == nmf_gpu) transferFromDevice(Z1.data, "Z1");
+    // print_ct("current Z1", &Z1, true);
+
+    // if (opt == nmf_gpu) transferFromDevice(Z2.data, "Z2");
+    // print_ct("current Z2", &Z2, true);
+    //}
+
+  }
+
+
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+  // transfer results to matlab /////////////////////////////////////////////////////////////
+
+  if ( opt == pltf_gpu){
+    for (size_t z=0; z<model_elements.size(); z++){
+      std::stringstream Zn;
+      Zn << 'Z' << z;
+      transferFromDevice(output_data_ptr[z], Zn.str().c_str());
+    }
+    //transferFromDevice(m_Z1, "Z1");
+    //transferFromDevice(m_Z2, "Z2");
+  }else if ( opt == pltf_cpp){
+    for (size_t z=0; z<model_elements.size(); z++){
+      memcpy(output_data_ptr[z], Z_tensors[z].data, Z_tensors[z].mem_size);
+    }
+    //memcpy(m_Z1, Z1.data, Z1.mem_size);
+    //memcpy(m_Z2, Z2.data, Z2.mem_size);
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+
+  // reset device
+  if (opt == nmf_gpu)
+    resetDevice();
+
+
+}
+
+
+
+
+
+
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
   if ( COUT ) std::cout << "mct: found " << nrhs << " number of arguments " << std::endl;
@@ -503,6 +887,12 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   }else if (strcmp(op_name, "tensor_cpp") == 0){
     if ( COUT ) std::cout << "selecting tensor operation on CPU" << std::endl;
     opt=tensor_cpp;
+  }else if (strcmp(op_name, "pltf_gpu") == 0){
+    if ( COUT ) std::cout << "selecting factorization operation on GPU" << std::endl;
+    opt=pltf_gpu;
+  }else if (strcmp(op_name, "pltf_cpp") == 0){
+    if ( COUT ) std::cout << "selecting factorization operation on CPU" << std::endl;
+    opt=pltf_cpp;
   }else{
     std::cout << "mct: unknown operation: " << op_name << std::endl;
     // print help;
@@ -513,5 +903,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     nmfop(nlhs, plhs, nrhs, prhs, opt);
   }else if ( opt == tensor_gpu || opt == tensor_cpp ){
     tensorop(nlhs, plhs, nrhs, prhs, opt);
+  }else if ( opt == pltf_gpu || opt == pltf_cpp){
+    pltf(nlhs, plhs, nrhs, prhs, opt);
   }
 }

@@ -22,8 +22,9 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
 #include <string>
 #include <map>
 
-extern std::map<std::string,ct*> h_objs; // defined extern elsewhere
-extern size_t* h_full_cardinalities;     // defined extern elsewhere
+extern std::map<std::string,ct*> h_objs; // defined in mct_tensorop_utils.cu
+extern size_t* h_full_cardinalities;     // defined in mct_tensorop_utils.cu
+extern size_t* h_full_cardinalities2;     // defined in mct_tensorop_utils.cu
 
 void register_ct(std::string key, ct* obj);
 void clear_ct();
@@ -59,9 +60,11 @@ struct operation{
 };
 
 #include <vector>
+void print_oc(std::vector<operation>* operation_chain);
 void operate(std::vector<operation>* operation_chain);
 
 bool check_input_keys(std::string A, std::string B, std::string C, std::string F);
 
-
+void print_model_elements(std::vector<m_tensor>* model_elements, m_tensor* x_tensor);
+void assign_m_tensor_cards_numeric(m_tensor* m_t, mxChar* V_char, double* V_numeric, size_t ndims);
 #endif

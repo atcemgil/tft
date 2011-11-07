@@ -63,4 +63,13 @@ struct dev_ptrs{
   size_t zero_cardinality_dim_tuples_C_element_number;
 };
 
+
+#include <vector>
+#include "mex.h"
+struct m_tensor{
+  mxChar* cards_char; // ['i', 'j'] 
+  size_t factor_ndims;
+  std::vector<size_t> cards_numeric; // [2, 3, 0]
+};
+
 #endif

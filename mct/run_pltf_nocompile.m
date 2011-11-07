@@ -4,69 +4,44 @@ for i=1:40
     display('****');
 end
 
-!rm *.o *.mexa64
-
-display('compiling');
-
-!/usr/local/cuda/bin/nvcc -c -g  mct_tensorop_utils.cu mct_tensorop_cpp.cu mct_tensorop_gpu.cu mct_kernels.cu mct.cu -arch sm_13 -Xcompiler -fPIC -I /opt/matlab/extern/include -I /home/can2/nvidia/NVIDIA_GPU_Computing_SDK/C/common/inc/
-
-display('linking');
-mex -largeArrayDims ...
-    mct.o mct_tensorop_utils.o mct_tensorop_cpp.o ...
-    mct_tensorop_gpu.o mct_kernels.o ...
-    cutil/bank_checker.cpp.o cutil/cmd_arg_reader.cpp.o ...
-    cutil/cutil.cpp.o ...
-    cutil/multithreading.cpp.o cutil/param.cpp.o ...
-    cutil/stopwatch.cpp.o cutil/stopwatch_linux.cpp.o  ...
-    -L /usr/local/cuda/lib64 -lcudart -lcufft
-
-
-display('running');
 
 S = RandStream('mt19937ar');
 RandStream.setDefaultStream(S);
 
-I = 3;
-F = 2;
-T = 4;
+I=3;
+K=2;
+J=3;
 
-A_true = 10*rand(F, I)
-B_true = 10*rand(I, T)
-L = A_true*B_true;
-
-X = poissrnd(L);
-
-M=ones(size(X))
-
-
+X = 10*rand(I,J)
 
 % GPU code
-display('GPU run');
-tic; [Z1_gpu Z2_gpu]=mct('nmf_gpu',X, M); toc;
+display([char(10) char(10) 'GPU run']);
+tic; [Z1_gpu Z2_gpu]=mct('pltf_gpu', ['i','k','j'], [I K J], ['i','j'], X, ['i','k'], ['k','j']); toc;
+
 display('GPU result');
 display('Z1 result');
 display(Z1_gpu);
 display('Z2 result');
 display(Z2_gpu);
 display('X result');
-display(Z1_gpu*Z2_gpu);
+display(reshape(Z1_gpu,I,K)*reshape(Z2_gpu,K,J));
+
 
 % C code
-display('C code run')
-tic; [Z1_cpp Z2_cpp]=mct('nmf_cpp',X, M); toc;
+display([char(10) char(10) 'C code run'])
+tic; [Z1_cpp Z2_cpp]=mct('pltf_cpp', ['i','k','j'], [I K J], ['i','j'], X, ['i','k'], ['k','j']); toc;
 display('CPU result');
 display('Z1 result');
 display(Z1_cpp);
 display('Z2 result');
 display(Z2_cpp);
 display('X result');
-display(Z1_cpp*Z2_cpp);
+display(reshape(Z1_cpp,I,K) * reshape(Z2_cpp,K,J));
 
 
+display([char(10) char(10) 'comparing GPU and C code'])
 
-display('comparing GPU and C code')
-
-epsilon=0.001
+%epsilon=0.001
 
 numeldiff_z1 = numel(Z1_cpp) - numel(Z1_gpu);
 allequal_z1=0;

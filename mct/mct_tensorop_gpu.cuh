@@ -23,7 +23,7 @@ bool mct_tensorop_gpu_keys( bool isHadamard,
 			    std::string F="F"
 			    );
 
-void transferToDevice(size_t ndims);
+void transferToDevice(size_t full_ndims);
 void resetDevice();
 void transferFromDevice(double* matlab_storage, std::string d_storage_key);
 

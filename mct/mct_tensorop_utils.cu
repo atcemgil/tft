@@ -10,6 +10,7 @@
 // real definitions for global (extern) variables
 std::map<std::string,ct*> h_objs;
 size_t* h_full_cardinalities;
+size_t* h_full_cardinalities2;
 
 void register_ct(std::string key, ct* obj){
   h_objs[key] = obj;
@@ -76,7 +77,7 @@ void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_ca
 
   // assign h_ct host data
   size_t elnum = (size_t) mxGetNumberOfElements(m_data);
-  if ( txt != NULL && COUT ){
+  if ( txt != NULL && (PRINT_CT || COUT) ){
     std::cout << txt << std::endl;
   }
   if ( COUT ) std::cout << "prepareDeviceTensor elnum " << elnum << std::endl;
@@ -117,7 +118,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   }
 
   // assign h_ct host data
-  if ( txt != NULL && COUT == true){
+  if ( txt != NULL && ( COUT || PRINT_CT) ){
     std::cout << txt << std::endl;
   }
   if ( COUT ) std::cout << "prepareDeviceTensor elnum " << elnum << std::endl;
@@ -127,11 +128,11 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   if (data == NULL){
     //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
     h_ct->data = (double*) malloc(h_ct->mem_size);
-    for (size_t i=0; i<h_ct->element_number; i++ ) 
+    for (size_t i=0; i<h_ct->element_number; i++ )
       if (rand)
-	h_ct->data[i]= ((double) std::rand()) / (double)(RAND_MAX+1.0);
+        h_ct->data[i]= ((double) std::rand()) / (double)(RAND_MAX+1.0);
       else
-	h_ct->data[i]=(double)0;
+        h_ct->data[i]=(double)0;
 
   }else{
     h_ct->data = (double*)malloc( h_ct->mem_size );
@@ -231,11 +232,11 @@ void operate(std::vector<operation>* operation_chain){
 
     std::string A = it->A;
     std::string B = it->B;
-    
-    if ( it != operation_chain->begin() && // if this is not the first operation and
-	 (it-1)->result_in_F){ // previous operation's result was stored in F instead of C
 
-      //we must use F instead of C in next operation for any input named 
+    if ( it != operation_chain->begin() && // if this is not the first operation and
+         (it-1)->result_in_F){ // previous operation's result was stored in F instead of C
+
+      //we must use F instead of C in next operation for any input named
       //same as previous operation's output object (C)
 
       // example:
@@ -247,32 +248,85 @@ void operate(std::vector<operation>* operation_chain){
       // thus if we are using H in current operation's input (A or B)
       // we must not use the object pointed by C (H) in previous operation
       // but instead use the object pointed by F in previous operation
-      
+
       if ( it->A.compare( (it-1)->C ) == 0)
-	A = (it-1)->F;
+        A = (it-1)->F;
 
       if ( it->B.compare( (it-1)->C ) == 0)
-	B = (it-1)->F;
+        B = (it-1)->F;
 
     }
 
     if (COUT_operate)
-      std::cout << "util: operate A " << A << " B " << B << " C " << it->C << " F " << it->F 
-		<< " chain size " << operation_chain->size() 
-		<< std::endl;
-    
-    (it->operate) (it->isHadamard, 
-		   it->use_multiplication, 
-		   it->ndims, 
-		   &(it->result_in_F), 
-		   A, B, it->C, 
-		   it->F);
+      std::cout << "util: operate A " << A << " B " << B << " C " << it->C << " F " << it->F
+                << " chain size " << operation_chain->size()
+                << std::endl;
+
+    (it->operate) (it->isHadamard,
+                   it->use_multiplication,
+                   it->ndims,
+                   &(it->result_in_F),
+                   A, B, it->C,
+                   it->F);
 
     if (COUT_operate)
       std::cout << " util result: result_in_F " << it->result_in_F
-		<< std::endl;
+                << std::endl;
 
   }
 
 }
 
+void print_oc(std::vector<operation>* operation_chain){
+  std::cout << "printing operation chain" << std::endl;
+
+  for (int o=0; o<(*operation_chain).size(); o++){
+    operation* oc = &((*operation_chain)[o]);
+    std::cout << "operation " << o << std::endl
+              << "A " << (*oc).A << " B " << (*oc).B << " C " << (*oc).C << " F " << (*oc).F << std::endl
+              << "ndims "<< (*oc).ndims << " result_in_F " << (*oc).result_in_F << " isHadamard " << (*oc).isHadamard << " use_multiplication " << (*oc).use_multiplication << std::endl;
+  }
+}
+
+void print_m_tensor(m_tensor* m_t){
+  std::cout << "cards_char element number " << (*m_t).factor_ndims << std::endl;
+  for (size_t m_i=0; m_i<(*m_t).factor_ndims; m_i++){
+    std::cout << (char) (*m_t).cards_char[m_i]  <<" ";
+  }
+  std::cout << std::endl << "cards_numeric number " << (*m_t).cards_numeric.size() << std::endl;
+  for (size_t m_i=0; m_i<(*m_t).cards_numeric.size(); m_i++){
+    std::cout << (size_t) (*m_t).cards_numeric[m_i] << " ";
+  }
+}
+
+void print_model_elements(std::vector<m_tensor>* model_elements, m_tensor* x_tensor){
+  std::cout << "printing model elements" << std::endl;
+  for (size_t m=0; m<(*model_elements).size(); m++){
+    print_m_tensor( &(*model_elements)[m] );
+    std::cout << std::endl;
+  }
+
+  std::cout << "printing X tensor" << std::endl;
+  print_m_tensor( x_tensor );
+  std::cout << std::endl;
+
+}
+void assign_m_tensor_cards_numeric(m_tensor* m_t, mxChar* V_char, double* V_numeric, size_t ndims){
+  for (size_t i=0; i<ndims; i++){
+    bool found=false;
+    for (size_t m_i=0; m_i< m_t->factor_ndims; m_i++){
+      //std::cout << "cards_char["<<m_i<<"] " << (char) m_t->cards_char[m_i]
+      //<< " V_char["<<i<<"] " << (char)V_char[i] << std::endl;
+      if ( (char)m_t->cards_char[m_i] == (char)V_char[i] ){
+        m_t->cards_numeric.push_back(V_numeric[i]);
+        //std::cout << " insert V_numeric[" << i << "] " << V_numeric[i] << std::endl;
+        found=true;
+        break; // goto next dimension
+      }
+    }
+    if (!found){
+      m_t->cards_numeric.push_back(0);
+      //std::cout << " insert 0 " << std::endl;
+    }
+  }
+}

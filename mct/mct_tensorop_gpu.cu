@@ -197,13 +197,13 @@ void mct_tensorop_gpu(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, do
 
 
 
-void transferToDevice(size_t ndims){
+void transferToDevice(size_t full_ndims){
   std::map<std::string,ct*>::iterator it;
 
   // copy h_full_cardinalities to device manually
-  cutilSafeCall(cudaMalloc((void**)&(d_full_cardinalities), sizeof(size_t)*ndims));
+  cutilSafeCall(cudaMalloc((void**)&(d_full_cardinalities), sizeof(size_t)*full_ndims));
 
-  cutilSafeCall(cudaMemcpy(d_full_cardinalities, h_full_cardinalities, sizeof(size_t)*ndims, cudaMemcpyHostToDevice));
+  cutilSafeCall(cudaMemcpy(d_full_cardinalities, h_full_cardinalities, sizeof(size_t)*full_ndims, cudaMemcpyHostToDevice));
 
   // copy registered objects to device
   for(it=h_objs.begin(); it != h_objs.end(); it++){
@@ -215,8 +215,8 @@ void transferToDevice(size_t ndims){
     double* d_data;
 
     // copy to device
-    cutilSafeCall(cudaMalloc((void**)&(d_strides), sizeof(size_t)*ndims));
-    cutilSafeCall(cudaMemcpy(d_strides, obj->strides, sizeof(size_t)*ndims, cudaMemcpyHostToDevice));
+    cutilSafeCall(cudaMalloc((void**)&(d_strides), sizeof(size_t)*obj->ndims));
+    cutilSafeCall(cudaMemcpy(d_strides, obj->strides, sizeof(size_t)*obj->ndims, cudaMemcpyHostToDevice));
     cutilSafeCall(cudaMalloc((void**)&(d_data), obj->mem_size));
     cutilSafeCall(cudaMemcpy(d_data, obj->data, obj->mem_size, cudaMemcpyHostToDevice));
 
