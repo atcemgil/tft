@@ -4,31 +4,34 @@ clear
 S = RandStream('mt19937ar');
 RandStream.setDefaultStream(S);
 
-I=3;
+I=5;
 J=4;
-K=5;
+K=3;
 a=2;
 
-V=['i','j','k','a']
+V_card_sym=['i','j','k','a']
+V_cards=[I, J, K, a];
 
-A_cards=['i','a']
+A_card_sym=['i','a']
 A_true = round(10*rand(I,a));
 
-B_cards=['j','a']
+B_card_sym=['j','a']
 B_true = round(20*rand(J,a));
 
-C_cards=['k','a']
+C_card_sym=['k','a']
 C_true = round(30*rand(K,a));
 
-X_cards = ['i','j','k'];
+X_card_sym = ['i','j','k'];
 X_true = get_parafac(A_true,B_true,C_true,I,J,K,a,[I J K])
 
 X = poissrnd(X_true)
 
+%iter_range = 1:300:1000;
+iter_range = 1:50:200;
 
-iter_range = 1:11;
 gpu_times = zeros(1,length(iter_range));
 sequential_times = zeros(1,length(iter_range));
+
 gpu_error = zeros(1,length(iter_range));
 sequential_error = zeros(1,length(iter_range));
 
@@ -36,25 +39,34 @@ for i=1:length(iter_range)
   iter = iter_range(i);
   display(['testing iteration ' num2str(iter)]);
 
-  cards=[I, J, K, a];
+  tic; [A B C]=mct('pltf_cpp', iter, V_card_sym, V_cards, X_card_sym, X, A_card_sym, B_card_sym, C_card_sym); sequential_times(i)=toc;
+  sequential_error(i) = sum(get_KL_div(X, get_parafac(A,B,C,I,J,K,a,size(X))));
 
-  tic; [A B C]=mct('pltf_cpp', iter, V, cards, X_cards, X_true, A_cards, B_cards, C_cards); gpu_times(i)=toc;
-  gpu_error(i) = sum(get_KL_div(X_true, get_parafac(A,B,C,I,J,K,a,size(X_true))));
+  tic; [A B C]=mct('pltf_gpu', iter, V_card_sym, V_cards, X_card_sym, X, A_card_sym, B_card_sym, C_card_sym); gpu_times(i)=toc;
+  gpu_error(i) = sum(get_KL_div(X, get_parafac(A,B,C,I,J,K,a,size(X))));
 
 end
 
 display(gpu_times);
-plot (iter_range, gpu_times, '-')
-legend('GPU code')
+display(sequential_times);
+plot (iter_range, gpu_times, '-', ...
+      iter_range, sequential_times, '--')
+legend('GPU code', 'Sequential code')
 xlabel('Number of iterations')
 ylabel('seconds')
-title('GPU code (PARAFAC)')
+title(['PARAFAC run times I ' num2str(I) ' J ' num2str(J) ...
+       ' K ' num2str(K) ' a ' num2str(a)])
 
 figure
 
 display(gpu_error);
-plot (iter_range, gpu_error, '-')
-legend('GPU code')
+display(sequential_error);
+plot (iter_range, gpu_error, '-',...
+      iter_range, sequential_error, '--')
+legend('GPU code', 'Sequential code')
 xlabel('Number of iterations')
-ylabel('KL divergence')
-title('GPU code (PARAFAC)')
+ylabel('KL divergence (X || Xhat)')
+title([ 'PARAFAC KL divergence I ' num2str(I) ' J ' num2str(J) ...
+        ' K ' num2str(K) ' a ' num2str(a)])
+
+

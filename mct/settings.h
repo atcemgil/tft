@@ -11,7 +11,7 @@
 #define CUPRINTF false
 #define COUT false
 #define PRINT_CT false
-#define PRINT_CHAIN false
+#define PRINT_CHAIN true
 #define COUT_operate false
 #define COUT_cpp_contract false
 #define COUT_cpp_contract2 false

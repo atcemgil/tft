@@ -251,6 +251,10 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
     return false;
   }
 
+  if ( PRINT_CT ) {
+    print_ct("C: BEFORE tensorop cpp F", h_objs[F],true);
+  }
+
   if ( isHadamard ){
 
     for( size_t i=0; i<h_objs[C]->element_number; i++)
@@ -261,7 +265,7 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
 
     if ( PRINT_CT ) {
       print_ct("C: tensorop cpp A", h_objs[A], true);
-      print_ct("c: tensorop cpp B", h_objs[B], true);
+      print_ct("C: tensorop cpp B", h_objs[B], true);
       print_ct("C: tensorop cpp C ", h_objs[C], true);
     }
 

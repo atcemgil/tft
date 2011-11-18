@@ -26,9 +26,9 @@ for i=1:length(a_range)
 
   cards=[I, J, K, a];
 
-  tic; [A B C]=mct('pltf_gpu', V, cards, X_cards, X, A_cards, B_cards, C_cards); gpu_times(i)=toc;
+  tic; [A B C]=mct('pltf_gpu', 30, V, cards, X_cards, X, A_cards, B_cards, C_cards); gpu_times(i)=toc;
   test_parafac(A,B,C,I,J,K,a,X,'gpu');
-  tic; [A B C]=mct('pltf_cpp', V, cards, X_cards, X, A_cards, B_cards, C_cards); sequential_times(i)=toc;
+  tic; [A B C]=mct('pltf_cpp', 30, V, cards, X_cards, X, A_cards, B_cards, C_cards); sequential_times(i)=toc;
   test_parafac(A,B,C,I,J,K,a,X,'sequential');
 
 end

@@ -230,7 +230,10 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_typ
 
 
 
-void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool use_multiplication, size_t ndims, std::string A, std::string B, std::string C, op_type opt, std::string F="F"){
+void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool use_multiplication, size_t ndims, std::string A, std::string B, std::string C, op_type opt, bool resetF=true, std::string F="F", bool internal=false){
+  if (resetF == true && internal == false)
+    oc_push_back(operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", opt, true, "F", true); // reset F 
+
   operation oc;
   oc.isHadamard = isHadamard;
   oc.use_multiplication = use_multiplication;
@@ -239,7 +242,7 @@ void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool
   oc.B = B;
   oc.C = C;
   oc.F = F;
-  oc.result_in_F = false;  /// dikkat !!!
+  oc.result_in_F = false;  /// dikkat !!! // untested -> non hadamard , no contraction case
 
   if (opt == nmf_gpu || opt == pltf_gpu){
     oc.operate = &mct_tensorop_gpu_keys;
@@ -501,8 +504,9 @@ mct_tensorop_cpp(it->isHadamard, *(h_objs[it->A]), *(h_objs[it->B]), *(h_objs[it
 void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type opt){
 
 
-  if ( nrhs < (6+1) ){
-    std::cout << "mct: Factorization operation requires at least 6 arguments. " << std::endl
+  if ( nrhs < (7+1) ){
+    std::cout << "mct: Factorization operation requires at least 7 arguments. " << std::endl
+	      << "Number iterations, example 30" << std::endl
               << "V, index set of factorization operation, example ['i', 'j', 'k']" << std::endl
               << "cardinalities, cardinality for each index provided in V, example [2, 3, 4]" << std::endl
               << "X, index set and data elements for the tensor to be factorized, example ['i','j'], X" << std::endl
@@ -516,22 +520,35 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
 
   // prepare model elements  //////////////////////////////////////////////////////
 
-  size_t factor_count = nrhs - 5;
+  size_t op_iter_count = ((double *)mxGetData(prhs[1]))[0];
+
+  size_t factor_count = nrhs - 6;
 
   m_tensor x_tensor;
-  x_tensor.cards_char = mxGetChars(prhs[3]);
-  x_tensor.factor_ndims = (size_t) mxGetNumberOfElements(prhs[3]);
-  const mxArray* x_tensor_data = prhs[4];
+  x_tensor.cards_char = (char*) malloc(mxGetNumberOfElements(prhs[4])+1);
+  for (size_t i=0; i<=mxGetNumberOfElements(prhs[4]); i++)
+    if ( i == mxGetNumberOfElements(prhs[4]) )
+      x_tensor.cards_char[i] = '\0';
+    else
+      x_tensor.cards_char[i] = mxGetChars(prhs[4])[i];
+
+
+  const mxArray* x_tensor_data = prhs[5];
 
   std::vector<m_tensor> model_elements;
   for (size_t t=0; t<factor_count; t++){
     m_tensor tmp_m_tensor;
-    tmp_m_tensor.cards_char = mxGetChars(prhs[ 5 + t ]);
-    tmp_m_tensor.factor_ndims = (size_t) mxGetNumberOfElements(prhs[5 + t]);
+    tmp_m_tensor.cards_char = (char*) malloc(mxGetNumberOfElements(prhs[6+t])+1);
+    for (size_t i=0; i<=mxGetNumberOfElements(prhs[6+t]) ; i++)
+      if ( i == mxGetNumberOfElements(prhs[6+t]) )
+	tmp_m_tensor.cards_char[i] = '\0';
+      else
+	tmp_m_tensor.cards_char[i] = (char) mxGetChars(prhs[6+t])[i] ;
+
     model_elements.push_back(tmp_m_tensor);
   }
 
-  if(COUT) std::cout << "found " << model_elements.size() << " model elements" << std::endl;
+  if(COUT) std::cout << "found " << model_elements.size() << " model elements" << " will run for " << op_iter_count << " iterations" <<std::endl;
 
   if( nlhs != model_elements.size() ){
     std::cout << "mct: this factorization requires " << model_elements.size() << " number of output arguments, given: " << nlhs << std::endl;
@@ -545,9 +562,9 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
   // A['i','k'], B['k', 'j'], C['i','j'] where V is ['i','k','j'] = [2 3 4]
   // here we convert indices to internal format:
   // A[2, 3, 0], B[0, 3, 4], C[2, 0, 4]
-  mxChar* V_char = mxGetChars(prhs[1]);
-  size_t ndims = mxGetNumberOfElements(prhs[1]);
-  double* V_numeric = (double*) mxGetData(prhs[2]);
+  mxChar* V_char = mxGetChars(prhs[2]);
+  size_t ndims = mxGetNumberOfElements(prhs[2]);
+  double* V_numeric = (double*) mxGetData(prhs[3]);
 
   for (size_t m=0; m<model_elements.size(); m++){
     assign_m_tensor_cards_numeric(&(model_elements[m]), V_char, V_numeric, ndims);
@@ -602,23 +619,33 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
   // prepare host memory for tensors  ///////////////////////////////////////////////////////
 
   h_full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
-  h_full_cardinalities2 = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
 
-  for (size_t dim=0; dim<ndims; dim++){
+  ///// cards_numeric are alligned according to the V cardinalities ///// above //
+  for (size_t dim=0; dim<ndims; dim++){ // for each dimension
     size_t max_dim_card = 0;
 
-    for (size_t t=0; t<model_elements.size(); t++){
-      size_t tensor_dim_card = model_elements[t].cards_numeric[dim];
-      if ( max_dim_card < tensor_dim_card )
-        max_dim_card = tensor_dim_card;
+    for (size_t t=0; t<model_elements.size(); t++){ // for each model
+      for (size_t card=0; card<strlen(model_elements[t].cards_char); card++){ // for each dimension of the model
+	if (model_elements[t].cards_char[card] == V_char[dim]){ // if this dimension character matches current dimension's
+	  size_t tensor_dim_card = model_elements[t].cards_numeric[dim]; //see above//
+	  if ( max_dim_card < tensor_dim_card )
+	    max_dim_card = tensor_dim_card;
+	  break; // only one dimension of each model can match with current dimension
+	}
+      }
     }
 
-    size_t tensor_dim_card = x_tensor.cards_numeric[dim] ;
-    if ( max_dim_card < tensor_dim_card )
-      max_dim_card = tensor_dim_card;
+    // also check X tensor
+    for (size_t card=0; card<strlen(x_tensor.cards_char); card++){ // for each dimension of the X tensor
+      if (x_tensor.cards_char[card] == V_char[dim]){ // if this dimension matches current dimension
+	size_t tensor_dim_card = x_tensor.cards_numeric[dim] ;
+	if ( max_dim_card < tensor_dim_card )
+	  max_dim_card = tensor_dim_card;
+	break; // only one dimension of X tensor can match with current dimension
+      }
+    }
 
     h_full_cardinalities[dim] = max_dim_card;
-    h_full_cardinalities2[dim] = 5;
   }
 
 
@@ -661,7 +688,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
 
 
 
-  ct Xhat, X, A, F, M;
+  ct Xhat, X, A, F, M, Fzeros;
 
   mwSize ndims_mwsize = ndims;
   mxArray* m_X_card = mxCreateNumericArray(1, &ndims_mwsize, mxDOUBLE_CLASS, mxREAL);
@@ -682,6 +709,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
   prepareHostTensorFromCpp(&A, NULL, X_card, ndims, (const char*) "Host A"); // init with 0
   prepareHostTensorFromCpp(&Xhat, NULL, X_card, ndims, (const char*) "Host Xhat");
   prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
+  prepareHostTensorFromCpp(&Fzeros, NULL, h_full_cardinalities, ndims, (const char*) "Host Fzeros");
 
 
   // used first as C must be zeroed for cpp to work
@@ -719,7 +747,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
     register_ct( d_name2.str().c_str(), &D_tensors[z*2+1]);
   }
 
-  REGISTER_CT(Xhat); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
+  REGISTER_CT(Xhat); REGISTER_CT(Fzeros); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
 
   if (opt==pltf_gpu)
     transferToDevice(ndims);
@@ -746,11 +774,18 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
     //oc_push_back(&operation_chain, false, 1, ndims, "Z1", "Z2", "Xhat", opt);
     for (size_t z=0; z<Z_tensors.size(); z++){
       if (z==0) continue;
-      if (z==1) oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "Xhat", opt);
+      if (z==1) oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "Xhat", opt); // Xhat -> F olabilir?
       else{
         std::stringstream Zn;
         Zn << 'Z' << z;
-        oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "Xhat", "Xhat", opt);
+
+	if (z!=(Z_tensors.size()-1)){
+	  // in all non last operations store result in F to avoid mis-contraction
+	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "F", opt, false);
+	}else{
+	  // in last operation store result into Xhat
+	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "Xhat", opt, false);
+	}
       }
     }
 
@@ -768,8 +803,17 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
       std::stringstream other_z_name;
       other_z_name << "Z" << other_z;
 
-      if ( tmp_op_count == 0 )  oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), opt);
-      else                      oc_push_back(&operation_chain, false, 1, ndims, d1.str().c_str(), other_z_name.str().c_str(), d1.str().c_str(), opt);
+      if ( tmp_op_count == 0 ){
+	oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), opt); // d1 -> F olabilir?
+      }else{
+	if (other_z!=Z_tensors.size()-1){
+	  // in all non last operations store result in F to avoid mis-contraction
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", opt, false);
+	}else{
+	  // in last operation store result into d1
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), opt, false);
+	}
+      }
       tmp_op_count++;
     }
 
@@ -783,8 +827,17 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
       std::stringstream other_z_name;
       other_z_name << "Z" << other_z;
 
-      if ( tmp_op_count == 0 )  oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), opt);
-      else                      oc_push_back(&operation_chain, false, 1, ndims, d2.str().c_str(), other_z_name.str().c_str(), d2.str().c_str(), opt);
+      if ( tmp_op_count == 0 ){
+	oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), opt); // d2 -> F olabilir?
+      }else{
+	if (other_z!=Z_tensors.size()-1){
+	  // in all non last operations store result in F to avoid mis-contraction
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", opt, false);
+	}else{
+	  // in last operation store result into d2
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), opt, false);
+	}
+      }
       tmp_op_count++;
     }
 
@@ -798,7 +851,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
   if (PRINT_CHAIN) print_oc(&operation_chain);
 
 
-  for (int iter=0; iter<30; iter++){
+  for (int iter=0; iter<op_iter_count; iter++){
     //if (opt == nmf_gpu)
 
     operate(&operation_chain);

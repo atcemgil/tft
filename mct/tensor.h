@@ -67,8 +67,7 @@ struct dev_ptrs{
 #include <vector>
 #include "mex.h"
 struct m_tensor{
-  mxChar* cards_char; // ['i', 'j'] 
-  size_t factor_ndims;
+  char* cards_char; // ['i', 'j'] 
   std::vector<size_t> cards_numeric; // [2, 3, 0]
 };
 

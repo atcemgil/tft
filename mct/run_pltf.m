@@ -28,11 +28,11 @@ RandStream.setDefaultStream(S);
 
 X = 10*rand(2,4)
 
-
+iter=1
 
 % GPU code
 display('GPU run');
-tic; [Z1_gpu Z2_gpu]=mct('pltf_gpu', ['i','k','j'], [2 3 4], ['i','j'], X, ['i','k'], ['k','j']); toc;
+tic; [Z1_gpu Z2_gpu]=mct('pltf_gpu', iter, ['i','k','j'], [2 3 4], ['i','j'], X, ['i','k'], ['k','j']); toc;
 
 display('GPU result');
 display('Z1 result');
@@ -45,7 +45,7 @@ display(Z1_gpu*reshape(Z2_gpu,3,4));
 
 % C code
 display([char(10) char(10) 'C code run'])
-tic; [Z1_cpp Z2_cpp]=mct('pltf_cpp', ['i','k','j'], [2 3 4], ['i','j'], X, ['i','k'], ['k','j']); toc;
+tic; [Z1_cpp Z2_cpp]=mct('pltf_cpp', iter, ['i','k','j'], [2 3 4], ['i','j'], X, ['i','k'], ['k','j']); toc;
 display('CPU result');
 display('Z1 result');
 display(Z1_cpp);
@@ -54,7 +54,6 @@ display(Z2_cpp);
 display('X result');
 display(Z1_cpp * reshape(Z2_cpp,3,4));
 
-return
 
 
 display('comparing GPU and C code')

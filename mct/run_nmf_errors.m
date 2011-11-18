@@ -21,7 +21,7 @@ X_true=A_true*B_true;
 
 X=poissrnd(X_true);
 
-iter_range = 1:50;
+iter_range = 1:5:50;
 gpu_times = zeros(1,length(iter_range));
 sequential_times = zeros(1,length(iter_range));
 gpu_error = zeros(1,length(iter_range));
@@ -33,8 +33,8 @@ for i=1:length(iter_range)
 
   cards=[I, K, J];
 
-  tic; [A B]=mct('pltf_gpu', iter, V, cards, X_cards, X_true, A_cards, B_cards); gpu_times(i)=toc;
-  gpu_error(i) = sum(get_KL_div(X_true, reshape(A,I,K)*reshape(B,K,J)));
+  tic; [A B]=mct('pltf_gpu', iter, V, cards, X_cards, X, A_cards, B_cards); gpu_times(i)=toc;
+  gpu_error(i) = sum(get_KL_div(X, reshape(A,I,K)*reshape(B,K,J)));
 
 end
 

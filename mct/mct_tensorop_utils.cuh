@@ -24,7 +24,6 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
 
 extern std::map<std::string,ct*> h_objs; // defined in mct_tensorop_utils.cu
 extern size_t* h_full_cardinalities;     // defined in mct_tensorop_utils.cu
-extern size_t* h_full_cardinalities2;     // defined in mct_tensorop_utils.cu
 
 void register_ct(std::string key, ct* obj);
 void clear_ct();

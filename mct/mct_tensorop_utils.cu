@@ -6,6 +6,7 @@
 
 #include "mct_tensorop_utils.cuh"
 #include <stdlib.h>
+#include <string.h>
 
 // real definitions for global (extern) variables
 std::map<std::string,ct*> h_objs;
@@ -289,8 +290,8 @@ void print_oc(std::vector<operation>* operation_chain){
 }
 
 void print_m_tensor(m_tensor* m_t){
-  std::cout << "cards_char element number " << (*m_t).factor_ndims << std::endl;
-  for (size_t m_i=0; m_i<(*m_t).factor_ndims; m_i++){
+  std::cout << "cards_char element number " << strlen(m_t->cards_char) << std::endl;
+  for (size_t m_i=0; m_i<strlen(m_t->cards_char); m_i++){
     std::cout << (char) (*m_t).cards_char[m_i]  <<" ";
   }
   std::cout << std::endl << "cards_numeric number " << (*m_t).cards_numeric.size() << std::endl;
@@ -314,7 +315,7 @@ void print_model_elements(std::vector<m_tensor>* model_elements, m_tensor* x_ten
 void assign_m_tensor_cards_numeric(m_tensor* m_t, mxChar* V_char, double* V_numeric, size_t ndims){
   for (size_t i=0; i<ndims; i++){
     bool found=false;
-    for (size_t m_i=0; m_i< m_t->factor_ndims; m_i++){
+    for (size_t m_i=0; m_i< strlen(m_t->cards_char); m_i++){
       //std::cout << "cards_char["<<m_i<<"] " << (char) m_t->cards_char[m_i]
       //<< " V_char["<<i<<"] " << (char)V_char[i] << std::endl;
       if ( (char)m_t->cards_char[m_i] == (char)V_char[i] ){
