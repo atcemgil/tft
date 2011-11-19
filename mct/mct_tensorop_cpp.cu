@@ -8,20 +8,20 @@
 #include "mct_tensorop_cpp.cuh"
 
 double get_element(const ct* h_ct, size_t* global_index, const char* str){
-  if ( COUT ) std::cout << "get_element: " << str << " cur_ind ";
+  if ( COUT_get_set ) std::cout << "get_element: " << str << " cur_ind ";
   size_t cur_ind=0;
   for (size_t dim=0; dim<h_ct->ndims; dim++){
-    if ( COUT ) std::cout << global_index[dim] << " ";
+    if ( COUT_get_set ) std::cout << global_index[dim] << " ";
     if(h_ct->strides[dim] != 0 )
       cur_ind += h_ct->strides[dim] * global_index[dim];
   }
 
   if ( cur_ind >= h_ct->element_number ) {
     cur_ind=h_ct->element_number-1;
-    if ( COUT ) std::cout << std::endl << " warning: overriding to avoid h_ct overflow h_ct->element_number to " << cur_ind << std::endl;
+    if ( COUT_get_set ) std::cout << std::endl << " warning: overriding to avoid h_ct overflow h_ct->element_number to " << cur_ind << std::endl;
   }
 
-  if ( COUT ) std::cout << " index " << cur_ind << " val " << h_ct->data[cur_ind]
+  if ( COUT_get_set ) std::cout << " index " << cur_ind << " val " << h_ct->data[cur_ind]
                         << std::endl;
 
   return h_ct->data[cur_ind];
@@ -29,14 +29,14 @@ double get_element(const ct* h_ct, size_t* global_index, const char* str){
 
 
 void set_element(ct* h_ct, size_t* global_index, double val, const char* str){
-  if ( COUT ) std::cout << "set_element: " << str << " cur_ind ";
+  if ( COUT_get_set ) std::cout << "set_element: " << str << " cur_ind ";
   size_t cur_ind=0;
   for (size_t dim=0; dim<h_ct->ndims; dim++){
-    if ( COUT ) std::cout << global_index[dim] << " ";
+    if ( COUT_get_set ) std::cout << global_index[dim] << " ";
     if(h_ct->strides[dim] != 0 )
       cur_ind += h_ct->strides[dim] * global_index[dim];
   }
-  if ( COUT ) std::cout << " index " << cur_ind << " prev val " << h_ct->data[cur_ind]
+  if ( COUT_get_set ) std::cout << " index " << cur_ind << " prev val " << h_ct->data[cur_ind]
                         << " new val " << val
                         << std::endl;
   h_ct->data[cur_ind] = val;
@@ -239,6 +239,7 @@ void mct_tensorop_cpp(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, do
 
 
 
+#include <string.h>
 bool mct_tensorop_cpp_keys(bool isHadamard,
                            bool use_multiplication,
                            size_t ndims,
@@ -253,6 +254,8 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
 
   if ( PRINT_CT ) {
     print_ct("C: BEFORE tensorop cpp F", h_objs[F],true);
+    print_ct("C: BEFORE tensorop cpp A", h_objs[A], true);
+    print_ct("C: BEFORE tensorop cpp B", h_objs[B], true);
   }
 
   if ( isHadamard ){
@@ -260,13 +263,12 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
     for( size_t i=0; i<h_objs[C]->element_number; i++)
       if(use_multiplication)
         h_objs[C]->data[i] = h_objs[A]->data[i] * h_objs[B]->data[i];
-      else
+      else{
         h_objs[C]->data[i] = h_objs[A]->data[i] / h_objs[B]->data[i];
+      }
 
     if ( PRINT_CT ) {
-      print_ct("C: tensorop cpp A", h_objs[A], true);
-      print_ct("C: tensorop cpp B", h_objs[B], true);
-      print_ct("C: tensorop cpp C ", h_objs[C], true);
+      print_ct("C: AFTER tensorop cpp C ", h_objs[C], true);
     }
 
     *result_in_F=false;
@@ -290,9 +292,7 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
     }
 
     if ( PRINT_CT ){
-      print_ct("C: tensorop cpp A", h_objs[A], true);
-      print_ct("C: tensorop cpp B", h_objs[B], true);
-      print_ct("C: tensorop cpp F", h_objs[F],true);
+      print_ct("C: AFTER tensorop cpp F", h_objs[F],true);
     }
 
 
@@ -301,7 +301,7 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
     bool got_zeros = false;
     for ( size_t dim=0; dim<ndims; dim++){
       if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0){
-        if ( COUT ) std::cout << " GOT ZEROS found zero on C dimension " << dim << std::endl;
+        if ( COUT_cpp_contract ) std::cout << " GOT ZEROS found zero on C dimension " << dim << std::endl;
         got_zeros = true;
         break;
       }
@@ -324,7 +324,7 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
           }
         }
 
-        if ( COUT ) {
+        if ( COUT_cpp_contract ) {
           std::cout << "zero_cardinality_dims" << std::endl;
           for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
             std::cout << zero_cardinality_dims.at(j) << std::endl;
@@ -429,7 +429,7 @@ bool mct_tensorop_cpp_keys(bool isHadamard,
       //memcpy(m_C, h_objs[C]->data, h_objs[C]->mem_size);
 
       if ( PRINT_CT ){
-        print_ct("C: tensorop cpp C", h_objs[C], true);
+        print_ct("C: AFTER tensorop cpp C", h_objs[C], true);
       }
 
       *result_in_F=false;

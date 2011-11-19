@@ -230,9 +230,7 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_typ
 
 
 
-void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool use_multiplication, size_t ndims, std::string A, std::string B, std::string C, op_type opt, bool resetF=true, std::string F="F", bool internal=false){
-  if (resetF == true && internal == false)
-    oc_push_back(operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", opt, true, "F", true); // reset F 
+void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool use_multiplication, size_t ndims, std::string A, std::string B, std::string C, op_type opt, std::string F="F"){
 
   operation oc;
   oc.isHadamard = isHadamard;
@@ -675,10 +673,10 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
 
     std::stringstream d1;
     d1 << "Host D1_Z" << t;
-    prepareHostTensorFromCpp(&tmp_ct_D1, NULL, Z_card, ndims, d1.str().c_str(), true);
+    prepareHostTensorFromCpp(&tmp_ct_D1, NULL, Z_card, ndims, d1.str().c_str());
     std::stringstream d2;
     d2 << "Host D2_Z" << t;
-    prepareHostTensorFromCpp(&tmp_ct_D2, NULL, Z_card, ndims, d2.str().c_str(), true);
+    prepareHostTensorFromCpp(&tmp_ct_D2, NULL, Z_card, ndims, d2.str().c_str());
 
 
     Z_tensors.push_back(tmp_ct);
@@ -688,7 +686,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
 
 
 
-  ct Xhat, X, A, F, M, Fzeros;
+  ct Xhat, X, A, F, M, Fzeros, Fones;
 
   mwSize ndims_mwsize = ndims;
   mxArray* m_X_card = mxCreateNumericArray(1, &ndims_mwsize, mxDOUBLE_CLASS, mxREAL);
@@ -710,6 +708,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
   prepareHostTensorFromCpp(&Xhat, NULL, X_card, ndims, (const char*) "Host Xhat");
   prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
   prepareHostTensorFromCpp(&Fzeros, NULL, h_full_cardinalities, ndims, (const char*) "Host Fzeros");
+  prepareHostTensorFromCpp(&Fones, NULL, h_full_cardinalities, ndims, (const char*) "Host Fones", false, true);
 
 
   // used first as C must be zeroed for cpp to work
@@ -747,7 +746,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
     register_ct( d_name2.str().c_str(), &D_tensors[z*2+1]);
   }
 
-  REGISTER_CT(Xhat); REGISTER_CT(Fzeros); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
+  REGISTER_CT(Xhat); REGISTER_CT(Fzeros); REGISTER_CT(Fones); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
 
   if (opt==pltf_gpu)
     transferToDevice(ndims);
@@ -772,23 +771,32 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
     // Z2 * Xhat -> Xhat
     // ...
     //oc_push_back(&operation_chain, false, 1, ndims, "Z1", "Z2", "Xhat", opt);
+
+
     for (size_t z=0; z<Z_tensors.size(); z++){
       if (z==0) continue;
-      if (z==1) oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "Xhat", opt); // Xhat -> F olabilir?
+      if (z==1) {
+	// if this is the last operation (2 factor problem) store result in Xhat
+	if ( Z_tensors.size() == 2 ){
+	  oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "Xhat", opt);
+	}else{
+	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", opt); // reset F to zero
+	  oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "F", opt);
+	}
+      }
       else{
         std::stringstream Zn;
         Zn << 'Z' << z;
 
 	if (z!=(Z_tensors.size()-1)){
 	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "F", opt, false);
+	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "F", opt);
 	}else{
 	  // in last operation store result into Xhat
-	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "Xhat", opt, false);
+	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "Xhat", opt);
 	}
       }
     }
-
 
 
     oc_push_back(&operation_chain, true , 0, ndims, "X", "Xhat", "A", opt);
@@ -804,19 +812,23 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
       other_z_name << "Z" << other_z;
 
       if ( tmp_op_count == 0 ){
-	oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), opt); // d1 -> F olabilir?
+	if ( Z_tensors.size() == 2){
+	  oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), opt);
+	}else{
+	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", opt); // reset F to zero
+	  oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), "F", opt);
+	}
       }else{
-	if (other_z!=Z_tensors.size()-1){
+	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
 	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", opt, false);
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", opt);
 	}else{
 	  // in last operation store result into d1
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), opt, false);
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), opt);
 	}
       }
       tmp_op_count++;
     }
-
 
     std::stringstream d2;
     d2 << "D2_Z" << t;
@@ -828,14 +840,19 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
       other_z_name << "Z" << other_z;
 
       if ( tmp_op_count == 0 ){
-	oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), opt); // d2 -> F olabilir?
+	if ( Z_tensors.size() == 2) {
+	  oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), opt);
+	}else{
+	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", opt); // reset F to zero
+	  oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), "F", opt); 
+	}
       }else{
-	if (other_z!=Z_tensors.size()-1){
+	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
 	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", opt, false);
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", opt);
 	}else{
 	  // in last operation store result into d2
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), opt, false);
+	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), opt);
 	}
       }
       tmp_op_count++;
@@ -852,8 +869,9 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
 
 
   for (int iter=0; iter<op_iter_count; iter++){
-    //if (opt == nmf_gpu)
 
+    if (COUT) std::cout << "iteration number "<< iter << std::endl;
+    //if (opt == nmf_gpu)
     operate(&operation_chain);
 
     //////////////////////////////////////////////////////////////////////////////////

@@ -4,22 +4,22 @@ clear
 S = RandStream('mt19937ar');
 RandStream.setDefaultStream(S);
 
-I=5;
-J=4;
-K=3;
-a=2;
+I=10;
+J=20;
+K=30;
+a=5;
 
 V_card_sym=['i','j','k','a']
 V_cards=[I, J, K, a];
 
 A_card_sym=['i','a']
-A_true = round(10*rand(I,a));
+A_true = round(10*rand(I,1,1,a));
 
 B_card_sym=['j','a']
-B_true = round(20*rand(J,a));
+B_true = round(20*rand(1,J,1,a));
 
 C_card_sym=['k','a']
-C_true = round(30*rand(K,a));
+C_true = round(30*rand(1,1,K,a));
 
 X_card_sym = ['i','j','k'];
 X_true = get_parafac(A_true,B_true,C_true,I,J,K,a,[I J K])
@@ -27,7 +27,7 @@ X_true = get_parafac(A_true,B_true,C_true,I,J,K,a,[I J K])
 X = poissrnd(X_true)
 
 %iter_range = 1:300:1000;
-iter_range = 1:50:200;
+iter_range = 1:50:160;
 
 gpu_times = zeros(1,length(iter_range));
 sequential_times = zeros(1,length(iter_range));

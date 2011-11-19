@@ -93,7 +93,7 @@ void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_ca
 
 
 
-void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, const char* txt, bool rand){
+void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, const char* txt, bool rand, bool init_to_one){
   h_ct->ndims = ndims;
   h_ct->cardinalities = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
   h_ct->strides = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
@@ -132,8 +132,12 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
     for (size_t i=0; i<h_ct->element_number; i++ )
       if (rand)
         h_ct->data[i]= ((double) std::rand()) / (double)(RAND_MAX+1.0);
-      else
-        h_ct->data[i]=(double)0;
+      else{
+	if ( init_to_one )
+	  h_ct->data[i]=(double)1;
+	else
+	  h_ct->data[i]=(double)0;
+      }
 
   }else{
     h_ct->data = (double*)malloc( h_ct->mem_size );
@@ -156,7 +160,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
 // Recursive function which generates all permutations of a given list
 void gen_range_permutation_helper(std::vector<size_t> iter_dims, std::vector<size_t> cur_perm, std::vector<size_t>* acc){
   if ( iter_dims.size() == 0 ){
-    if (COUT){
+    if (COUT_contract){
       std::cout << "final cur_perm" <<  std::endl;
       for ( size_t j=0; j<cur_perm.size(); j++){
         std::cout << cur_perm.at(j) << std::endl;
@@ -172,7 +176,7 @@ void gen_range_permutation_helper(std::vector<size_t> iter_dims, std::vector<siz
     for ( size_t i=0; i<one_dim ; i++){
       std::vector<size_t> tmp_vec (cur_perm.begin(), cur_perm.end());
       tmp_vec.push_back(i);
-      if ( COUT ){
+      if ( COUT_contract ){
         std::cout << " tmp_vec " << std::endl;
         for ( size_t j=0; j<tmp_vec.size(); j++){
           std::cout << tmp_vec.at(j) << std::endl;
@@ -197,7 +201,7 @@ size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnu
   std::copy(acc.begin(), acc.end(), acc_array);
   (*elnum) = acc.size();
 
-  if ( COUT ){
+  if ( COUT_contract ){
     std::cout << "gen_range_permutation \n acc:" << std::endl;
     for ( size_t i=0; i<acc.size(); i++){
       std::cout << acc.at(i) << std::endl;
@@ -229,39 +233,44 @@ bool check_input_keys(std::string A, std::string B, std::string C, std::string F
 void operate(std::vector<operation>* operation_chain){
   std::vector<operation>::iterator it;
 
+  size_t opnum=0;
   for ( it=operation_chain->begin() ; it < operation_chain->end(); it++ ){
+    if(COUT) {
+      std::cout << "operation chain number " << opnum << " ";
+      opnum++;
+    }
+    
 
     std::string A = it->A;
     std::string B = it->B;
 
-    if ( it != operation_chain->begin() && // if this is not the first operation and
-         (it-1)->result_in_F){ // previous operation's result was stored in F instead of C
+    // if ( it != operation_chain->begin() && // if this is not the first operation and
+    //      (it-1)->result_in_F){ // previous operation's result was stored in F instead of C
 
-      //we must use F instead of C in next operation for any input named
-      //same as previous operation's output object (C)
+    // //   //we must use F instead of C in next operation for any input named
+    // //   //same as previous operation's output object (C)
 
-      // example:
-      // in previous operation we had
-      // E * G = H
-      // but H was not stored in object pointed by C
-      // it was stored in object pointed by F to avoid copying
+    // //   // example:
+    // //   // in previous operation we had
+    // //   // E * G = H
+    // //   // but H was not stored in object pointed by C
+    // //   // it was stored in object pointed by F to avoid copying
 
-      // thus if we are using H in current operation's input (A or B)
-      // we must not use the object pointed by C (H) in previous operation
-      // but instead use the object pointed by F in previous operation
+    // //   // thus if we are using H in current operation's input (A or B)
+    // //   // we must not use the object pointed by C (H) in previous operation
+    // //   // but instead use the object pointed by F in previous operation
 
-      if ( it->A.compare( (it-1)->C ) == 0)
-        A = (it-1)->F;
+    //   if ( it->A.compare( (it-1)->C ) == 0)
+    // 	A = (it-1)->F;
 
-      if ( it->B.compare( (it-1)->C ) == 0)
-        B = (it-1)->F;
+    //   if ( it->B.compare( (it-1)->C ) == 0)
+    // 	B = (it-1)->F;
 
-    }
+    // }
 
     if (COUT_operate)
-      std::cout << "util: operate A " << A << " B " << B << " C " << it->C << " F " << it->F
-                << " chain size " << operation_chain->size()
-                << std::endl;
+      print_oc_element(&(*it));
+
 
     (it->operate) (it->isHadamard,
                    it->use_multiplication,
@@ -271,21 +280,29 @@ void operate(std::vector<operation>* operation_chain){
                    it->F);
 
     if (COUT_operate)
-      std::cout << " util result: result_in_F " << it->result_in_F
+      std::cout << " operate end: result_in_F " << it->result_in_F
                 << std::endl;
 
   }
 
 }
 
+void print_oc_element(operation* oc){
+    std::cout << (*oc).A;
+    if ( (*oc).use_multiplication ) std::cout << " . ";
+    else std::cout << " / " ;
+
+    std::cout << (*oc).B << " -> " << (*oc).C << " (F: " << (*oc).F << ")"
+              << " \t\t  ndims "<< (*oc).ndims << " result_in_F " << (*oc).result_in_F 
+	      << " isHadamard " << (*oc).isHadamard << " use_multiplication " << (*oc).use_multiplication << std::endl;
+}
+
 void print_oc(std::vector<operation>* operation_chain){
   std::cout << "printing operation chain" << std::endl;
 
   for (int o=0; o<(*operation_chain).size(); o++){
-    operation* oc = &((*operation_chain)[o]);
-    std::cout << "operation " << o << std::endl
-              << "A " << (*oc).A << " B " << (*oc).B << " C " << (*oc).C << " F " << (*oc).F << std::endl
-              << "ndims "<< (*oc).ndims << " result_in_F " << (*oc).result_in_F << " isHadamard " << (*oc).isHadamard << " use_multiplication " << (*oc).use_multiplication << std::endl;
+    std::cout << "operation " << o << ": \t";
+    print_oc_element( &((*operation_chain)[o]) );
   }
 }
 
