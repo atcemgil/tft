@@ -8,7 +8,7 @@ RandStream.setDefaultStream(S);
 I=10;
 J=20;
 K=30;
-a=2;
+a=5;
 
 V_card_sym=['i','j','k','a']
 V_cards=[I, J, K, a];
@@ -41,12 +41,8 @@ for i=1:length(iter_range)
   iter = iter_range(i);
   display([char(10) char(10) char(10) 'testing iteration ' num2str(iter)]);
 
-  tic; [A B C]=mct('pltf_cpp', iter, V_card_sym, V_cards, X_card_sym, X, A_card_sym, B_card_sym, C_card_sym); sequential_times(i)=toc;
-  sequential_error(i) = sum(get_KL_div(X, get_parafac(A,B,C,I,J,K,a,size(X))))
-  xhat=get_parafac(A,B,C,I,J,K,a,size(X))
-  display(A);
-  display(B);
-  display(C);
+  %tic; [A B C]=mct('pltf_cpp', iter, V_card_sym, V_cards, X_card_sym, X, A_card_sym, B_card_sym, C_card_sym); sequential_times(i)=toc;
+  %sequential_error(i) = sum(get_KL_div(X, get_parafac(A,B,C,I,J,K,a,size(X))))
 
   tic; [A B C]=mct('pltf_gpu', iter, V_card_sym, V_cards, X_card_sym, X, A_card_sym, B_card_sym, C_card_sym); gpu_times(i)=toc;
   gpu_error(i) = sum(get_KL_div(X, get_parafac(A,B,C,I,J,K,a,size(X))));
@@ -54,10 +50,14 @@ for i=1:length(iter_range)
 end
 
 
-format long
+format long eng
+display('gpu error');
 display(gpu_error');
+display('sequential error');
 display(sequential_error');
+display('gpu times')
 display(gpu_times');
+display('sequential times');
 display(sequential_times');
 
 
