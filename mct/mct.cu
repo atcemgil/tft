@@ -598,14 +598,17 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
     mwSize argMatDims[ndims];
     for (size_t i=0; i<ndims; i++) {
       size_t val = model_elements[t].cards_numeric[i];
-       if (val == 0) argMatDims[i] = 1; // MATLAB needs to get 1 instead of 0
-       else          argMatDims[i] = val;
+      if (val == 0) argMatDims[i] = 1; // MATLAB needs to get 1 instead of 0
+      else          argMatDims[i] = val;
       // if (val != 0){
       //  	argMatDims[j] = val;
       // 	j++;
       // }
     }
 
+    //std::cout << " mxCreateNumericArray dimensions argMatDims ";
+    //for (size_t i=0; i<ndims; i++) std::cout << " " << argMatDims[i];
+    //std::cout << std::endl;
 
     plhs[t] = mxCreateNumericArray(ndims, argMatDims, mxDOUBLE_CLASS, mxREAL);
     //plhs[t] = mxCreateNumericArray(non_zero_dims, argMatDims, mxDOUBLE_CLASS, mxREAL);
@@ -914,7 +917,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], op_type op
 
 
   // reset device
-  if (opt == nmf_gpu)
+  if (opt==pltf_gpu)
     resetDevice();
 
 
@@ -940,6 +943,11 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // print help;
     return;
   }
+
+  // read config from file
+  read_config();
+  print_config();
+
   mwSize buflen = mxGetN(prhs[0])*sizeof(mxChar)+1;
   char* op_name = (char*) mxMalloc(buflen);
   op_type opt;

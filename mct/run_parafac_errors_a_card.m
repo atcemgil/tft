@@ -34,7 +34,7 @@ for i=1:length(a_range)
     X_true = get_parafac(A_true,B_true,C_true,I,J,K,a,[I J K]);
 
     X = poissrnd(X_true);
-    X(X==0)=0.000001; % suppress zeros, division/multiplication problems
+    X(X==0)=0.000001; % suppress zeros, division/log problems
 
     display(['testing a ' num2str(a)]);
 

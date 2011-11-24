@@ -28,7 +28,8 @@ extern size_t* h_full_cardinalities;     // defined in mct_tensorop_utils.cu
 
 void register_ct(std::string key, ct* obj);
 void clear_ct();
-
+void read_config();
+void print_config();
 
 
 

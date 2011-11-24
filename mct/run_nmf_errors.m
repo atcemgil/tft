@@ -34,10 +34,10 @@ for i=1:length(iter_range)
   cards=[I, K, J];
 
   tic; [A B]=mct('pltf_gpu', iter, V, cards, X_cards, X, A_cards, B_cards); gpu_times(i)=toc;
-  gpu_error(i) = sum(get_KL_div(X, reshape(A,I,K)*reshape(B,K,J)));
+  gpu_error(i) = sum(get_KL_div(X, reshape(A,I,K)*reshape(B,K,J)))
 
   tic; [A B]=mct('pltf_cpp', iter, V, cards, X_cards, X, A_cards, B_cards); sequential_times(i)=toc;
-  sequential_error(i) = sum(get_KL_div(X, reshape(A,I,K)*reshape(B,K,J)));
+  sequential_error(i) = sum(get_KL_div(X, reshape(A,I,K)*reshape(B,K,J)))
 
 end
 

@@ -7,20 +7,18 @@
 #ifndef MCT_SETTINGS_H
 #define MCT_SETTINGS_H
 
-#define COUT false
-#define PRINT_CT false
-#define PRINT_CHAIN false
-#define COUT_operate false
+extern bool COUT;
+extern bool PRINT_CT;
+extern bool PRINT_CHAIN;
+extern bool COUT_operate;
 
-#define COUT_get_set false
-#define CUPRINTF false
-#define COUT_contract false
-#define COUT_cpp_contract false
-#define COUT_cpp_contract2 false
+extern bool COUT_get_set;
+extern bool CUPRINTF;
+extern bool COUT_contract;
+extern bool COUT_cpp_contract;
+extern bool COUT_cpp_contract2;
 
-#define NUM_BLOCKS 53000
-//#define NUM_BLOCKS 5
-#define THREADS_FOR_BLOCK 512
-//#define THREADS_FOR_BLOCK 128
+extern size_t NUM_BLOCKS;
+extern size_t THREADS_FOR_BLOCK;
 
 #endif

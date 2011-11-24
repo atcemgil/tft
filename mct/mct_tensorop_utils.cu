@@ -8,6 +8,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <iostream>
+#include <fstream>
+
+// defined in settings.h
+bool COUT = false;
+bool PRINT_CT = false;
+bool PRINT_CHAIN = false;
+bool COUT_operate = false;
+
+bool COUT_get_set = false;
+bool CUPRINTF = false;
+bool COUT_contract = false;
+bool COUT_cpp_contract = false;
+bool COUT_cpp_contract2 = false;
+
+size_t NUM_BLOCKS = 53000;
+size_t THREADS_FOR_BLOCK =  512;
+
+
 // real definitions for global (extern) variables
 std::map<std::string,ct*> h_objs;
 size_t* h_full_cardinalities;
@@ -347,4 +366,73 @@ void assign_m_tensor_cards_numeric(m_tensor* m_t, mxChar* V_char, double* V_nume
       //std::cout << " insert 0 " << std::endl;
     }
   }
+}
+
+void read_config(){
+  std::ifstream is;
+  is.open ("config");
+  if (is.bad()){
+    std::cout << "can not read config file" << std::endl;
+  }
+
+  std::string line;
+  getline(is,line);
+  COUT = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  PRINT_CT = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  PRINT_CHAIN = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  COUT_operate = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  COUT_get_set = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  CUPRINTF = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  COUT_contract = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  COUT_cpp_contract = (line == "1");
+  if (is.bad()) return;
+
+  getline(is,line);
+  COUT_cpp_contract2 = (line == "1");
+  if (is.bad()) return;
+
+  getline(is, line);
+  if (is.bad()) return;
+  NUM_BLOCKS=atoi(line.c_str());
+  if (is.bad()) return;
+
+  getline(is, line);
+  if (is.bad()) return;
+  THREADS_FOR_BLOCK=atoi(line.c_str());
+  if (is.bad()) return;
+}
+
+void print_config(){
+  std::cout << "COUT" << "\t" << COUT << std::endl;
+  std::cout << "PRINT_CT" << "\t" << PRINT_CT << std::endl;
+  std::cout << "PRINT_CHAIN" << "\t" << PRINT_CHAIN << std::endl;
+  std::cout << "COUT_operate" << "\t" << COUT_operate << std::endl;
+  std::cout << "COUT_get_set" << "\t" << COUT_get_set << std::endl;
+  std::cout << "CUPRINTF" << "\t" << CUPRINTF << std::endl;
+  std::cout << "COUT_contract" << "\t" << COUT_contract << std::endl;
+  std::cout << "COUT_cpp_contract" << "\t" << COUT_cpp_contract << std::endl;
+  std::cout << "COUT_cpp_contract2" << "\t" << COUT_cpp_contract2 << std::endl;
+  std::cout << "NUM_BLOCKS" << "\t" << NUM_BLOCKS << std::endl;
+  std::cout << "THREADS_FOR_BLOCK" << "\t" << THREADS_FOR_BLOCK << std::endl;
 }
