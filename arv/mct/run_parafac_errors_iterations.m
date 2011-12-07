@@ -5,9 +5,9 @@ clear
 S = RandStream('mt19937ar');
 RandStream.setDefaultStream(S);
 
-I=10;
-J=20;
-K=30;
+I=2;
+J=3;
+K=4;
 a=5;
 
 V_card_sym=['i','j','k','a']
@@ -28,8 +28,8 @@ X_true = get_parafac(A_true,B_true,C_true,I,J,K,a,[I J K])
 X = poissrnd(X_true)
 X(X==0)=0.000001; % suppress zeros, division/log problems
 
-iter_range = 1:500:2000;
-%iter_range = 1:50:160;
+%iter_range = 1:500:2000;
+iter_range = 1:50:160;
 
 gpu_times = zeros(1,length(iter_range));
 sequential_times = zeros(1,length(iter_range));

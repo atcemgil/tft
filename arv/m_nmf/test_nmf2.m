@@ -3,9 +3,9 @@ function [] = test_nmf2()
     S = RandStream('mt19937ar');
     RandStream.setDefaultStream(S);
     
-    I = 10;
-    F = 20;
-    T = 2;
+    I = 5;
+    F = 5;
+    T = 5;
 
     A_true = 10*rand(F, I);
     B_true = 10*rand(I, T);
@@ -15,8 +15,11 @@ function [] = test_nmf2()
 
     M=ones(size(X));
     
-    [A B kl_data] = m_nmf(500, A_true, B_true, M, X, 0.00001);
-    
+    %Z1= [0.0600514, 0.788318 ; 0.203068 , 0.348563]';
+    %Z2= [0.361609, 0.134639 ; 0.375968, 0.259322]';
+    %[A B kl_data] = m_nmf(500, Z1, Z2, M, X, 0.00001)
+    [A B kl_data] = m_nmf(10, A_true, B_true, M, X, 0.00001)
+
     subplot(221);
     imagesc(X);
     title('X')
