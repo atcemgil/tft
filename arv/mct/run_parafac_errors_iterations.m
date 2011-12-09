@@ -29,7 +29,7 @@ X = poissrnd(X_true)
 X(X==0)=0.000001; % suppress zeros, division/log problems
 
 %iter_range = 1:500:2000;
-iter_range = 1:50:160;
+iter_range = 1:50:100;
 
 gpu_times = zeros(1,length(iter_range));
 sequential_times = zeros(1,length(iter_range));
