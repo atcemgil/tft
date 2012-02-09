@@ -75,6 +75,7 @@ struct dev_ptrs{
 struct m_tensor{
   char* cards_char; // ['i', 'j'] 
   std::vector<size_t> cards_numeric; // [2, 3, 0]
+  double* data;
 };
 
 #endif

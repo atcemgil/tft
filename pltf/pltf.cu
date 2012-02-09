@@ -55,12 +55,12 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
   if ( nrhs < 7 ){
-    std::cout << "mct: Factorization operation requires at least 7 arguments. " << std::endl
+    std::cout << "pltf: Factorization operation requires at least 7 arguments. " << std::endl
 	      << "Number iterations, example 30" << std::endl
               << "V, index set of factorization operation, example ['i', 'j', 'k']" << std::endl
               << "cardinalities, cardinality for each index provided in V, example [2, 3, 4]" << std::endl
               << "X, index set and data elements for the tensor to be factorized, example ['i','j'], X" << std::endl
-              << "Z_alpha, desired factor tensors, example ['i', 'j'], ['j', 'k'] " << std::endl
+              << "Z_alpha, desired factor tensor index set and data list, data may be empty list , example ['i', 'j'], [], ['j', 'k'], Z_2" << std::endl
               << std::endl << "Tensor objects are represented by the indices they use from the index set V." << std::endl
               << "Specified index order must match given data dimension order."
               << std::endl;
@@ -86,7 +86,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   const mxArray* x_tensor_data = prhs[4];
 
   std::vector<m_tensor> model_elements;
-  for (size_t t=0; t<factor_count; t++){
+  for (size_t t=0; t<factor_count*2; t+=2){
     m_tensor tmp_m_tensor;
     tmp_m_tensor.cards_char = (char*) malloc(mxGetNumberOfElements(prhs[5+t])+1);
     for (size_t i=0; i<=mxGetNumberOfElements(prhs[5+t]) ; i++)
@@ -94,6 +94,14 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 	tmp_m_tensor.cards_char[i] = '\0';
       else
 	tmp_m_tensor.cards_char[i] = (char) mxGetChars(prhs[5+t])[i] ;
+
+    if ( mxGetNumberOfElements(prhs[5+t+1]) == 0 ){
+      // tensor init data is not given
+      tmp_m_tensor.data = NULL;
+    }else{
+      // tensor init data is given, save pointer
+      tmp_m_tensor.data = (double*) mxGetPr(plhs[5+t+1]);
+    }
 
     model_elements.push_back(tmp_m_tensor);
   }
@@ -224,7 +232,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
     std::stringstream z;
     z << "Host Z" << t;
-    prepareHostTensorFromCpp(&tmp_ct, NULL, Z_card, ndims, z.str().c_str(), true);
+    prepareHostTensorFromCpp(&tmp_ct, model_elements[t].data, Z_card, ndims, z.str().c_str(), true); // init with given data, if null init with rand
 
     std::stringstream d1;
     d1 << "Host D1_Z" << t;

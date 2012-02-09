@@ -1,0 +1,51 @@
+I=7;
+J=8;
+K=9;
+A=10;
+
+% I=10;
+% J=11;
+% K=12;
+% A=10;
+
+V_card_sym=['i','j','k','a'];
+V_cards=[I, J, K, A];
+
+A_card_sym=['i','a'];
+A_true = round(10*rand(I,1,1,A));
+
+B_card_sym=['j','a'];
+B_true = round(20*rand(1,J,1,A));
+
+C_card_sym=['k','a'];
+C_true = round(30*rand(1,1,K,A));
+
+X_card_sym = ['i','j','k'];
+X_true = get_parafac(A_true,B_true,C_true,I,J,K,A,[I J K]);
+
+X = poissrnd(X_true);
+X(X==0)=0.000001; % suppress zeros, division/log problems, not the best method
+
+iter_num=50;
+
+tic; [factor_A factor_B factor_C] = pltf_seq ( iter_num, V_card_sym, V_cards, X_card_sym, X, ...
+                                               A_card_sym, B_card_sym, C_card_sym); toc;
+get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)))
+
+
+tic; [factor_A factor_B factor_C] = pltf_par ( iter_num, V_card_sym, V_cards, X_card_sym, X, ...
+                                               A_card_sym, B_card_sym, C_card_sym); toc;
+get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)))
+
+
+
+
+% iter_num=100;
+% tic; [factor_A factor_B factor_C] = pltf_seq ( iter_num, V_card_sym, V_cards, X_card_sym, X, ...
+%                                                A_card_sym, B_card_sym, C_card_sym); toc;
+% get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)))
+% 
+% 
+% tic; [factor_A factor_B factor_C] = pltf_par ( iter_num, V_card_sym, V_cards, X_card_sym, X, ...
+%                                                A_card_sym, B_card_sym, C_card_sym); toc;
+% get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)))
