@@ -72,7 +72,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   size_t op_iter_count = ((double *)mxGetData(prhs[0]))[0];
 
-  size_t factor_count = nrhs - 5;
+  size_t factor_count = (nrhs - 5)/2;
 
   m_tensor x_tensor;
   x_tensor.cards_char = (char*) malloc(mxGetNumberOfElements(prhs[3])+1);
@@ -100,7 +100,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       tmp_m_tensor.data = NULL;
     }else{
       // tensor init data is given, save pointer
-      tmp_m_tensor.data = (double*) mxGetPr(plhs[5+t+1]);
+      tmp_m_tensor.data = (double*) mxGetData(prhs[5+t+1]);
+      if (COUT) std::cout << "found factor with init data. Data size " << mxGetNumberOfElements(prhs[5+t+1]) << std::endl;
     }
 
     model_elements.push_back(tmp_m_tensor);

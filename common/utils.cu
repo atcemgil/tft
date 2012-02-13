@@ -141,7 +141,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   if ( txt != NULL && ( COUT || PRINT_CT) ){
     std::cout << txt << std::endl;
   }
-  if ( COUT ) std::cout << "prepareDeviceTensor elnum " << elnum << std::endl;
+  if ( COUT ) std::cout << "prepareDeviceTensorFromCpp elnum " << elnum << std::endl;
   h_ct->mem_size= sizeof(double) * elnum;
   h_ct->element_number = elnum;
 
@@ -163,7 +163,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
     memcpy(h_ct->data, data, h_ct->mem_size);
   }
 
-  if ( PRINT_CT ) print_ct("prepareDeviceTensor h_ct",h_ct,true);
+  if ( PRINT_CT ) print_ct("prepareDeviceTensorFromCpp h_ct",h_ct,true);
 
 }
 
@@ -255,7 +255,7 @@ void operate(std::vector<operation>* operation_chain){
   size_t opnum=0;
   for ( it=operation_chain->begin() ; it < operation_chain->end(); it++ ){
     if(COUT) {
-      std::cout << "operation chain number " << opnum << " ";
+      std::cout << "operation chain number " << opnum << " " << std::endl;
       opnum++;
     }
     
