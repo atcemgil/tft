@@ -13,14 +13,14 @@
 
 
 // generates pair-wise multiplication result
-__global__ void hadamard_mul(double* d_A, double* d_B, double* d_C, size_t C_element_number){
+__global__ void hadamard_mul(double* d_A, double* d_B, double* d_C, size_t C_element_number, int to_power_A, int to_power_B){
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid < C_element_number){
 
-    d_C[tid] = d_A[tid] * d_B[tid];
+    d_C[tid] = pow(d_A[tid], to_power_A) * pow(d_B[tid], to_power_B);
 
 #if CUPRINTF == true
-    double result = d_A[tid] * d_B[tid];
+    double result = pow(d_A[tid], to_power_A) * pow(d_B[tid], to_power_B);
     cuPrintf("hadamard_mul result %f \n", result);
 #endif
 
@@ -28,14 +28,28 @@ __global__ void hadamard_mul(double* d_A, double* d_B, double* d_C, size_t C_ele
 }
 
 // generates pair-wise division result
-__global__ void hadamard_div(double* d_A, double* d_B, double* d_C, size_t C_element_number){
+__global__ void hadamard_div(double* d_A, double* d_B, double* d_C, size_t C_element_number, int to_power_A, int to_power_B){
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid < C_element_number){
-    d_C[tid] = d_A[tid] / d_B[tid];
+    d_C[tid] = pow(d_A[tid], to_power_A) / pow(d_B[tid], to_power_B);
 
 #if CUPRINTF == true
-    double result = d_A[tid] / d_B[tid];
+    double result = pow(d_A[tid], to_power_A) / pow(d_B[tid], to_power_B);
     cuPrintf("hadamard_div result %f \n", result);
+#endif
+
+  }
+}
+
+// generates pair-wise summation result
+__global__ void hadamard_sum(double* d_A, double* d_B, double* d_C, size_t C_element_number, int to_power_A, int to_power_B){
+  size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tid < C_element_number){
+    d_C[tid] = pow(d_A[tid], to_power_A) + pow(d_B[tid], to_power_B);
+
+#if CUPRINTF == true
+    double result = pow(d_A[tid], to_power_A) + pow(d_B[tid], to_power_B);
+    cuPrintf("hadamard_sum result %f \n", result);
 #endif
 
   }
@@ -47,7 +61,8 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
                               size_t* d_strides_A, size_t* d_strides_B, size_t* d_strides_F,
                               double* d_A, double* d_B, double* d_F, 
 			      size_t F_element_number, size_t A_element_number, size_t B_element_number,
-			      size_t use_multiplication){
+			      size_t use_multiplication,
+			      int to_power_A, int to_power_B){
 
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   size_t d_inds_F;// = (size_t*) malloc(sizeof(size_t)*ndims);
@@ -103,18 +118,18 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
 
 
     if (use_multiplication == 1)
-      d_F[F_ind] = d_A[A_ind] * d_B[B_ind];
+      d_F[F_ind] = pow(d_A[A_ind], to_power_A) * pow(d_B[B_ind], to_power_B);
     else
-      d_F[F_ind] = d_A[A_ind] / d_B[B_ind];
+      d_F[F_ind] = pow(d_A[A_ind], to_power_A) / pow(d_B[B_ind], to_power_B);
 
 
 #if CUPRINTF == true 
     double tmpval = 0;
 
     if (use_multiplication == 1)
-      tmpval = d_A[A_ind] * d_B[B_ind];
+      tmpval = pow(d_A[A_ind], to_power_A) * pow(d_B[B_ind], to_power_B);
     else
-      tmpval = d_A[A_ind] / d_B[B_ind];
+      tmpval = pow(d_A[A_ind], to_power_A) / pow(d_B[B_ind], to_power_B);
 
     double Aval = d_A[A_ind];
     double Bval = d_B[B_ind];

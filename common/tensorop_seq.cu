@@ -6,6 +6,7 @@
 
 #include "../common/utils.cuh"
 #include "tensorop_seq.cuh"
+#include <math.h>
 
 double get_element(const ct* h_ct, size_t* global_index, const char* str){
   if ( COUT_get_set ) std::cout << "get_element: " << str << " cur_ind ";
@@ -238,14 +239,13 @@ void tensorop_seq(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
 
 
 
-
-#include <string.h>
-bool tensorop_seq_keys(bool isHadamard,
-		       bool use_multiplication,
+//#include <string.h>
+bool tensorop_seq_keys(operation_type op_type,
 		       size_t ndims,
 		       bool* result_in_F,
 		       std::string A, std::string B, std::string C,
-		       std::string F
+		       std::string F,
+		       int to_power_A, int to_power_B
 		       ){
 
   if (check_input_keys(A,B,C,F) == false){
@@ -258,14 +258,15 @@ bool tensorop_seq_keys(bool isHadamard,
     print_ct("C: BEFORE tensorop cpp B", h_objs[B], true);
   }
 
-  if ( isHadamard ){
+  if ( is_hadamard(op_type) ){
 
     for( size_t i=0; i<h_objs[C]->element_number; i++)
-      if(use_multiplication)
-        h_objs[C]->data[i] = h_objs[A]->data[i] * h_objs[B]->data[i];
-      else{
-        h_objs[C]->data[i] = h_objs[A]->data[i] / h_objs[B]->data[i];
-      }
+      if ( is_multiplication(op_type) )
+        h_objs[C]->data[i] = pow(h_objs[A]->data[i], to_power_A) * pow(h_objs[B]->data[i], to_power_B);
+      else if ( is_division(op_type) )
+        h_objs[C]->data[i] = pow(h_objs[A]->data[i], to_power_A) / pow(h_objs[B]->data[i], to_power_B);
+      else if ( is_addition(op_type) )
+        h_objs[C]->data[i] = pow(h_objs[A]->data[i], to_power_A) + pow(h_objs[B]->data[i], to_power_B);
 
     if ( PRINT_CT ) {
       print_ct("C: AFTER tensorop cpp C ", h_objs[C], true);
@@ -280,12 +281,15 @@ bool tensorop_seq_keys(bool isHadamard,
       global_index[i] = 0;
 
     for ( size_t F_ind = 0; F_ind < h_objs[F]->element_number; F_ind++){
-      if(use_multiplication)
+      if ( is_multiplication(op_type) )
         set_element(h_objs[F], global_index,
-                    get_element(h_objs[A],global_index) * get_element(h_objs[B], global_index) );
-      else
+                    pow(get_element(h_objs[A],global_index), to_power_A) * pow(get_element(h_objs[B], global_index), to_power_B) );
+      else if ( is_division(op_type) )      
         set_element(h_objs[F], global_index,
-                    get_element(h_objs[A],global_index) / get_element(h_objs[B], global_index) );
+                    pow(get_element(h_objs[A],global_index), to_power_A) / pow(get_element(h_objs[B], global_index), to_power_B) );
+      else if ( is_addition(op_type) )
+        set_element(h_objs[F], global_index,
+                    pow(get_element(h_objs[A],global_index), to_power_A) + pow(get_element(h_objs[B], global_index), to_power_B) );
 
 
       increment_cur_index(ndims, h_full_cardinalities, global_index);
@@ -316,7 +320,7 @@ bool tensorop_seq_keys(bool isHadamard,
       size_t zero_cardinality_dim_tuples_C_element_number = 0;
       size_t* h_zero_cardinality_dim_tuples_C = NULL;
 
-      if ( isHadamard == false){
+      if ( is_hadamard(op_type) == false){
         std::vector<size_t> zero_cardinality_dims;
         for ( size_t dim=0; dim<ndims; dim++ ){
           if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){

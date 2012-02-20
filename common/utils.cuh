@@ -13,8 +13,13 @@
 #include <vector>
 #include <iostream>
 
+#include "tensorop_seq.cuh"
+#include "tensorop_par.cuh"
+
+#define REGISTER_CT(obj) register_ct(#obj, &obj)
+
 void print_ct(const char* txt, ct* ct, bool printdata=false);
-void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_card, const char* txt=NULL);
+//void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_card, const char* txt=NULL);
 size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnum);
 void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, 
 			      const char* txt=NULL, bool rand=false,
@@ -32,8 +37,6 @@ void register_ct(std::string key, ct* obj);
 void clear_ct();
 void read_config();
 void print_config();
-
-
 
 
 // using this construct avoids unnecessary memory duplication
@@ -54,12 +57,14 @@ struct operation{
   std::string B;
   std::string C;
   std::string F;
+  int to_power_A;
+  int to_power_B;
   bool isHadamard;
-  bool use_multiplication;
+  operation_type op_type;
   size_t ndims;
   bool result_in_F;
   // pointer to one of the following functions: mct_tensorop_gpu_keys, mct_tensorop_cpp_keys
-  bool (*operate) (bool, bool, size_t, bool*, std::string, std::string, std::string, std::string);
+  bool (*operate) (operation_type, size_t, bool*, std::string, std::string, std::string, std::string, int, int);
 };
 
 #include <vector>
@@ -70,5 +75,32 @@ void operate(std::vector<operation>* operation_chain);
 bool check_input_keys(std::string A, std::string B, std::string C, std::string F);
 
 void print_model_elements(std::vector<m_tensor>* model_elements, m_tensor* x_tensor);
+void print_model_elements_text(std::vector<m_tensor>* model_elements, char* text);
 void assign_m_tensor_cards_numeric(m_tensor* m_t, mxChar* V_char, double* V_numeric, size_t ndims);
+
+void oc_push_back(std::vector<operation>* operation_chain, operation_type op_type, size_t ndims, std::string A, std::string B, std::string C, bool is_parallel, std::string F="F", int to_power_A=1, int to_power_B=1);
+
+int get_latent_tensor_num(bool* R, size_t v, size_t max_alpha, size_t max_v);
+
+inline bool is_hadamard(operation_type op_type){
+  if ( op_type == HADAMARD_DIV || op_type == HADAMARD_MUL || op_type == HADAMARD_SUM){ return true; }
+  else{ return false; }
+}
+
+inline bool is_multiplication(operation_type op_type){
+  if ( op_type == HADAMARD_MUL || op_type == GMULT){ return true; }
+  else{ return false; }
+}
+
+inline bool is_addition(operation_type op_type){
+  if ( op_type == HADAMARD_SUM ){ return true;
+  }else{ return false; }
+}
+
+inline bool is_division(operation_type op_type){
+  if ( op_type == HADAMARD_DIV ){  return true; }
+  else{  return false; }
+}
+
+
 #endif

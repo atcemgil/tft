@@ -1,5 +1,10 @@
+
+
 #ifndef MCT_TENSOROP_CPP_H
 #define MCT_TENSOROP_CPP_H
+
+#include "enums.cuh"
+#include "tensor.h"
 
 double get_element(const ct* h_ct, size_t* global_index, const char* str="");
 void set_element(ct* h_ct, size_t* global_index, double val, const char* str="");
@@ -10,12 +15,12 @@ void tensorop_seq(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
 
 // returns false on error (specified input object not found in object map)
 // result_in_F is true if result is not copied to the the C 
-bool tensorop_seq_keys( bool isHadamard, 
-			bool use_multiplication,
+bool tensorop_seq_keys( operation_type op_type,
 			size_t ndims,
 			bool* result_in_F,
 			std::string A, std::string B, std::string C, 
-			std::string F="F"
+			std::string F="F", 
+			int to_power_A=1, int to_power_B=1
 			);
 
 #endif

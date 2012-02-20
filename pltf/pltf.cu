@@ -8,48 +8,6 @@
 #include <sstream>
 
 #include "../common/utils.cuh"
-#include "../common/tensorop_seq.cuh"
-#include "../common/tensorop_par.cuh"
-
-#define REGISTER_CT(obj) register_ct(#obj, &obj)
-
-void oc_push_back(std::vector<operation>* operation_chain, bool isHadamard, bool use_multiplication, size_t ndims, std::string A, std::string B, std::string C, bool is_parallel, std::string F="F"){
-
-  operation oc;
-  oc.isHadamard = isHadamard;
-  oc.use_multiplication = use_multiplication;
-  oc.ndims = ndims;
-  oc.A = A;
-  oc.B = B;
-  oc.C = C;
-  oc.F = F;
-  oc.result_in_F = false;  /// dikkat !!! // untested -> non hadamard , no contraction case
-
-  if (is_parallel){
-    oc.operate = &tensorop_par_keys;
-  }else{
-    oc.operate = &tensorop_seq_keys;
-  }
-
-  operation_chain->push_back(oc);
-
-
-
-  size_t* full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
-
-  for (size_t dim=0; dim<ndims; dim++){
-    size_t max_dim_card = 0;
-    if ( max_dim_card < h_objs[A]->cardinalities[dim] )
-      max_dim_card = h_objs[A]->cardinalities[dim];
-    if ( max_dim_card < h_objs[B]->cardinalities[dim] )
-      max_dim_card = h_objs[B]->cardinalities[dim];
-    if ( max_dim_card < h_objs[C]->cardinalities[dim] )
-      max_dim_card = h_objs[C]->cardinalities[dim];
-
-    full_cardinalities[dim] = max_dim_card;
-  }
-}
-
 
 void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_parallel){
 
@@ -262,7 +220,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   }
 
 
-  prepareHostTensor(&X, x_tensor_data, m_X_card, (const char*) "Host X");
+  prepareHostTensorFromCpp(&X, mxGetPr(x_tensor_data), X_card, ndims, (const char*) "Host X");
 
   double M_data[X.mem_size];
   for(size_t i=0; i<X.mem_size; i++) M_data[i]=1;
@@ -342,10 +300,10 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       if (z==1) {
 	// if this is the last operation (2 factor problem) store result in Xhat
 	if ( Z_tensors.size() == 2 ){
-	  oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "Xhat", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "Xhat", is_parallel);
 	}else{
 	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, false, 1, ndims, "Z0", "Z1", "F", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "F", is_parallel);
 	}
       }
       else{
@@ -354,17 +312,17 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 	if (z!=(Z_tensors.size()-1)){
 	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "F", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "F", is_parallel);
 	}else{
 	  // in last operation store result into Xhat
-	  oc_push_back(&operation_chain, false, 1, ndims, Zn.str().c_str(), "F", "Xhat", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "Xhat", is_parallel);
 	}
       }
     }
 
 
-    oc_push_back(&operation_chain, true , 0, ndims, "X", "Xhat", "A", is_parallel);
-    oc_push_back(&operation_chain, true , 1, ndims, "M", "A", "A", is_parallel);
+    oc_push_back(&operation_chain, HADAMARD_DIV, ndims, "X", "Xhat", "A", is_parallel);
+    oc_push_back(&operation_chain, HADAMARD_MUL, ndims, "M", "A", "A", is_parallel);
 
     std::stringstream d1;
     d1 << "D1_Z" << t;
@@ -377,18 +335,18 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
       if ( tmp_op_count == 0 ){
 	if ( Z_tensors.size() == 2){
-	  oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
 	}else{
 	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, false, 1, ndims, "A", other_z_name.str().c_str(), "F", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), "F", is_parallel);
 	}
       }else{
 	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
 	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
 	}else{
 	  // in last operation store result into d1
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), is_parallel);
 	}
       }
       tmp_op_count++;
@@ -405,28 +363,28 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
       if ( tmp_op_count == 0 ){
 	if ( Z_tensors.size() == 2) {
-	  oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), is_parallel);
 	}else{
 	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, false, 1, ndims, "M", other_z_name.str().c_str(), "F", is_parallel); 
+	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), "F", is_parallel); 
 	}
       }else{
 	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
 	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
 	}else{
 	  // in last operation store result into d2
-	  oc_push_back(&operation_chain, false, 1, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), is_parallel);
 	}
       }
       tmp_op_count++;
     }
 
-    oc_push_back(&operation_chain, true , 0, ndims, d1.str().c_str(), d2.str().c_str(), d1.str().c_str(), is_parallel);
+    oc_push_back(&operation_chain, HADAMARD_DIV, ndims, d1.str().c_str(), d2.str().c_str(), d1.str().c_str(), is_parallel);
 
     std::stringstream Zn;
     Zn << 'Z' << t ;
-    oc_push_back(&operation_chain, true , 1, ndims, Zn.str().c_str(), d1.str().c_str(), Zn.str().c_str(), is_parallel);
+    oc_push_back(&operation_chain, HADAMARD_MUL, ndims, Zn.str().c_str(), d1.str().c_str(), Zn.str().c_str(), is_parallel);
   }
 
   if (PRINT_CHAIN) print_oc(&operation_chain);

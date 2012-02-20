@@ -7,9 +7,7 @@
 #include <string.h>
 #include <sstream>
 
-#include "../common/utils.cuh"
-#include "../common/tensorop_seq.cuh"
-#include "../common/tensorop_par.cuh"
+#include "utils.cuh"
 
 void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_parallel){
   if( nlhs != 1 ){
@@ -108,8 +106,16 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool i
   // prepare host memory for tensors  ///////////////////////////////////////////////////////
 
   ct h_A, h_B, h_C, h_F;
-  prepareHostTensor(&h_A, m_A_data, m_A_card, (const char*) "Host A");
-  prepareHostTensor(&h_B, m_B_data, m_B_card, (const char*)"Host B");
+
+  size_t A_card[ndims];
+  size_t B_card[ndims];
+  for (size_t i=0; i<ndims; i++){
+    A_card[i] = ((double *)mxGetData(m_A_card))[i];
+    B_card[i] = ((double *)mxGetData(m_B_card))[i];
+  }
+
+  prepareHostTensorFromCpp(&h_A, mxGetPr(m_A_data), A_card, ndims, (const char*) "Host A");
+  prepareHostTensorFromCpp(&h_B, mxGetPr(m_B_data), B_card, ndims, (const char*)"Host B");
   // NULL initiates data with zero
   prepareHostTensorFromCpp(&h_F, NULL, h_full_cardinalities, ndims, "Host F");
 

@@ -291,12 +291,12 @@ void operate(std::vector<operation>* operation_chain){
       print_oc_element(&(*it));
 
 
-    (it->operate) (it->isHadamard,
-                   it->use_multiplication,
+    (it->operate) (it->op_type,
                    it->ndims,
                    &(it->result_in_F),
                    A, B, it->C,
-                   it->F);
+                   it->F,
+		   it->to_power_A, it->to_power_B);
 
     if (COUT_operate)
       std::cout << " operate end: result_in_F " << it->result_in_F
@@ -308,12 +308,17 @@ void operate(std::vector<operation>* operation_chain){
 
 void print_oc_element(operation* oc){
     std::cout << (*oc).A;
-    if ( (*oc).use_multiplication ) std::cout << " . ";
-    else std::cout << " / " ;
+    //if ( (*oc).op_type ) std::cout << " . ";
+    //else std::cout << " / " ;
+
+    if ( is_multiplication(oc->op_type) ) std::cout << " * " ;
+    else if ( is_division(oc->op_type) )  std::cout << " / " ;
+    else if ( is_addition(oc->op_type) )  std::cout << " + " ;
 
     std::cout << (*oc).B << " -> " << (*oc).C << " (F: " << (*oc).F << ")"
               << " \t\t  ndims "<< (*oc).ndims << " result_in_F " << (*oc).result_in_F 
-	      << " isHadamard " << (*oc).isHadamard << " use_multiplication " << (*oc).use_multiplication << std::endl;
+	      << " isHadamard " << (*oc).isHadamard << " operation_type " << (*oc).op_type 
+	      << " \t to_power_A " << oc->to_power_A << "\t to_power_B " << oc->to_power_B << std::endl;
 }
 
 void print_oc(std::vector<operation>* operation_chain){
@@ -334,6 +339,10 @@ void print_m_tensor(m_tensor* m_t){
   for (size_t m_i=0; m_i<(*m_t).cards_numeric.size(); m_i++){
     std::cout << (size_t) (*m_t).cards_numeric[m_i] << " ";
   }
+
+  std::cout << std::endl << "data pointer " << m_t->data;
+  std::cout << std::endl << "is_updateable " << m_t->is_updateable;
+  std::cout << std::endl;
 }
 
 void print_model_elements(std::vector<m_tensor>* model_elements, m_tensor* x_tensor){
@@ -346,8 +355,16 @@ void print_model_elements(std::vector<m_tensor>* model_elements, m_tensor* x_ten
   std::cout << "printing X tensor" << std::endl;
   print_m_tensor( x_tensor );
   std::cout << std::endl;
-
 }
+
+void print_model_elements_text(std::vector<m_tensor>* model_elements, char* text){
+  std::cout << text << std::endl;
+  for (size_t m=0; m<(*model_elements).size(); m++){
+    print_m_tensor( &(*model_elements)[m] );
+    std::cout << std::endl;
+  }
+}
+
 void assign_m_tensor_cards_numeric(m_tensor* m_t, mxChar* V_char, double* V_numeric, size_t ndims){
   for (size_t i=0; i<ndims; i++){
     bool found=false;
@@ -441,4 +458,52 @@ void free_ct(ct* c){
   free(c->cardinalities);
   free(c->strides);
   free(c->data);
+}
+
+void oc_push_back(std::vector<operation>* operation_chain, operation_type op_type, size_t ndims, std::string A, std::string B, std::string C, bool is_parallel, std::string F, int to_power_A, int to_power_B){
+
+  operation oc;
+  oc.isHadamard = is_hadamard(op_type);
+  oc.op_type = op_type;
+  oc.ndims = ndims;
+  oc.A = A;
+  oc.B = B;
+  oc.C = C;
+  oc.F = F;
+  oc.to_power_A = to_power_A;
+  oc.to_power_B = to_power_B;
+  oc.result_in_F = false;  /// dikkat !!! // untested -> non hadamard , no contraction case
+
+  if (is_parallel){
+    oc.operate = &tensorop_par_keys;
+  }else{
+    oc.operate = &tensorop_seq_keys;
+  }
+
+  operation_chain->push_back(oc);
+
+
+
+  size_t* full_cardinalities = (size_t*) calloc(ndims, sizeof(size_t)); // defined in mct_tensorop_utils.cuh
+
+  for (size_t dim=0; dim<ndims; dim++){
+    size_t max_dim_card = 0;
+    if ( max_dim_card < h_objs[A]->cardinalities[dim] )
+      max_dim_card = h_objs[A]->cardinalities[dim];
+    if ( max_dim_card < h_objs[B]->cardinalities[dim] )
+      max_dim_card = h_objs[B]->cardinalities[dim];
+    if ( max_dim_card < h_objs[C]->cardinalities[dim] )
+      max_dim_card = h_objs[C]->cardinalities[dim];
+
+    full_cardinalities[dim] = max_dim_card;
+  }
+}
+
+// returns number of used latent tensors for a given observed tensor
+int get_latent_tensor_num(bool* R, size_t v, size_t max_alpha, size_t max_v){
+  int count=0;
+  for (int j=0; j<max_alpha; j++){
+    if (R[v + j*max_v]) count++;
+  }
+  return count;
 }

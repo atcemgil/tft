@@ -231,12 +231,11 @@ void transferToDevice(size_t full_ndims){
 
 // perform tensor operation with specified objects
 // ct* result contains a pointer to the ct objects containing the result. It may be input C or F.
-bool tensorop_par_keys(bool isHadamard,
-		       bool use_multiplication,
+bool tensorop_par_keys(operation_type op_type,
 		       size_t ndims,
 		       bool* result_in_F,
 		       std::string A, std::string B, std::string C,
-		       std::string F
+		       std::string F, int to_power_A, int to_power_B
 		       ){
   if (check_input_keys(A,B,C,F) == false){
     return false;
@@ -251,18 +250,29 @@ bool tensorop_par_keys(bool isHadamard,
 
   bool got_zeros = false;
 
-  if ( isHadamard ){
+  if ( is_hadamard(op_type) ){
 
-    if (use_multiplication == 1)
+    if (is_multiplication(op_type) )
       hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(d_obj_data[A],
                                                       d_obj_data[B],
                                                       d_obj_data[C],
-                                                      h_objs[C]->element_number);
-    else
+                                                      h_objs[C]->element_number,
+						      to_power_A,
+						      to_power_B);
+    else if (is_division(op_type) )
       hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(d_obj_data[A],
                                                       d_obj_data[B],
                                                       d_obj_data[C],
-                                                      h_objs[C]->element_number);
+                                                      h_objs[C]->element_number,
+						      to_power_A,
+						      to_power_B);
+    else if (is_addition(op_type) )
+      hadamard_sum<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(d_obj_data[A],
+                                                      d_obj_data[B],
+                                                      d_obj_data[C],
+                                                      h_objs[C]->element_number,
+						      to_power_A,
+						      to_power_B);
 
     if ( PRINT_CT ) {
       transferFromDevice(h_objs[A]->data, A);
@@ -282,7 +292,8 @@ bool tensorop_par_keys(bool isHadamard,
                                                     d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
                                                     d_obj_data[A], d_obj_data[B], d_obj_data[F],
                                                     h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number,
-                                                    use_multiplication);
+                                                    is_multiplication(op_type),
+						    to_power_A, to_power_B);
 
     // test full result
     cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
@@ -317,7 +328,7 @@ bool tensorop_par_keys(bool isHadamard,
       size_t* h_zero_cardinality_dim_tuples_C = NULL;
       size_t* d_zero_cardinality_dim_tuples_C = NULL;
 
-      if ( isHadamard == false){
+      if ( is_hadamard(op_type) == false){
         std::vector<size_t> zero_cardinality_dims;
         for ( size_t dim=0; dim<ndims; dim++ ){
           if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){
