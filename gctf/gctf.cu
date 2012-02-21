@@ -249,18 +249,18 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     }
 
     // for summation of division operands
-    ct tmp_ct_D1_sum;
-    ct tmp_ct_D2_sum;
-    std::stringstream d1;
-    d1 << "Host D1_Z" << el << "sum";
-    prepareHostTensorFromCpp(&tmp_ct_D1_sum, NULL, Z_card, ndims, d1.str().c_str());
+    // ct tmp_ct_D1_sum;
+    // ct tmp_ct_D2_sum;
+    // std::stringstream d1;
+    // d1 << "Host D1_Z" << el << "sum";
+    // prepareHostTensorFromCpp(&tmp_ct_D1_sum, NULL, Z_card, ndims, d1.str().c_str());
 
-    std::stringstream d2;
-    d2 << "Host D2_Z" << el << "sum";
-    prepareHostTensorFromCpp(&tmp_ct_D2_sum, NULL, Z_card, ndims, d2.str().c_str());
+    // std::stringstream d2;
+    // d2 << "Host D2_Z" << el << "sum";
+    // prepareHostTensorFromCpp(&tmp_ct_D2_sum, NULL, Z_card, ndims, d2.str().c_str());
 
-    D_tensors.push_back(tmp_ct_D1_sum);
-    D_tensors.push_back(tmp_ct_D2_sum);    
+    // D_tensors.push_back(tmp_ct_D1_sum);
+    // D_tensors.push_back(tmp_ct_D2_sum);    
   }
 
 
@@ -290,13 +290,13 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       //     register_ct( name_update.str().c_str(), &(Z_update_tensors[k]) );
     }
   
-    std::stringstream d_name1, d_name2;
-    d_name1 << "D1_Z" << alpha << "sum";
-    d_name2 << "D2_Z" << alpha << "sum";
-    register_ct( d_name2.str().c_str(), &D_tensors[k]);
-    k++;
-    register_ct( d_name2.str().c_str(), &D_tensors[k]);
-    k++;
+    // std::stringstream d_name1, d_name2;
+    // d_name1 << "D1_Z" << alpha << "sum";
+    // d_name2 << "D2_Z" << alpha << "sum";
+    // register_ct( d_name2.str().c_str(), &D_tensors[k]);
+    // k++;
+    // register_ct( d_name2.str().c_str(), &D_tensors[k]);
+    // k++;
   }
 
   for (size_t z=0; z<Z_tensors.size(); z++){
@@ -510,8 +510,6 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
     // sum D1_Zalpha_Xv and D2_Zalpha_Xv for all v to update Zalpha
     std::stringstream D1_Zalpha_sum, D2_Zalpha_sum; // will sum into these
-    //D1_Zalpha_X0 << "D1_Z" << alpha << "sum";
-    //D2_Zalpha_X0 << "D2_Z" << alpha << "sum";
 
     bool first = true;
     for (size_t v=0; v<max_v; v++){

@@ -69,10 +69,7 @@ figure
 plot ( [1:iter_num ], kl_paracan_seq)
 
 
-
-
 return
-
 
 kl_parafac_par = zeros(1, length(1:iter_num))
 kl_paracan_par = zeros(1, length(1:iter_num))
@@ -96,6 +93,7 @@ for i = [ 1:iter_num ]
     kl_paracan_par(i)= get_KL_div(X2, get_paracan(factor_A,factor_B,I,J, A,size(X2)));
 end
 
+figure
 plot ( [1:iter_num ], kl_parafac_par)
 figure
 plot ( [1:iter_num ], kl_paracan_par)
