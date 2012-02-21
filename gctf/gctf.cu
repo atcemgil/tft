@@ -339,7 +339,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   // update each Zn
   for (size_t alpha=0; alpha<max_alpha; alpha++){
-
+    if ( latent_elements[alpha].is_updateable == false) continue;
 
 
 

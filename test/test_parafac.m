@@ -5,6 +5,12 @@ J=8;
 K=9;
 A=10;
 
+I=3;
+J=4;
+K=5;
+A=2;
+
+
 % I=10;
 % J=11;
 % K=12;
@@ -28,7 +34,7 @@ X_true = get_parafac(A_true,B_true,C_true,I,J,K,A,[I J K]);
 X = poissrnd(X_true);
 X(X==0)=0.000001; % suppress zeros, division/log problems, not the best method
 
-iter_num=50;
+iter_num=10;
 
 init=0;
 
@@ -42,15 +48,20 @@ else
     C_init = [];
 end
 
-tic; [factor_A factor_B factor_C] = pltf_seq ( iter_num, ...
-                                               V_card_sym, V_cards, ...
-                                               X_card_sym, X, ...
-                                               A_card_sym, A_init, ...
-                                               B_card_sym, B_init, ...
-                                               C_card_sym, C_init ); toc;
-get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)))
+kl_parafac_seq = zeros(1,length(1:iter_num));
 
+for i = [ 1:iter_num ]
 
+    tic; [factor_A factor_B factor_C] = pltf_seq ( i, ...
+                                                   V_card_sym, V_cards, ...
+                                                   X_card_sym, X, ...
+                                                   A_card_sym, A_init, ...
+                                                   B_card_sym, B_init, ...
+                                                   C_card_sym, C_init ); toc;
+    kl_parafac_seq(i) = get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)));
+end
+plot ( [1:iter_num ], kl_parafac_seq)
+return
 
 tic; [factor_A factor_B factor_C] = pltf_par ( iter_num, ...
                                                V_card_sym, V_cards, ...
