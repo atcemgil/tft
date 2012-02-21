@@ -44,8 +44,8 @@ updateZ3=1;
 kl_parafac_seq = zeros(1, length(1:iter_num))
 kl_paracan_seq = zeros(1, length(1:iter_num))
 
-%for i = [ 1:iter_num ]
-i=iter_num
+for i = [ 1:iter_num ]
+%i=iter_num
 
     tic; [factor_A factor_B factor_C] = gctf_seq ( i, ...
                                                    V_card_sym, ...
@@ -62,7 +62,7 @@ i=iter_num
 
     kl_parafac_seq(i)= get_KL_div(X1, get_parafac(factor_A, factor_B,factor_C,I,J,K,A,size(X1)))
     kl_paracan_seq(i)= get_KL_div(X2, get_paracan(factor_A,factor_B,I,J, A,size(X2)));
-%end
+end
 
 plot ( [1:iter_num ], kl_parafac_seq)
 figure

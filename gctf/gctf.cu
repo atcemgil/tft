@@ -218,35 +218,49 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   std::vector<ct> D_tensors;
   for (size_t el=0; el<latent_elements.size(); el++){
     ct tmp_ct;
-    ct tmp_ct_D1;
-    ct tmp_ct_D2;
 
     size_t Z_card[ndims];
     for (size_t i=0; i<ndims; i++) Z_card[i] = latent_elements[el].cards_numeric[i];
-
     std::stringstream z;
-
     z << "Host Z" << el;
     prepareHostTensorFromCpp(&tmp_ct, latent_elements[el].data, Z_card, ndims, z.str().c_str(), true); // init with given data, if null init with rand
+    Z_tensors.push_back(tmp_ct);
 
     for (size_t v=0; v<max_v; v++){
-      ct tmp_ct_update;
-      std::stringstream z_update;
-      z_update << "Host Z_update" << el << "X" << v;
-      prepareHostTensorFromCpp(&tmp_ct_update, NULL, Z_card, ndims, z_update.str().c_str(), false, false); // rand=false, init_to_one=false -> init with 0
-      Z_update_tensors.push_back(tmp_ct_update);
+      ct tmp_ct_D1;
+      ct tmp_ct_D2;
+
+      std::stringstream d1;
+      d1 << "Host D1_Z" << el << "X" << v;
+      prepareHostTensorFromCpp(&tmp_ct_D1, NULL, Z_card, ndims, d1.str().c_str());
+
+      std::stringstream d2;
+      d2 << "Host D2_Z" << el << "X" << v;
+      prepareHostTensorFromCpp(&tmp_ct_D2, NULL, Z_card, ndims, d2.str().c_str());
+
+      D_tensors.push_back(tmp_ct_D1);
+      D_tensors.push_back(tmp_ct_D2);
+
+      // ct tmp_ct_update;
+      // std::stringstream z_update;
+      // z_update << "Host Z_update" << el << "X" << v;
+      // prepareHostTensorFromCpp(&tmp_ct_update, NULL, Z_card, ndims, z_update.str().c_str(), false, false); // rand=false, init_to_one=false -> init with 0
+      // Z_update_tensors.push_back(tmp_ct_update);
     }
 
+    // for summation of division operands
+    ct tmp_ct_D1_sum;
+    ct tmp_ct_D2_sum;
     std::stringstream d1;
-    d1 << "Host D1_Z" << el;
-    prepareHostTensorFromCpp(&tmp_ct_D1, NULL, Z_card, ndims, d1.str().c_str());
-    std::stringstream d2;
-    d2 << "Host D2_Z" << el;
-    prepareHostTensorFromCpp(&tmp_ct_D2, NULL, Z_card, ndims, d2.str().c_str());
+    d1 << "Host D1_Z" << el << "sum";
+    prepareHostTensorFromCpp(&tmp_ct_D1_sum, NULL, Z_card, ndims, d1.str().c_str());
 
-    Z_tensors.push_back(tmp_ct);
-    D_tensors.push_back(tmp_ct_D1);
-    D_tensors.push_back(tmp_ct_D2);
+    std::stringstream d2;
+    d2 << "Host D2_Z" << el << "sum";
+    prepareHostTensorFromCpp(&tmp_ct_D2_sum, NULL, Z_card, ndims, d2.str().c_str());
+
+    D_tensors.push_back(tmp_ct_D1_sum);
+    D_tensors.push_back(tmp_ct_D2_sum);    
   }
 
 
@@ -260,26 +274,35 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   size_t k=0;
   for (size_t alpha=0; alpha<max_alpha; alpha++){
-    for (size_t v=0; v<max_v; v++){    
-      std::stringstream name_update;
-      name_update << "Zup" << alpha << "X" << v;
-      register_ct( name_update.str().c_str(), &(Z_update_tensors[k]) );
+    for (size_t v=0; v<max_v; v++){
+      std::stringstream d_name1;
+      d_name1 << "D1_Z" << alpha << "X" << v;
+      register_ct( d_name1.str().c_str(), &D_tensors[k]);
       k++;
+
+      std::stringstream d_name2;
+      d_name2 << "D2_Z" << alpha << "X" << v;
+      register_ct( d_name2.str().c_str(), &D_tensors[k]);
+      k++;
+
+      //     std::stringstream name_update;
+      //     name_update << "Zup" << alpha << "X" << v;
+      //     register_ct( name_update.str().c_str(), &(Z_update_tensors[k]) );
     }
+  
+    std::stringstream d_name1, d_name2;
+    d_name1 << "D1_Z" << alpha << "sum";
+    d_name2 << "D2_Z" << alpha << "sum";
+    register_ct( d_name2.str().c_str(), &D_tensors[k]);
+    k++;
+    register_ct( d_name2.str().c_str(), &D_tensors[k]);
+    k++;
   }
 
   for (size_t z=0; z<Z_tensors.size(); z++){
     std::stringstream name;
     name << 'Z' << z;
     register_ct( name.str().c_str(), &(Z_tensors[z]) );
-
-    std::stringstream d_name1;
-    d_name1 << "D1_Z" << z;
-    register_ct( d_name1.str().c_str(), &D_tensors[z*2]);
-
-    std::stringstream d_name2;
-    d_name2 << "D2_Z" << z;
-    register_ct( d_name2.str().c_str(), &D_tensors[z*2+1]);
   }
 
 
@@ -308,6 +331,20 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   // perform GCTF operation //////////////////////////////////////////////////////////////////
 
   std::vector<operation> operation_chain;
+
+
+
+
+  // all hat_Xv are recalculated
+
+  // update each Zn
+  for (size_t alpha=0; alpha<max_alpha; alpha++){
+
+
+
+
+
+
 
   // update all hatX
   for ( size_t cur_v=0; cur_v<max_v; cur_v++){
@@ -377,13 +414,17 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
 
-  // all hat_Xv are recalculated
 
-  // update each Zn
-  for (size_t alpha=0; alpha<max_alpha; alpha++){
+
+
+
+
+
+
 
     // for each Xv
     for (size_t cur_v=0; cur_v<max_v; cur_v++){
+      if ( R[cur_v + alpha*max_v] == false ) continue; // if this Xv does not have this Zalpha dothing to do
 
       std::stringstream hat_Xv;
       hat_Xv << "hatX" << cur_v;
@@ -391,7 +432,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       // calculate D1_Zalpha_Xv
 
       std::stringstream d1;
-      d1 << "D1_Z" << alpha;
+      d1 << "D1_Z" << alpha << "X" << cur_v;
       size_t tmp_op_count=0;
 
       std::stringstream Av;
@@ -429,7 +470,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       // calculate D2_Zalpha_Xv
 
       std::stringstream d2;
-      d2 << "D2_Z" << alpha;
+      d2 << "D2_Z" << alpha << "X" << cur_v;
       tmp_op_count=0;
 
       for (size_t other_z=0; other_z < max_alpha; other_z++){
@@ -460,29 +501,40 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
         tmp_op_count++;
       }
 
-      std::stringstream Zup_v;
-      Zup_v << "Zup" << alpha << "X" << cur_v;
-      oc_push_back(&operation_chain, HADAMARD_DIV, ndims, d1.str().c_str(), d2.str().c_str(), Zup_v.str().c_str(), is_parallel);
+      //std::stringstream Zup_v;
+      //Zup_v << "Zup" << alpha << "X" << cur_v;
+      //oc_push_back(&operation_chain, HADAMARD_DIV, ndims, d1.str().c_str(), d2.str().c_str(), Zup_v.str().c_str(), is_parallel);
     }
 
 
 
-    // sum Zup_v to update Zalpha
-    std::stringstream Zup_v0;
-    Zup_v0 << "Zup" << alpha << "X" << 0;
+    // sum D1_Zalpha_Xv and D2_Zalpha_Xv for all v to update Zalpha
+    std::stringstream D1_Zalpha_sum, D2_Zalpha_sum; // will sum into these
+    //D1_Zalpha_X0 << "D1_Z" << alpha << "sum";
+    //D2_Zalpha_X0 << "D2_Z" << alpha << "sum";
 
-    for (size_t Zup_v=1; Zup_v<max_v; Zup_v++){
-      std::stringstream Zup_v_name, Zup_v_name_prev;
-      Zup_v_name << "Zup" << alpha << "X" << Zup_v;
-      Zup_v_name_prev << "Zup" << alpha << "X" << Zup_v-1;
-
-      oc_push_back(&operation_chain, HADAMARD_SUM, ndims, Zup_v_name.str().c_str(), Zup_v_name_prev.str().c_str(), Zup_v0.str().c_str(), is_parallel);
+    bool first = true;
+    for (size_t v=0; v<max_v; v++){
+      if ( R[v + alpha*max_v] ){
+	if ( first ){
+	  D1_Zalpha_sum << "D1_Z" << alpha << "X" << v;
+	  D2_Zalpha_sum << "D2_Z" << alpha << "X" << v;
+	  first = false;
+	}else{
+	  std::stringstream other_d1, other_d2;
+	  other_d1 << "D1_Z" << alpha << "X" << v;
+	  other_d2 << "D2_Z" << alpha << "X" << v;
+	  oc_push_back(&operation_chain, HADAMARD_SUM, ndims, D1_Zalpha_sum.str().c_str(), other_d1.str().c_str(), D1_Zalpha_sum.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, HADAMARD_SUM, ndims, D2_Zalpha_sum.str().c_str(), other_d2.str().c_str(), D2_Zalpha_sum.str().c_str(), is_parallel);
+	}
+      }
     }
 
+    oc_push_back(&operation_chain, HADAMARD_DIV, ndims, D1_Zalpha_sum.str().c_str(), D2_Zalpha_sum.str().c_str(), D1_Zalpha_sum.str().c_str(), is_parallel);
 
     std::stringstream Zalpha;
     Zalpha << 'Z' << alpha ;
-    oc_push_back(&operation_chain, HADAMARD_MUL, ndims, Zalpha.str().c_str(), Zup_v0.str().c_str(), Zalpha.str().c_str(), is_parallel);
+    oc_push_back(&operation_chain, HADAMARD_MUL, ndims, Zalpha.str().c_str(), D1_Zalpha_sum.str().c_str(), Zalpha.str().c_str(), is_parallel);
   }
 
 
