@@ -279,7 +279,7 @@ bool tensorop_par_keys(operation_type op_type,
 
   if ( COUT ) std::cout << " tensorop_gpu_keys Running kernels " << std::endl << std::endl;
 
-  bool got_zeros = false;
+  //bool got_zeros = false;
 
   if ( is_hadamard(op_type) ){
 
@@ -322,90 +322,108 @@ bool tensorop_par_keys(operation_type op_type,
   }else{
 
     // generate the full output
-    genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(d_full_cardinalities, ndims,
-                                                    d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
-                                                    d_obj_data[A], d_obj_data[B], d_obj_data[F],
-                                                    h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number,
-                                                    is_multiplication(op_type),
-						    CUPRINTF,
-						    to_power_A, to_power_B);
+    // genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(d_full_cardinalities, ndims,
+    //                                                 d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
+    //                                                 d_obj_data[A], d_obj_data[B], d_obj_data[F],
+    //                                                 h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number,
+    //                                                 is_multiplication(op_type),
+    // 						    CUPRINTF,
+    // 						    to_power_A, to_power_B);
 
-    // test full result
-    cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
-    if ( PRINT_CT ) {
-      transferFromDevice(h_objs[A]->data, A);
-      print_ct("tensorop gpu A", h_objs[A], true);
+    // // test full result
+    // cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
+    // if ( PRINT_CT ) {
+    //   transferFromDevice(h_objs[A]->data, A);
+    //   print_ct("tensorop gpu A", h_objs[A], true);
 
-      transferFromDevice(h_objs[B]->data, B);
-      print_ct("tensorop gpu B", h_objs[B], true);
+    //   transferFromDevice(h_objs[B]->data, B);
+    //   print_ct("tensorop gpu B", h_objs[B], true);
 
-      transferFromDevice(h_objs[F]->data, F);
-      print_ct("tensorop gpu F", h_objs[F], true);
-    }
+    //   transferFromDevice(h_objs[F]->data, F);
+    //   print_ct("tensorop gpu F", h_objs[F], true);
+    // }
 
-    // if no contraction is required, result is already stored in F, return that
-    got_zeros = false;
-    for ( size_t dim=0; dim<ndims; dim++){
-      if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0){
-        if ( COUT ) std::cout << " GOT ZEROS found zero on h_objs[C] dimension " << dim << std::endl;
-        got_zeros = true;
-        break;
+    // // if no contraction is required, result is already stored in F, return that
+    // got_zeros = false;
+    // for ( size_t dim=0; dim<ndims; dim++){
+    //   if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0){
+    //     if ( COUT ) std::cout << " GOT ZEROS found zero on h_objs[C] dimension " << dim << std::endl;
+    //     got_zeros = true;
+    //     break;
+    //   }
+    // }
+
+    // *result_in_F=true;
+
+    // if ( got_zeros ){
+
+    // prepare range permutation vector //////////////////////////////////////////////////////
+    size_t zero_cardinality_dim_tuple_size_C = 0;
+    size_t zero_cardinality_dim_tuples_C_element_number = 0;
+    size_t* h_zero_cardinality_dim_tuples_C = NULL;
+    size_t* d_zero_cardinality_dim_tuples_C = NULL;
+
+    if ( is_hadamard(op_type) == false){
+      std::vector<size_t> zero_cardinality_dims;
+      for ( size_t dim=0; dim<ndims; dim++ ){
+	if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){
+	  zero_cardinality_dims.push_back(h_objs[F]->cardinalities[dim]);
+	}
       }
-    }
 
-    *result_in_F=true;
-
-    if ( got_zeros ){
-
-      // prepare range permutation vector //////////////////////////////////////////////////////
-      size_t zero_cardinality_dim_tuple_size_C = 0;
-      size_t zero_cardinality_dim_tuples_C_element_number = 0;
-      size_t* h_zero_cardinality_dim_tuples_C = NULL;
-      size_t* d_zero_cardinality_dim_tuples_C = NULL;
-
-      if ( is_hadamard(op_type) == false){
-        std::vector<size_t> zero_cardinality_dims;
-        for ( size_t dim=0; dim<ndims; dim++ ){
-          if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){
-            zero_cardinality_dims.push_back(h_objs[F]->cardinalities[dim]);
-          }
-        }
-
-        if ( COUT ) {
-          std::cout << "zero_cardinality_dims" << std::endl;
-          for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
-            std::cout << zero_cardinality_dims.at(j) << std::endl;
-          }
-        }
-
-        zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
-
-        h_zero_cardinality_dim_tuples_C =
-          gen_range_permutation(zero_cardinality_dims,
-                                &(zero_cardinality_dim_tuples_C_element_number));
-
-        // transfer to device
-        cutilSafeCall(cudaMalloc((void**)&(d_zero_cardinality_dim_tuples_C),
-                                 sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number));
-        cutilSafeCall(cudaMemcpy(d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
-                                 sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number, cudaMemcpyHostToDevice));
-
+      if ( COUT ) {
+	std::cout << "zero_cardinality_dims" << std::endl;
+	for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
+	  std::cout << zero_cardinality_dims.at(j) << std::endl;
+	}
       }
+
+      zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
+
+      h_zero_cardinality_dim_tuples_C =
+	gen_range_permutation(zero_cardinality_dims,
+			      &(zero_cardinality_dim_tuples_C_element_number));
+
+      // transfer to device
+      cutilSafeCall(cudaMalloc((void**)&(d_zero_cardinality_dim_tuples_C),
+			       sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number));
+      cutilSafeCall(cudaMemcpy(d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
+			       sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number, cudaMemcpyHostToDevice));
+
+    }
 
       ////////////////////////////////////////////////////////////////////////////////////////
 
 
 
-      // contract on required dimensions
-      if ( COUT ) std::cout << "performing contaction" << std::endl;
-      contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
-                                                       d_obj_strides[F], d_obj_strides[C],
-                                                       d_obj_data[F], d_obj_data[C],
-                                                       h_objs[C]->element_number,
-                                                       d_zero_cardinality_dim_tuples_C,
-                                                       zero_cardinality_dim_tuple_size_C,
-                                                       zero_cardinality_dim_tuples_C_element_number,
-						       CUPRINTF);
+      // // contract on required dimensions
+      // if ( COUT ) std::cout << "performing contaction" << std::endl;
+      // contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
+      //                                                  d_obj_strides[F], d_obj_strides[C],
+      //                                                  d_obj_data[F], d_obj_data[C],
+      //                                                  h_objs[C]->element_number,
+      //                                                  d_zero_cardinality_dim_tuples_C,
+      //                                                  zero_cardinality_dim_tuple_size_C,
+      //                                                  zero_cardinality_dim_tuples_C_element_number,
+      // 						       CUPRINTF);
+
+
+
+
+
+    // do not use F
+    calculate_C <<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>( ndims,
+						    d_obj_strides[F], d_obj_strides[A], d_obj_strides[B], d_obj_strides[C],
+						    d_obj_data[A], d_obj_data[B], d_obj_data[C], 
+						    h_objs[A]->element_number, h_objs[B]->element_number, h_objs[C]->element_number,
+						    d_zero_cardinality_dim_tuples_C,
+						    zero_cardinality_dim_tuple_size_C,
+						    zero_cardinality_dim_tuples_C_element_number,
+						    is_multiplication(op_type),
+						    CUPRINTF,
+						    to_power_A, to_power_B);
+
+
 
     if ( PRINT_CT ) {
       transferFromDevice(h_objs[C]->data, C);
@@ -413,8 +431,8 @@ bool tensorop_par_keys(operation_type op_type,
     }
 
 
-      *result_in_F=false;
-    }
+      // *result_in_F=false;
+    //}
   }
 
   // check if kernel execution generated and error

@@ -384,7 +384,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
           break; // do not need to loop any more for this hatX
         }else{
           // there will be more Zn to operate on save the result in F
-          oc_push_back(&operation_chain, GMULT, ndims, first_Z.str().c_str(), Zn.str().c_str(), "F", is_parallel);
+          oc_push_back(&operation_chain, GMULT, ndims, first_Z.str().c_str(), Zn.str().c_str(), hat_Xv.str().c_str(), is_parallel);
           used_Z_count++;
         }
 
@@ -393,10 +393,10 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
         if (alpha != (Z_tensors.size()-1)){
           // in all non last operations store result in F to avoid mis-contraction
-          oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "F", is_parallel);
+          oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), hat_Xv.str().c_str(), hat_Xv.str().c_str(), is_parallel);
         }else{
           // in last operation store result into Xhat
-          oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", hat_Xv.str().c_str(), is_parallel);
+          oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), hat_Xv.str().c_str(), hat_Xv.str().c_str(), is_parallel);
         }
       }
     }
@@ -450,16 +450,16 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
             oc_push_back(&operation_chain, GMULT, ndims, Av.str().c_str(), other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
             break; // do not need to loop any more for this D1_Zn with this Xv
           }else{
-            oc_push_back(&operation_chain, GMULT, ndims, Av.str().c_str(), other_z_name.str().c_str(), "F", is_parallel);
+            oc_push_back(&operation_chain, GMULT, ndims, Av.str().c_str(), other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
           }
         }else{
           //if ( tmp_op_count != Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
           if ( tmp_op_count != get_latent_tensor_num(R, cur_v, max_alpha, max_v) - 2) { // -1 for D1_Zn does not loop for Zn, -1 for current op. is not incremented yet
             // in all non last operations store result in F to avoid mis-contraction
-            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
+            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d1.str().c_str(), d1.str().c_str(), is_parallel);
           }else{
             // in last operation store result into d1
-            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), is_parallel);
+            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d1.str().c_str(), d1.str().c_str(), is_parallel);
           }
         }
 
@@ -485,17 +485,17 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
             oc_push_back(&operation_chain, GMULT, ndims, hat_Xv.str().c_str(), other_z_name.str().c_str(), d2.str().c_str(), is_parallel, "F", p+1, 1);
             break; // do not need to loop any more for this D2_Zn with this Xv
           }else{
-            oc_push_back(&operation_chain, GMULT, ndims, hat_Xv.str().c_str(), other_z_name.str().c_str(), "F", is_parallel, "F", p+1, 1);
+            oc_push_back(&operation_chain, GMULT, ndims, hat_Xv.str().c_str(), other_z_name.str().c_str(), d2.str().c_str(), is_parallel, "F", p+1, 1);
           }
         }else{
           // third or later Zn
 
           if ( tmp_op_count != get_latent_tensor_num(R, cur_v, max_alpha, max_v) - 2 ){
             // in all non last operations store result in F to avoid mis-contraction
-            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
+            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d2.str().c_str(), d2.str().c_str(), is_parallel);
           }else{
             // in last operation store result into d2
-            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), is_parallel);
+            oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d2.str().c_str(), d2.str().c_str(), is_parallel);
           }
         }
         tmp_op_count++;
