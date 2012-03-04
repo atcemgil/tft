@@ -10,9 +10,7 @@
 #include "cutil_inline.h"
 #include "../common/kernels.cuh"
 
-#if CUPRINTF == true
 #include "../common/cuPrintf.cuh"
-#endif
 
 
 std::map<std::string,size_t*> d_obj_strides;
@@ -76,7 +74,7 @@ dev_ptrs prepareDeviceParameters(size_t ndims,
   return dp;
 }
 
-void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C, size_t h_zero_cardinality_dim_tuple_size_C, size_t use_multiplication){
+void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double* m_C, ct& h_F, size_t ndims, size_t h_zero_cardinality_dim_tuples_C_element_number, const size_t* h_zero_cardinality_dim_tuples_C, size_t h_zero_cardinality_dim_tuple_size_C, size_t use_multiplication, int to_power_A, int to_power_B){
   
   // prepare device memory for tensors  /////////////////////////////////////////////////////
 
@@ -97,29 +95,48 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
   cutilCheckError(cutCreateTimer(&timer));
   cutilCheckError(cutStartTimer(timer));
 
-#if CUPRINTF == true
-  cudaPrintfInit();
-#endif
+  if( CUPRINTF ){
+    cudaPrintfInit();
+  }
+
 
   if ( COUT ) std::cout << " tensorop_gpu Running kernels " << std::endl << std::endl;
 
-  bool got_zeros = false;
+  //bool got_zeros = false;
 
   if ( isHadamard ){
 
     if (use_multiplication == 1)
-      hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(dp.d_data_A,dp.d_data_B,dp.d_data_C,h_C.element_number);
+      hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(dp.d_data_A,dp.d_data_B,dp.d_data_C,h_C.element_number, CUPRINTF);
     else
-      hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(dp.d_data_A,dp.d_data_B,dp.d_data_C,h_C.element_number);
+      hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(dp.d_data_A,dp.d_data_B,dp.d_data_C,h_C.element_number, CUPRINTF);
 
   }else{
 
+    // do not use F
+    calculate_C <<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>( ndims,
+						    dp.d_strides_F, dp.d_strides_A, dp.d_strides_B, dp.d_strides_C,
+						    dp.d_data_A, dp.d_data_B, dp.d_data_C,
+						    h_A.element_number, h_B.element_number, h_C.element_number,
+						    dp.d_zero_cardinality_dim_tuples_C,
+						    dp.zero_cardinality_dim_tuple_size_C,
+						    dp.zero_cardinality_dim_tuples_C_element_number,
+						    use_multiplication,
+						    CUPRINTF,
+						    to_power_A, to_power_B);
+
+
+
+    
+
+    /*
+
     // generate the full output
     genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(dp.d_full_cardinalities, ndims,
-                                                    dp.d_strides_A, dp.d_strides_B, dp.d_strides_F,
-                                                    dp.d_data_A, dp.d_data_B, dp.d_data_F,
-                                                    h_F.element_number, h_A.element_number, h_B.element_number, 
-                                                    use_multiplication);
+                                                     dp.d_strides_A, dp.d_strides_B, dp.d_strides_F,
+                                                     dp.d_data_A, dp.d_data_B, dp.d_data_F,
+                                                     h_F.element_number, h_A.element_number, h_B.element_number, 
+						    use_multiplication, CUPRINTF);
 
     // test full result
     cutilSafeCall(cudaMemcpy(h_F.data, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
@@ -140,37 +157,50 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
       if ( COUT ) std::cout << "performing contaction" << std::endl;
       contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
                                                        dp.d_strides_F, dp.d_strides_C,
-                                                       dp.d_data_F, dp.d_data_C,
-                                                       h_C.element_number,
-                                                       dp.d_zero_cardinality_dim_tuples_C,
+						       dp.d_data_F, dp.d_data_C,
+						       h_C.element_number,
+						       dp.d_zero_cardinality_dim_tuples_C,
                                                        dp.zero_cardinality_dim_tuple_size_C,
-                                                       dp.zero_cardinality_dim_tuples_C_element_number);
+                                                       dp.zero_cardinality_dim_tuples_C_element_number,
+      						       CUPRINTF);
     }
+    */
+
+
+
+
   }
+
+
 
   // check if kernel execution generated and error
   cutilCheckMsg("Kernel execution failed");
   cudaThreadSynchronize();
+
   // stop and destroy timer
   cutilCheckError(cutStopTimer(timer));
   cutilCheckError(cutDeleteTimer(timer));
 
-#if CUPRINTF == true
-  cudaPrintfDisplay(stdout, true);
-  cudaPrintfEnd();
-#endif
+  if ( CUPRINTF ){
+    cudaPrintfDisplay(stdout, true);
+    cudaPrintfEnd();
+  }
 
 
   if ( isHadamard ){
     cutilSafeCall(cudaMemcpy(m_C, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
   }else{
-    if ( got_zeros ){
-      cutilSafeCall(cudaMemcpy(m_C, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
+    //if ( got_zeros ){
+    cutilSafeCall(cudaMemcpy(m_C, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
+    
+    if ( PRINT_CT ) {
       cutilSafeCall(cudaMemcpy(h_C.data, dp.d_data_C, h_C.mem_size, cudaMemcpyDeviceToHost));
-      if ( PRINT_CT ) print_ct("result on C side (after)", &h_C,true);
-    }else{
-      cutilSafeCall(cudaMemcpy(m_C, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
+      print_ct("result on C side (after)", &h_C,true);
     }
+
+    //}else{
+    //  cutilSafeCall(cudaMemcpy(m_C, dp.d_data_F, h_F.mem_size, cudaMemcpyDeviceToHost));
+    //}
   }
 
   cudaThreadExit();
@@ -242,9 +272,10 @@ bool tensorop_par_keys(operation_type op_type,
   }
 
 
-#if CUPRINTF == true
-  cudaPrintfInit();
-#endif
+  if ( CUPRINTF ){
+    cudaPrintfInit();
+  }
+
 
   if ( COUT ) std::cout << " tensorop_gpu_keys Running kernels " << std::endl << std::endl;
 
@@ -257,6 +288,7 @@ bool tensorop_par_keys(operation_type op_type,
                                                       d_obj_data[B],
                                                       d_obj_data[C],
                                                       h_objs[C]->element_number,
+						      CUPRINTF,
 						      to_power_A,
 						      to_power_B);
     else if (is_division(op_type) )
@@ -264,6 +296,7 @@ bool tensorop_par_keys(operation_type op_type,
                                                       d_obj_data[B],
                                                       d_obj_data[C],
                                                       h_objs[C]->element_number,
+						      CUPRINTF,
 						      to_power_A,
 						      to_power_B);
     else if (is_addition(op_type) )
@@ -271,6 +304,7 @@ bool tensorop_par_keys(operation_type op_type,
                                                       d_obj_data[B],
                                                       d_obj_data[C],
                                                       h_objs[C]->element_number,
+						      CUPRINTF,
 						      to_power_A,
 						      to_power_B);
 
@@ -293,6 +327,7 @@ bool tensorop_par_keys(operation_type op_type,
                                                     d_obj_data[A], d_obj_data[B], d_obj_data[F],
                                                     h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number,
                                                     is_multiplication(op_type),
+						    CUPRINTF,
 						    to_power_A, to_power_B);
 
     // test full result
@@ -369,7 +404,8 @@ bool tensorop_par_keys(operation_type op_type,
                                                        h_objs[C]->element_number,
                                                        d_zero_cardinality_dim_tuples_C,
                                                        zero_cardinality_dim_tuple_size_C,
-                                                       zero_cardinality_dim_tuples_C_element_number);
+                                                       zero_cardinality_dim_tuples_C_element_number,
+						       CUPRINTF);
 
     if ( PRINT_CT ) {
       transferFromDevice(h_objs[C]->data, C);
@@ -385,10 +421,10 @@ bool tensorop_par_keys(operation_type op_type,
   cutilCheckMsg("Kernel execution failed");
   cudaDeviceSynchronize();
 
-#if CUPRINTF == true
-  cudaPrintfDisplay(stdout, true);
-  cudaPrintfEnd();
-#endif
+  if ( CUPRINTF ){
+    cudaPrintfDisplay(stdout, true);
+    cudaPrintfEnd();
+  }
 
 
   ///////////////////////////////////////////////////////////////////////////////////////////
