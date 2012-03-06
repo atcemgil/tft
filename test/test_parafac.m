@@ -1,4 +1,5 @@
-rand('state',0);
+%rand('state',0);
+rng(1)
 
 I=7;
 J=8;
@@ -34,7 +35,6 @@ X_true = get_parafac(A_true,B_true,C_true,I,J,K,A,[I J K]);
 X = poissrnd(X_true);
 X(X==0)=0.000001; % suppress zeros, division/log problems, not the best method
 
-iter_num=10;
 
 init=0;
 
@@ -48,6 +48,7 @@ else
     C_init = [];
 end
 
+iter_num=3;
 kl_parafac_seq = zeros(1,length(1:iter_num));
 kl_parafac_par = zeros(1,length(1:iter_num));
 
@@ -59,7 +60,7 @@ for i = [ 1:iter_num ]
                                                    A_card_sym, A_init, ...
                                                    B_card_sym, B_init, ...
                                                    C_card_sym, C_init ); toc;
-    kl_parafac_seq(i) = get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)));
+    kl_parafac_seq(i) = get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)))
 end
 plot ( [1:iter_num ], kl_parafac_seq)
 

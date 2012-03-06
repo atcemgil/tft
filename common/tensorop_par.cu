@@ -279,7 +279,7 @@ bool tensorop_par_keys(operation_type op_type,
 
   if ( COUT ) std::cout << " tensorop_gpu_keys Running kernels " << std::endl << std::endl;
 
-  //bool got_zeros = false;
+  bool got_zeros = false;
 
   if ( is_hadamard(op_type) ){
 
@@ -321,41 +321,41 @@ bool tensorop_par_keys(operation_type op_type,
     *result_in_F=false;
   }else{
 
-    // generate the full output
-    // genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(d_full_cardinalities, ndims,
-    //                                                 d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
-    //                                                 d_obj_data[A], d_obj_data[B], d_obj_data[F],
-    //                                                 h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number,
-    //                                                 is_multiplication(op_type),
-    // 						    CUPRINTF,
-    // 						    to_power_A, to_power_B);
+    //generate the full output
+    genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(d_full_cardinalities, ndims,
+                                                    d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
+                                                    d_obj_data[A], d_obj_data[B], d_obj_data[F],
+                                                    h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number,
+                                                    is_multiplication(op_type),
+    						    CUPRINTF,
+    						    to_power_A, to_power_B);
 
-    // // test full result
-    // cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
-    // if ( PRINT_CT ) {
-    //   transferFromDevice(h_objs[A]->data, A);
-    //   print_ct("tensorop gpu A", h_objs[A], true);
+    // test full result
+    cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
+    if ( PRINT_CT ) {
+      transferFromDevice(h_objs[A]->data, A);
+      print_ct("tensorop gpu A", h_objs[A], true);
 
-    //   transferFromDevice(h_objs[B]->data, B);
-    //   print_ct("tensorop gpu B", h_objs[B], true);
+      transferFromDevice(h_objs[B]->data, B);
+      print_ct("tensorop gpu B", h_objs[B], true);
 
-    //   transferFromDevice(h_objs[F]->data, F);
-    //   print_ct("tensorop gpu F", h_objs[F], true);
-    // }
+      transferFromDevice(h_objs[F]->data, F);
+      print_ct("tensorop gpu F", h_objs[F], true);
+    }
 
-    // // if no contraction is required, result is already stored in F, return that
-    // got_zeros = false;
-    // for ( size_t dim=0; dim<ndims; dim++){
-    //   if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0){
-    //     if ( COUT ) std::cout << " GOT ZEROS found zero on h_objs[C] dimension " << dim << std::endl;
-    //     got_zeros = true;
-    //     break;
-    //   }
-    // }
+    // if no contraction is required, result is already stored in F, return that
+    got_zeros = false;
+    for ( size_t dim=0; dim<ndims; dim++){
+      if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0){
+        if ( COUT ) std::cout << " GOT ZEROS found zero on h_objs[C] dimension " << dim << std::endl;
+        got_zeros = true;
+        break;
+      }
+    }
 
-    // *result_in_F=true;
+     *result_in_F=true;
 
-    // if ( got_zeros ){
+     if ( got_zeros ){
 
     // prepare range permutation vector //////////////////////////////////////////////////////
     size_t zero_cardinality_dim_tuple_size_C = 0;
@@ -396,21 +396,21 @@ bool tensorop_par_keys(operation_type op_type,
 
 
 
-      // // contract on required dimensions
-      // if ( COUT ) std::cout << "performing contaction" << std::endl;
-      // contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
-      //                                                  d_obj_strides[F], d_obj_strides[C],
-      //                                                  d_obj_data[F], d_obj_data[C],
-      //                                                  h_objs[C]->element_number,
-      //                                                  d_zero_cardinality_dim_tuples_C,
-      //                                                  zero_cardinality_dim_tuple_size_C,
-      //                                                  zero_cardinality_dim_tuples_C_element_number,
-      // 						       CUPRINTF);
+      // contract on required dimensions
+      if ( COUT ) std::cout << "performing contaction" << std::endl;
+       contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
+                                                        d_obj_strides[F], d_obj_strides[C],
+                                                        d_obj_data[F], d_obj_data[C],
+                                                        h_objs[C]->element_number,
+                                                        d_zero_cardinality_dim_tuples_C,
+                                                        zero_cardinality_dim_tuple_size_C,
+                                                        zero_cardinality_dim_tuples_C_element_number,
+       						       CUPRINTF);
 
 
 
 
-
+    /*
     // do not use F
     calculate_C <<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>( ndims,
 						    d_obj_strides[F], d_obj_strides[A], d_obj_strides[B], d_obj_strides[C],
@@ -422,7 +422,7 @@ bool tensorop_par_keys(operation_type op_type,
 						    is_multiplication(op_type),
 						    CUPRINTF,
 						    to_power_A, to_power_B);
-
+    */
 
 
     if ( PRINT_CT ) {
@@ -431,8 +431,8 @@ bool tensorop_par_keys(operation_type op_type,
     }
 
 
-      // *result_in_F=false;
-    //}
+       *result_in_F=false;
+    }
   }
 
   // check if kernel execution generated and error

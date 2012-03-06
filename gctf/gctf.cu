@@ -264,8 +264,9 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   }
 
 
-  ct F;
-  prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
+  //ct F;
+  //prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
+  
 
 
   ///////////////////////////////////////////////////////////////////////////////////////////
@@ -321,7 +322,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   }
 
 
-  REGISTER_CT(F);
+  //REGISTER_CT(F);
 
   if (is_parallel)
     transferToDevice(ndims);
