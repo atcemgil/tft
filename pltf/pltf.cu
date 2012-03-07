@@ -181,14 +181,10 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   std::vector<ct> Z_tensors;
   std::vector<ct> D_tensors;
-  std::vector<size_t> use_D1;
-  std::vector<size_t> use_D2;
   for (size_t t=0; t<model_elements.size(); t++){
     ct tmp_ct;
-    ct tmp_ct_D1_1;
-    ct tmp_ct_D1_2;
-    ct tmp_ct_D2_1;
-    ct tmp_ct_D2_2;
+    ct tmp_ct_D1;
+    ct tmp_ct_D2;
 
     size_t Z_card[ndims];
     for (size_t i=0; i<ndims; i++) Z_card[i] = model_elements[t].cards_numeric[i];
@@ -197,40 +193,22 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     z << "Host Z" << t;
     prepareHostTensorFromCpp(&tmp_ct, model_elements[t].data, Z_card, ndims, z.str().c_str(), true); // init with given data, if null init with rand
 
-    std::stringstream d1_1;
-    d1_1 << "Host D1_Z" << t << "_1";
-    prepareHostTensorFromCpp(&tmp_ct_D1_1, NULL, Z_card, ndims, d1_1.str().c_str());
-
-    std::stringstream d1_2;
-    d1_2 << "Host D1_Z" << t << "_2";
-    prepareHostTensorFromCpp(&tmp_ct_D1_2, NULL, Z_card, ndims, d1_2.str().c_str());
-
-
-
-    std::stringstream d2_1;
-    d2_1 << "Host D2_Z" << t << "_1";
-    prepareHostTensorFromCpp(&tmp_ct_D2_1, NULL, Z_card, ndims, d2_1.str().c_str());
-
-    std::stringstream d2_2;
-    d2_2 << "Host D2_Z" << t << "_2";
-    prepareHostTensorFromCpp(&tmp_ct_D2_2, NULL, Z_card, ndims, d2_2.str().c_str());
+    std::stringstream d1;
+    d1 << "Host D1_Z" << t;
+    prepareHostTensorFromCpp(&tmp_ct_D1, NULL, Z_card, ndims, d1.str().c_str());
+    std::stringstream d2;
+    d2 << "Host D2_Z" << t;
+    prepareHostTensorFromCpp(&tmp_ct_D2, NULL, Z_card, ndims, d2.str().c_str());
 
 
     Z_tensors.push_back(tmp_ct);
-
-    D_tensors.push_back(tmp_ct_D1_1);
-    D_tensors.push_back(tmp_ct_D1_2);
-    use_D1.push_back(1);
-
-    D_tensors.push_back(tmp_ct_D2_2);
-    D_tensors.push_back(tmp_ct_D2_1);
-    use_D2.push_back(1);
+    D_tensors.push_back(tmp_ct_D1);
+    D_tensors.push_back(tmp_ct_D2);
   }
 
 
 
-  ct Xhat_1, Xhat_2, X, A, F, M, Fzeros, Fones;
-  size_t use_xhat=1;
+  ct Xhat, X, A, F, M, Fzeros, Fones;
 
   mwSize ndims_mwsize = ndims;
   mxArray* m_X_card = mxCreateNumericArray(1, &ndims_mwsize, mxDOUBLE_CLASS, mxREAL);
@@ -249,8 +227,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   prepareHostTensorFromCpp(&M, M_data, X_card, ndims, (const char*) "Host M");
 
   prepareHostTensorFromCpp(&A, NULL, X_card, ndims, (const char*) "Host A"); // init with 0
-  prepareHostTensorFromCpp(&Xhat_1, NULL, X_card, ndims, (const char*) "Host Xhat_1");
-  prepareHostTensorFromCpp(&Xhat_2, NULL, X_card, ndims, (const char*) "Host Xhat_2");
+  prepareHostTensorFromCpp(&Xhat, NULL, X_card, ndims, (const char*) "Host Xhat");
   prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
   prepareHostTensorFromCpp(&Fzeros, NULL, h_full_cardinalities, ndims, (const char*) "Host Fzeros");
   prepareHostTensorFromCpp(&Fones, NULL, h_full_cardinalities, ndims, (const char*) "Host Fones", false, true);
@@ -278,30 +255,20 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   // register & transfer objects to device //////////////////////////////////////////////////
 
   for (size_t z=0; z<Z_tensors.size(); z++){
-    std::stringstream sstr;
-    sstr << 'Z' << z;
-    register_ct( sstr.str().c_str(), &(Z_tensors[z]) );
+    std::stringstream name;
+    name << 'Z' << z;
+    register_ct( name.str().c_str(), &(Z_tensors[z]) );
 
-    sstr.str(std::string());
-    sstr << "D1_Z" << z << "_1";
-    register_ct( sstr.str().c_str(), &D_tensors[z*4]);
+    std::stringstream d_name1;
+    d_name1 << "D1_Z" << z;
+    register_ct( d_name1.str().c_str(), &D_tensors[z*2]);
 
-    sstr.str(std::string());
-    sstr << "D1_Z" << z << "_2";
-    register_ct( sstr.str().c_str(), &D_tensors[z*4+1]);
-
-
-    sstr.str(std::string());
-    sstr << "D2_Z" << z << "_1";
-    register_ct( sstr.str().c_str(), &D_tensors[z*4+2]);
-
-    sstr.str(std::string());
-    sstr << "D2_Z" << z << "_2";
-    register_ct( sstr.str().c_str(), &D_tensors[z*4+3]);
-
+    std::stringstream d_name2;
+    d_name2 << "D2_Z" << z;
+    register_ct( d_name2.str().c_str(), &D_tensors[z*2+1]);
   }
 
-  REGISTER_CT(Xhat_1); REGISTER_CT(Xhat_2); REGISTER_CT(Fzeros); REGISTER_CT(Fones); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
+  REGISTER_CT(Xhat); REGISTER_CT(Fzeros); REGISTER_CT(Fones); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
 
   if (is_parallel)
     transferToDevice(ndims);
@@ -328,54 +295,37 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     //oc_push_back(&operation_chain, false, 1, ndims, "Z1", "Z2", "Xhat", is_parallel);
 
 
-    std::cout << " selam 1" << std::endl;
     for (size_t z=0; z<Z_tensors.size(); z++){
       if (z==0) continue;
       if (z==1) {
 	// if this is the last operation (2 factor problem) store result in Xhat
 	if ( Z_tensors.size() == 2 ){
-	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "Xhat_1", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "Xhat", is_parallel);
 	}else{
 	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "Xhat_1", is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "F", is_parallel);
 	}
-	use_xhat=1;
       }
       else{
         std::stringstream Zn;
         Zn << 'Z' << z;
 
- 	// if (z!=(Z_tensors.size()-1)){
-	// in all non last operations store result in F to avoid mis-contraction
-	if( use_xhat == 1 ){
-	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "Xhat_1", "Xhat_2", is_parallel);
-	  use_xhat = 2;
+	if (z!=(Z_tensors.size()-1)){
+	  // in all non last operations store result in F to avoid mis-contraction
+	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "F", is_parallel);
 	}else{
-	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "Xhat_2", "Xhat_1", is_parallel);
-	  use_xhat = 1;
+	  // in last operation store result into Xhat
+	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "Xhat", is_parallel);
 	}
-	// }else{
-	//   // in last operation store result into Xhat
-	//   oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "Xhat", is_parallel);
-	// }
       }
     }
 
 
-    std::cout << " selam 2" << std::endl;
-
-    if( use_xhat == 1 )
-      oc_push_back(&operation_chain, HADAMARD_DIV, ndims, "X", "Xhat_1", "A", is_parallel);
-    else
-      oc_push_back(&operation_chain, HADAMARD_DIV, ndims, "X", "Xhat_2", "A", is_parallel);
-
+    oc_push_back(&operation_chain, HADAMARD_DIV, ndims, "X", "Xhat", "A", is_parallel);
     oc_push_back(&operation_chain, HADAMARD_MUL, ndims, "M", "A", "A", is_parallel);
 
-    std::stringstream d1_1;
-    d1_1 << "D1_Z" << t << "_1";
-    std::stringstream d1_2;
-    d1_2 << "D1_Z" << t << "_2";
-
+    std::stringstream d1;
+    d1 << "D1_Z" << t;
     size_t tmp_op_count=0;
     for (size_t other_z=0; other_z < Z_tensors.size(); other_z++){
       if (other_z == t) continue;
@@ -385,39 +335,25 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
       if ( tmp_op_count == 0 ){
 	if ( Z_tensors.size() == 2){
-	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), d1_1.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
 	}else{
 	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), d1_1.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), "F", is_parallel);
 	}
-	use_D1[t] = 1;
-
       }else{
-
-	if ( use_D1[t] == 1 ){
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d1_1.str().c_str(), d1_2.str().c_str(), is_parallel);
-	  use_D1[t] = 2;
+	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
+	  // in all non last operations store result in F to avoid mis-contraction
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
 	}else{
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d1_2.str().c_str(), d1_1.str().c_str(), is_parallel);
-	  use_D1[t] = 1;
+	  // in last operation store result into d1
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), is_parallel);
 	}
-
-	// if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
-	//   // in all non last operations store result in F to avoid mis-contraction
-	//   oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
-	// }else{
-	//   // in last operation store result into d1
-	//   oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), is_parallel);
-	// }
       }
       tmp_op_count++;
     }
-    std::cout << " selam 3" << std::endl;
-    std::stringstream d2_1;
-    d2_1 << "D2_Z" << t << "_1";
-    std::stringstream d2_2;
-    d2_2 << "D2_Z" << t << "_2";
 
+    std::stringstream d2;
+    d2 << "D2_Z" << t;
     tmp_op_count=0;
     for (size_t other_z=0; other_z < Z_tensors.size(); other_z++){
       if (other_z == t) continue;
@@ -427,51 +363,32 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
       if ( tmp_op_count == 0 ){
 	if ( Z_tensors.size() == 2) {
-	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), d2_1.str().c_str(), is_parallel);
+	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), is_parallel);
 	}else{
 	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), d2_1.str().c_str(), is_parallel); 
+	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), "F", is_parallel); 
 	}
-	use_D2[t] = 1;
-
       }else{
-	if( use_D2[t] == 1 ){
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d2_1.str().c_str(), d2_2.str().c_str(), is_parallel);
-	  use_D2[t] = 2;
+	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
+	  // in all non last operations store result in F to avoid mis-contraction
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
 	}else{
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), d2_2.str().c_str(), d2_1.str().c_str(), is_parallel);
-	  use_D2[t] = 1;
+	  // in last operation store result into d2
+	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), is_parallel);
 	}
-
-
-	// if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
-	//   // in all non last operations store result in F to avoid mis-contraction
-	//   oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
-	// }else{
-	//   // in last operation store result into d2
-	//   oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), is_parallel);
-	// }
       }
       tmp_op_count++;
     }
 
-    std::cout << " selam 4" << std::endl;
-    std::stringstream d1;
-    d1 << "D1_Z" << t << "_" << use_D1[t];
-    std::stringstream d2;
-    d2 << "D2_Z" << t << "_" << use_D2[t];
-    std::cout << " selam 4.1" << std::endl;
     oc_push_back(&operation_chain, HADAMARD_DIV, ndims, d1.str().c_str(), d2.str().c_str(), d1.str().c_str(), is_parallel);
-    std::cout << " selam 4.2" << std::endl;
+
     std::stringstream Zn;
-    std::cout << " selam 4.3" << std::endl;
     Zn << 'Z' << t ;
     oc_push_back(&operation_chain, HADAMARD_MUL, ndims, Zn.str().c_str(), d1.str().c_str(), Zn.str().c_str(), is_parallel);
-    std::cout << " selam 4.4" << std::endl;
   }
 
   if (PRINT_CHAIN) print_oc(&operation_chain);
-  std::cout << " selam 5" << std::endl;
+
 
   for (int iter=0; iter<op_iter_count; iter++){
 
@@ -494,7 +411,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   }
 
-  std::cout << " selam 6" << std::endl;
+
   ///////////////////////////////////////////////////////////////////////////////////////////
 
   // transfer results to matlab /////////////////////////////////////////////////////////////
@@ -517,7 +434,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
-  std::cout << " selam 7" << std::endl;
+
   // reset device
   if ( is_parallel )
     resetDevice();
