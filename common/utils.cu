@@ -236,8 +236,8 @@ bool check_input_keys(std::string A, std::string B, std::string C, std::string F
   // check requested objects are registered
   if ( h_objs.find(A) == h_objs.end() ||
        h_objs.find(B) == h_objs.end() ||
-       h_objs.find(C) == h_objs.end() ) {
-       //h_objs.find(F) == h_objs.end() ){
+       h_objs.find(C) == h_objs.end() ||
+       h_objs.find(F) == h_objs.end() ){
     std::cout << "mct_tensorop_gpu_keys: all of requested keys should be registered "
               << " requested keys: A " << A << " B " << B << " C " << C << " F " << F
               << std::endl;

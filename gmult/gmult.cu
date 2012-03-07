@@ -24,7 +24,6 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool i
     return;
   }
 
-
   const mxArray* m_A_data = prhs[0];
   const mxArray* m_A_card = prhs[1];
 
@@ -173,11 +172,9 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool i
   else
     tensorop_seq(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
 
-  if (is_parallel)
-    resetDevice();
 
   free_ct(&h_A);
   free_ct(&h_B);
   free_ct(&h_C);
-  //free_ct(&h_F);
+  free_ct(&h_F);
 }
