@@ -38,20 +38,4 @@ __global__ void calculate_C(size_t ndims,
                             int to_power_A=1, int to_power_B=1); // pow(double, size_t) does not appear to exist in cuda:math.h
 
 
-__global__ void calculate_C_keys(size_t ndims,
-                                 size_t operand_num,
-                                 size_t* d_strides_operands, //  dim strided: stride_A_1, stride_A_2 .. stride_A_dim, stride_B_1, stride_B_2, ...
-                                 size_t* d_indices_operands, //  dim strided
-                                 size_t* d_strides_output,
-                                 size_t* d_indices_output,
-                                 size_t* d_cards_F,
-                                 size_t* d_cards_operands,   //  dim strided
-                                 double* d_operands,         //  dim strided
-                                 double* d_output,
-                                 size_t* operand_element_numbers,
-                                 size_t output_element_number,
-                                 size_t use_multiplication,
-                                 bool print,
-                                 int to_power_A, int to_power_B);
-
 #endif 
