@@ -48,7 +48,7 @@ else
     C_init = [];
 end
 
-iter_num=3;
+iter_num=2;
 kl_parafac_seq = zeros(1,length(1:iter_num));
 kl_parafac_par = zeros(1,length(1:iter_num));
 

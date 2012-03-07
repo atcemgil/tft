@@ -102,7 +102,7 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
 
   if ( COUT ) std::cout << " tensorop_gpu Running kernels " << std::endl << std::endl;
 
-  //bool got_zeros = false;
+  bool got_zeros = false;
 
   if ( isHadamard ){
 
@@ -112,7 +112,7 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
       hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(dp.d_data_A,dp.d_data_B,dp.d_data_C,h_C.element_number, CUPRINTF);
 
   }else{
-
+    /*
     // do not use F
     calculate_C <<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>( ndims,
 						    dp.d_strides_F, dp.d_strides_A, dp.d_strides_B, dp.d_strides_C,
@@ -124,12 +124,12 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
 						    use_multiplication,
 						    CUPRINTF,
 						    to_power_A, to_power_B);
-
+    */
 
 
     
 
-    /*
+    
 
     // generate the full output
     genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(dp.d_full_cardinalities, ndims,
@@ -164,7 +164,7 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
                                                        dp.zero_cardinality_dim_tuples_C_element_number,
       						       CUPRINTF);
     }
-    */
+
 
 
 
@@ -279,7 +279,7 @@ bool tensorop_par_keys(operation_type op_type,
 
   if ( COUT ) std::cout << " tensorop_gpu_keys Running kernels " << std::endl << std::endl;
 
-  bool got_zeros = false;
+  //bool got_zeros = false;
 
   if ( is_hadamard(op_type) ){
 
@@ -320,7 +320,7 @@ bool tensorop_par_keys(operation_type op_type,
 
     *result_in_F=false;
   }else{
-
+    /*
     //generate the full output
     genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(d_full_cardinalities, ndims,
                                                     d_obj_strides[A], d_obj_strides[B], d_obj_strides[F],
@@ -329,7 +329,7 @@ bool tensorop_par_keys(operation_type op_type,
                                                     is_multiplication(op_type),
     						    CUPRINTF,
     						    to_power_A, to_power_B);
-
+    */
     // test full result
     cutilSafeCall(cudaMemcpy(h_objs[F]->data, d_obj_data[F], h_objs[F]->mem_size, cudaMemcpyDeviceToHost));
     if ( PRINT_CT ) {
@@ -342,7 +342,7 @@ bool tensorop_par_keys(operation_type op_type,
       transferFromDevice(h_objs[F]->data, F);
       print_ct("tensorop gpu F", h_objs[F], true);
     }
-
+    /*
     // if no contraction is required, result is already stored in F, return that
     got_zeros = false;
     for ( size_t dim=0; dim<ndims; dim++){
@@ -352,11 +352,11 @@ bool tensorop_par_keys(operation_type op_type,
         break;
       }
     }
-
+    
      *result_in_F=true;
 
      if ( got_zeros ){
-
+    */
     // prepare range permutation vector //////////////////////////////////////////////////////
     size_t zero_cardinality_dim_tuple_size_C = 0;
     size_t zero_cardinality_dim_tuples_C_element_number = 0;
@@ -366,7 +366,7 @@ bool tensorop_par_keys(operation_type op_type,
     if ( is_hadamard(op_type) == false){
       std::vector<size_t> zero_cardinality_dims;
       for ( size_t dim=0; dim<ndims; dim++ ){
-	if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){
+	if ( h_objs[C]->cardinalities[dim] == 0 && (h_objs[A]->cardinalities[dim] != 0 && h_objs[B]->cardinalities[dim] != 0) ){
 	  zero_cardinality_dims.push_back(h_objs[F]->cardinalities[dim]);
 	}
       }
@@ -390,12 +390,12 @@ bool tensorop_par_keys(operation_type op_type,
       cutilSafeCall(cudaMemcpy(d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
 			       sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number, cudaMemcpyHostToDevice));
 
-    }
+      //    }
 
       ////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+    /*
       // contract on required dimensions
       if ( COUT ) std::cout << "performing contaction" << std::endl;
        contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
@@ -406,23 +406,21 @@ bool tensorop_par_keys(operation_type op_type,
                                                         zero_cardinality_dim_tuple_size_C,
                                                         zero_cardinality_dim_tuples_C_element_number,
        						       CUPRINTF);
-
-
-
-
-    /*
-    // do not use F
-    calculate_C <<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>( ndims,
-						    d_obj_strides[F], d_obj_strides[A], d_obj_strides[B], d_obj_strides[C],
-						    d_obj_data[A], d_obj_data[B], d_obj_data[C], 
-						    h_objs[A]->element_number, h_objs[B]->element_number, h_objs[C]->element_number,
-						    d_zero_cardinality_dim_tuples_C,
-						    zero_cardinality_dim_tuple_size_C,
-						    zero_cardinality_dim_tuples_C_element_number,
-						    is_multiplication(op_type),
-						    CUPRINTF,
-						    to_power_A, to_power_B);
     */
+
+
+
+    // do not use F
+      calculate_C <<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>( ndims,
+						      d_obj_strides[F], d_obj_strides[A], d_obj_strides[B], d_obj_strides[C],
+						      d_obj_data[A], d_obj_data[B], d_obj_data[C], 
+						      h_objs[A]->element_number, h_objs[B]->element_number, h_objs[C]->element_number,
+						      d_zero_cardinality_dim_tuples_C,
+						      zero_cardinality_dim_tuple_size_C,
+						      zero_cardinality_dim_tuples_C_element_number,
+						      is_multiplication(op_type),
+						      CUPRINTF,
+						      to_power_A, to_power_B);
 
 
     if ( PRINT_CT ) {
@@ -431,7 +429,7 @@ bool tensorop_par_keys(operation_type op_type,
     }
 
 
-       *result_in_F=false;
+    *result_in_F=false;
     }
   }
 
