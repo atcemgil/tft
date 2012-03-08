@@ -9,6 +9,47 @@
 
 #include "../common/utils.cuh"
 
+
+
+
+#include "cutil_inline.h"
+#include "../common/kernels.cuh"
+#include "../common/cuPrintf.cuh"
+
+
+struct operands{
+  size_t** d_strides_operand_pointers; // pointer to stride list, one for each operand
+  size_t** d_cards_operand_pointers; 
+  double** d_operand_pointers;
+};
+
+void gen_operation_arguments(std::vector<std::string> ops_str, operands* ops){
+  size_t operand_elnum = ops_str.size();
+  
+  size_t** h_strides_operand_pointers = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
+  size_t** h_cards_operand_pointers   = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
+  double** h_operand_pointers         = (double**) malloc( operand_elnum * sizeof(double*) );
+
+  for( size_t o=0; o<ops_str.size(); o++){
+    h_strides_operand_pointers[o] = get_d_obj_strides()[ops_str[o]];
+    h_cards_operand_pointers[o] = get_d_obj_cards()[ops_str[o]];
+    h_operand_pointers[o] = get_d_obj_data()[ops_str[o]];
+  }
+
+  // copy to device
+  cutilSafeCall(cudaMalloc((void**)&(ops->d_strides_operand_pointers), sizeof(size_t*)*operand_elnum));
+  cutilSafeCall(cudaMemcpy(ops->d_strides_operand_pointers, h_strides_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
+
+  cutilSafeCall(cudaMalloc((void**)&(ops->d_cards_operand_pointers), sizeof(size_t*)*operand_elnum));
+  cutilSafeCall(cudaMemcpy(ops->d_cards_operand_pointers, h_cards_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
+
+  cutilSafeCall(cudaMalloc((void**)&(ops->d_operand_pointers), sizeof(double*)*operand_elnum));
+  cutilSafeCall(cudaMemcpy(ops->d_operand_pointers, h_operand_pointers, sizeof(double*)*operand_elnum, cudaMemcpyHostToDevice));
+
+}
+
+
+
 void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_parallel){
 
 
@@ -233,13 +274,6 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   prepareHostTensorFromCpp(&Fones, NULL, h_full_cardinalities, ndims, (const char*) "Host Fones", false, true);
 
 
-  // used first as C must be zeroed for cpp to work
-  //prepareHostTensorFromCpp(&D1_z1, NULL, Z1_card, ndims, (const char*) "Host D1_z1");
-  //prepareHostTensorFromCpp(&D1_z2, NULL, Z2_card, ndims, (const char*) "Host D1_z2");
-
-  //prepareHostTensorFromCpp(&D2_z1, NULL, Z1_card, ndims, (const char*) "Host D2_z1");
-  //prepareHostTensorFromCpp(&D2_z2, NULL, Z2_card, ndims, (const char*) "Host D2_z2");
-
   /*
     if(PRINT_CT){
     print_ct("random Z1 init", &Z1, true);
@@ -270,6 +304,9 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   REGISTER_CT(Xhat); REGISTER_CT(Fzeros); REGISTER_CT(Fones); REGISTER_CT(X); REGISTER_CT(A); REGISTER_CT(M); REGISTER_CT(F);
 
+  if (CUPRINTF == true)
+    cudaPrintfInit();
+
   if (is_parallel)
     transferToDevice(ndims);
 
@@ -279,10 +316,117 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   // perform PLTF operation //////////////////////////////////////////////////////////////////
 
 
+  // operation arguments
+  operands ops_Z0_ZN_Xhat;
+  std::vector<std::string> z_tensors_str;
+  for (size_t z=0; z<Z_tensors.size(); z++){
+    std::stringstream name;
+    name << 'Z' << z;
+    z_tensors_str.push_back(name.str());
+  }
+  gen_operation_arguments(z_tensors_str, &ops_Z0_ZN_Xhat);
 
-  //  equalize dimensions, put 0 for non existent in correct order
 
 
+  unsigned int timer = 0;
+  cutilCheckError(cutCreateTimer(&timer));
+  cutilCheckError(cutStartTimer(timer));
+
+  if ( COUT ) std::cout << " tensorop_gpu Running kernels " << std::endl << std::endl;
+
+
+
+  for (int iter=0; iter<op_iter_count; iter++){
+    
+    if (COUT) std::cout << "iteration number "<< iter << std::endl;
+
+    // Z0 * Z1 * ... * ZN -> Xhat
+    calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims, 
+							(size_t) (Z_tensors.size()), 
+
+							(size_t**) (ops_Z0_ZN_Xhat.d_strides_operand_pointers),
+
+							(size_t*) (get_d_obj_strides()["Xhat"]),
+							(size_t*) (get_d_obj_cards()["F"]), 
+
+							(size_t**) (ops_Z0_ZN_Xhat.d_cards_operand_pointers),
+							(double**) (ops_Z0_ZN_Xhat.d_operand_pointers),
+
+							(double*) (get_d_obj_data()["Xhat"]),
+							//(double*) (get_d_obj_data()["Z0"]),
+							(size_t) (Xhat.element_number),
+							(size_t) 1, 
+							true);
+    
+    // h: X / Xhat -> A
+
+    // for all ZN
+    //   h: M * A -> A
+    //   A * other_Z  -> D1_Z1 
+    //   M * other_Z -> D2_Z1
+    //   h: D1_Z1 / D2_Z1 -> D1_Z1
+    //   h: Z1 * D1_Z1 -> Z1
+  }
+
+
+
+
+
+  if ( PRINT_CT ) {
+    transferFromDevice(h_objs["Xhat"]->data, "Xhat");
+    print_ct("tensorop gpu Xhat ", h_objs["Xhat"], true);
+  }
+
+
+  // check if kernel execution generated and error
+  cutilCheckMsg("Kernel execution failed");
+  cudaDeviceSynchronize();
+
+  if ( CUPRINTF == true ){
+    cudaPrintfDisplay(stdout, true);
+    cudaPrintfEnd();
+  }
+
+  cudaThreadExit();
+
+
+
+
+
+
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+  // transfer results to matlab /////////////////////////////////////////////////////////////
+
+  // if ( is_parallel ){
+  //   for (size_t z=0; z<model_elements.size(); z++){
+  //     std::stringstream Zn;
+  //     Zn << 'Z' << z;
+  //     transferFromDevice(output_data_ptr[z], Zn.str().c_str());
+  //   }
+  //   //transferFromDevice(m_Z1, "Z1");
+  //   //transferFromDevice(m_Z2, "Z2");
+  // }else{
+  //   for (size_t z=0; z<model_elements.size(); z++){
+  //     memcpy(output_data_ptr[z], Z_tensors[z].data, Z_tensors[z].mem_size);
+  //   }
+  //   //memcpy(m_Z1, Z1.data, Z1.mem_size);
+  //   //memcpy(m_Z2, Z2.data, Z2.mem_size);
+  // }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+
+  // reset device
+  if ( is_parallel )
+    resetDevice();
+
+
+
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+
+  /*
 
   std::vector<operation> operation_chain;
 
@@ -387,6 +531,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     oc_push_back(&operation_chain, HADAMARD_MUL, ndims, Zn.str().c_str(), d1.str().c_str(), Zn.str().c_str(), is_parallel);
   }
 
+
+
   if (PRINT_CHAIN) print_oc(&operation_chain);
 
 
@@ -410,34 +556,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     //}
 
   }
-
-
-  ///////////////////////////////////////////////////////////////////////////////////////////
-
-  // transfer results to matlab /////////////////////////////////////////////////////////////
-
-  if ( is_parallel ){
-    for (size_t z=0; z<model_elements.size(); z++){
-      std::stringstream Zn;
-      Zn << 'Z' << z;
-      transferFromDevice(output_data_ptr[z], Zn.str().c_str());
-    }
-    //transferFromDevice(m_Z1, "Z1");
-    //transferFromDevice(m_Z2, "Z2");
-  }else{
-    for (size_t z=0; z<model_elements.size(); z++){
-      memcpy(output_data_ptr[z], Z_tensors[z].data, Z_tensors[z].mem_size);
-    }
-    //memcpy(m_Z1, Z1.data, Z1.mem_size);
-    //memcpy(m_Z2, Z2.data, Z2.mem_size);
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////////
-
-
-  // reset device
-  if ( is_parallel )
-    resetDevice();
+  */
 
 
 }

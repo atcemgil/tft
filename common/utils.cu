@@ -146,6 +146,8 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   h_ct->element_number = elnum;
 
   if (data == NULL){
+    std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL" << std::endl;
+
     //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
     h_ct->data = (double*) malloc(h_ct->mem_size);
     for (size_t i=0; i<h_ct->element_number; i++ )
@@ -159,6 +161,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
       }
 
   }else{
+    std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL DEGIL" << std::endl;
     h_ct->data = (double*)malloc( h_ct->mem_size );
     memcpy(h_ct->data, data, h_ct->mem_size);
   }

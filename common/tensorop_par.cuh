@@ -20,20 +20,28 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
 #include <map>
 
 
+// extern std::map<std::string,size_t*> d_obj_strides;
+// extern std::map<std::string,size_t*> d_obj_cards;
+// extern std::map<std::string,double*> d_obj_data;
 
 void addToTransferList(std::string key, ct* obj);
 
 bool tensorop_par_keys( operation_type op_type,
-			size_t ndims,
-			bool* result_in_F,
-			std::string A, std::string B, std::string C, 
-			std::string F="F", 
-			int to_power_A=1, int to_power_B=1
-			);
+                        size_t ndims,
+                        bool* result_in_F,
+                        std::string A, std::string B, std::string C,
+                        std::string F="F",
+                        int to_power_A=1, int to_power_B=1
+                        );
 
 void transferToDevice(size_t full_ndims);
 void resetDevice();
 void transferFromDevice(double* matlab_storage, std::string d_storage_key);
+
+
+std::map<std::string,size_t*> get_d_obj_strides();
+std::map<std::string,size_t*> get_d_obj_cards();
+std::map<std::string,double*> get_d_obj_data();
 
 
 #endif
