@@ -316,7 +316,11 @@ __global__ void calculate_C_mops(size_t ndims,
     /////////////////////////////////////////////
 
     // new value for d_output[output_ind]
-    double val=1;
+    double val=0;
+
+    double tmp_vals[2] = {1, 1};
+    size_t tmp_val_ind = 0;
+
 
     // for each operand
     for( size_t operand=0; operand<operand_num; operand++){
@@ -366,10 +370,18 @@ __global__ void calculate_C_mops(size_t ndims,
       //size_t d_contraction_cards[20]; // 20 dimensions limit
       // number of indices to contract
       size_t contraction_index_num = 0;
+
+      // contains contraction indices of the operand
+      size_t d_contraction_ind_operand[20] = {0}; // 20 dimension limit 
+      size_t dcio_i=0;
       for( size_t dim=0; dim<ndims; dim++){
         if ( d_strides_output[dim] == 0 && d_cards_operand_pointers[operand][dim] != 0 ){
           //d_contraction_cards[contraction_index_num] = d_cards_F[dim];
           contraction_index_num++;
+
+	  // store which index of the operand we contract
+	  d_contraction_ind_operand[dcio_i]=dim;
+	  dcio_i++;
         }
 
 	if(print){
@@ -379,31 +391,31 @@ __global__ void calculate_C_mops(size_t ndims,
 	}
       }
 
-      if(print){
-	if ( blockIdx.x * blockDim.x + threadIdx.x == 0) {
-	  size_t elnum=1;
-	  for(int d=0; d<ndims; d++)
-	    if (d_cards_operand_pointers[operand][d] != 0)
-		elnum *= d_cards_operand_pointers[operand][d];
+      // if(print){
+      // 	if ( blockIdx.x * blockDim.x + threadIdx.x == 0) {
+      // 	  size_t elnum=1;
+      // 	  for(int d=0; d<ndims; d++)
+      // 	    if (d_cards_operand_pointers[operand][d] != 0)
+      // 		elnum *= d_cards_operand_pointers[operand][d];
 
-	  cuPrintf("operand %d elnum %d\n" , operand, elnum);
-	  for (int i=0; i<elnum; i++){
-	    double tmp1=d_operand_pointers[operand][ i ];
-	    cuPrintf("operand %d d_operand_pointers[%d][%d] = %f \n",operand, operand, i, tmp1);
-	  }
-	}
-      }
-
-
-      // if (print){
-      // 	// print d_output
-      // 	if ( blockIdx.x * blockDim.x + threadIdx.x == 0){
-      // 	  for(int i=0; i<6; i++){
-      // 	    double tmp=d_output[i];
-      // 	    cuPrintf("Z0[%d] = %f\n", i, tmp);
+      // 	  cuPrintf("operand %d elnum %d\n" , operand, elnum);
+      // 	  for (int i=0; i<elnum; i++){
+      // 	    double tmp1=d_operand_pointers[operand][ i ];
+      // 	    cuPrintf("operand %d d_operand_pointers[%d][%d] = %f \n",operand, operand, i, tmp1);
       // 	  }
       // 	}
       // }
+
+
+      if (print){
+      	// print d_output
+      	if ( blockIdx.x * blockDim.x + threadIdx.x == 0){
+      	  for(int i=0; i<60; i++){
+      	    double tmp=d_output[i];
+      	    cuPrintf("d_output[%d] = %f\n", i, tmp);
+      	  }
+      	}
+      }
 
 
       // // calculate displacement on d_operands due to previous operands
@@ -417,7 +429,16 @@ __global__ void calculate_C_mops(size_t ndims,
       if( contraction_index_num == 0 ){
 
         //val *= pow(d_operand_pointers[opreand][ operand_ind ], to_power_operands[operand]);
-        val *= d_operand_pointers[operand][ operand_ind ];
+	if (val == 0){
+	  val = d_operand_pointers[operand][ operand_ind ];
+	}else{
+	  val *= d_operand_pointers[operand][ operand_ind ];
+	}
+
+
+	d_output[output_ind] += val;
+	cuPrintf("d_output ASSIGN output_ind %d = val %d \n",output_ind, val);
+
 
 	if(print && blockIdx.x * blockDim.x + threadIdx.x == 0){
 	  cuPrintf("contraction_index_num=0 val %f d_operand_pointers[%d][%d] = %f ", val, operand, operand_ind);
@@ -426,13 +447,19 @@ __global__ void calculate_C_mops(size_t ndims,
       }else{
         // operand and output indices are not the same, must multiply and contract
 
-        double prev_val = val;
+	double prev_val;
+	if( val == 0 ){
+	  prev_val = 1;
+	}else{
+	  prev_val = val;
+	}
 
         // val += prev_val * operand[ base_index + stride_contraction_index ]
 
         // for each combination of the contraction indices, perform val += operation
         bool not_done=true;
         size_t d_contraction_ind[20] = {0}; // 20 dimensions limit
+
         do{
 
           // d_contraction_cards contains cardinalities of indices to be contracted on operand
@@ -442,27 +469,38 @@ __global__ void calculate_C_mops(size_t ndims,
           // use this configuration of d_contraction_indices and increment val
 
           size_t contraction_stride = 0;
-          for( size_t d=0; d<contraction_index_num; d++){
-            contraction_stride += d_strides_operand_pointers[operand][d] * d_contraction_ind[d];
+	  size_t i=0;
+          for( size_t d=0; d<ndims; d++){
+	    if ( d_strides_output[d] == 0 && d_cards_operand_pointers[operand][d] != 0 ){
+	      contraction_stride += d_strides_operand_pointers[operand][d] * d_contraction_ind[i];
+	      i++;
+	      cuPrintf("contraction_stride += %d * %d = %d\n", d_strides_operand_pointers[operand][d] , d_contraction_ind[i], contraction_stride);
+	    }
           }
 
           //val += prev_val * pow(d_operand_pointers[operand][operand_ind + contraction_stride ], to_power_operands[operand]);
-          val += prev_val * d_operand_pointers[operand][operand_ind + contraction_stride ];
+          tmp_vals[tmp_val_ind] *= prev_val * d_operand_pointers[operand][operand_ind + contraction_stride ];
+
+	  if( tmp_val_ind == 0 ) tmp_val_ind=1;
+	  else tmp_val_ind=0;
+	  
 
 	  if ( print 
 	       //&& blockIdx.x * blockDim.x + threadIdx.x == 0 
 	       ){
 	    double tmp = d_operand_pointers[operand][operand_ind + contraction_stride ];
-	    cuPrintf("d_output output_ind %d = val %f prev_val %f d_operand_pointers[%d][%d +%d] %f\n",output_ind, val, prev_val, operand, operand_ind, contraction_stride, tmp);
-	    for(int i=0; i<contraction_index_num; i++)
-	      cuPrintf("cin: %i %d \n",i, d_contraction_ind[i]);
+	    cuPrintf("val increment output_ind %d = val %f prev_val %f d_operand_pointers[%d][%d +%d] %f\n",output_ind, val, prev_val, operand, operand_ind, contraction_stride, tmp);
+	    for(int i=0; i<contraction_index_num; i++){
+	      size_t tmp = d_contraction_ind[i];
+	      cuPrintf("cin: operand %d cin[%i] = %d \n", operand, i, tmp);
+	    }
 	  }
 
 
           // increment d_contraction_ind
-          for (size_t dim=0; dim<ndims; dim++){
+          for (size_t dim=0; dim<contraction_index_num; dim++){
             // if we have NOT reached limit of this dimension
-            if( d_contraction_ind[dim] != (d_cards_operand_pointers[operand][dim]-1) && d_cards_operand_pointers[operand][dim] != 0 ){
+            if( d_contraction_ind[dim] != (d_cards_operand_pointers[operand][d_contraction_ind_operand[dim]]-1) && d_cards_operand_pointers[operand][d_contraction_ind_operand[dim]] != 0 ){
               // increment this dimension
               d_contraction_ind[dim]++;
               break;
@@ -470,14 +508,14 @@ __global__ void calculate_C_mops(size_t ndims,
               // we have reached limit of this dimension
 
               // if next dimension is at limit as well, skip this dimension, operation will take place in next dimension
-              if( dim != (ndims-1) &&
-                  (d_contraction_ind[dim+1] == (d_cards_operand_pointers[operand][dim+1]-1) || d_cards_operand_pointers[operand][dim+1] == 0 ) ){
+              if( dim != (contraction_index_num-1) &&
+                  (d_contraction_ind[dim+1] == (d_cards_operand_pointers[operand][d_contraction_ind_operand[dim+1]]-1) || d_cards_operand_pointers[operand][d_contraction_ind_operand[dim+1]] == 0 ) ){
                 //std::cout << "skip" << std::endl;
                 continue;
               }else{
 
                 // if this is the last dimension (and it is full) no increment is possible increment error
-                if (dim == ndims-1){
+                if (dim == contraction_index_num-1){
                   //h_ct->increment_error = 1;
                   not_done = false;
                   break;
@@ -496,8 +534,8 @@ __global__ void calculate_C_mops(size_t ndims,
         }while( not_done );
       }
     }
-    d_output[output_ind] = val;
-    cuPrintf("d_output output_ind %d = val %d \n",output_ind, val);
+    d_output[output_ind] += tmp_vals[0] + tmp_vals[1];
+    cuPrintf("d_output ASSIGN output_ind %d = val %f \n",output_ind, d_output[output_ind]);
   }
 }
 
