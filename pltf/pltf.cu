@@ -16,6 +16,8 @@
 #include "../common/kernels.cuh"
 #include "../common/cuPrintf.cuh"
 
+// sil??
+#include "../common/cuPrintf.cu"
 
 struct operands{
   size_t** d_strides_operand_pointers; // pointer to stride list, one for each operand
@@ -413,8 +415,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                           (size_t) (Xhat.element_number),
                                                           (size_t) 1,
                                                           CUPRINTF,1);
-      transferFromDevice(h_objs["Xhat"]->data, "Xhat");
-      print_ct("hello 1 ", h_objs["Xhat"], true);
+      // transferFromDevice(h_objs["Xhat"]->data, "Xhat");
+      // print_ct("hello 1 ", h_objs["Xhat"], true);
 
 
 
@@ -426,8 +428,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                       h_objs["A"]->element_number,
                                                       CUPRINTF);
 
-      transferFromDevice(h_objs["A"]->data, "A");
-      print_ct("hello 2 ", h_objs["A"], true);
+      // transferFromDevice(h_objs["A"]->data, "A");
+      // print_ct("hello 2 ", h_objs["A"], true);
 
       //,
       //to_power_A,
@@ -459,8 +461,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                           (size_t) 1,
                                                           CUPRINTF,2);
 
-      transferFromDevice(h_objs[d1.str().c_str()]->data, d1.str().c_str());
-      print_ct("hello 3 ", h_objs[d1.str().c_str()], true);
+      // transferFromDevice(h_objs[d1.str().c_str()]->data, d1.str().c_str());
+      // print_ct("hello 3 ", h_objs[d1.str().c_str()], true);
 
       
       //   M * other_Z -> D2_Z1
@@ -482,8 +484,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                           (size_t) 1,
                                                           CUPRINTF,3);
 
-      transferFromDevice(h_objs[d2.str().c_str()]->data, d2.str().c_str());
-      print_ct("hello 4 ", h_objs[d2.str().c_str()], true);
+      // transferFromDevice(h_objs[d2.str().c_str()]->data, d2.str().c_str());
+      // print_ct("hello 4 ", h_objs[d2.str().c_str()], true);
 
 
       //   h: D1_Z1 / D2_Z1 -> D1_Z1
@@ -493,8 +495,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       						      h_objs[d1.str().c_str()]->element_number,
       						      CUPRINTF);
 
-      transferFromDevice(h_objs[d1.str().c_str()]->data, d1.str().c_str());
-      print_ct("hello 5 ", h_objs[d1.str().c_str()], true);
+      // transferFromDevice(h_objs[d1.str().c_str()]->data, d1.str().c_str());
+      // print_ct("hello 5 ", h_objs[d1.str().c_str()], true);
 
       //   h: Z1 * D1_Z1 -> Z1
       hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(get_d_obj_data()[zname.str().c_str()],
@@ -502,8 +504,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       						      get_d_obj_data()[zname.str().c_str()],
       						      h_objs[zname.str().c_str()]->element_number,
       						      CUPRINTF);
-      transferFromDevice(h_objs[zname.str().c_str()]->data, zname.str().c_str());
-      print_ct("hello 6 ", h_objs[zname.str().c_str()], true);
+      // transferFromDevice(h_objs[zname.str().c_str()]->data, zname.str().c_str());
+      // print_ct("hello 6 ", h_objs[zname.str().c_str()], true);
 
     }
   }

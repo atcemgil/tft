@@ -11,10 +11,10 @@ K=5;
 A=2;
 
 
-% I=10;
-% J=11;
-% K=12;
-% A=10;
+I=10;
+J=11;
+K=12;
+A=10;
 
 V_card_sym=['i','j','k','a'];
 V_cards=[I, J, K, A];
@@ -34,7 +34,7 @@ X_true = get_parafac(A_true,B_true,C_true,I,J,K,A,[I J K]);
 X = poissrnd(X_true);
 X(X==0)=0.000001; % suppress zeros, division/log problems, not the best method
 
-iter_num=1;
+iter_num=10;
 
 init=1;
 
