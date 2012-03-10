@@ -19,13 +19,13 @@
 
 struct operands{
   size_t** d_strides_operand_pointers; // pointer to stride list, one for each operand
-  size_t** d_cards_operand_pointers; 
+  size_t** d_cards_operand_pointers;
   double** d_operand_pointers;
 };
 
 void gen_operation_arguments(std::vector<std::string> ops_str, operands* ops){
   size_t operand_elnum = ops_str.size();
-  
+
   size_t** h_strides_operand_pointers = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
   size_t** h_cards_operand_pointers   = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
   double** h_operand_pointers         = (double**) malloc( operand_elnum * sizeof(double*) );
@@ -55,7 +55,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   if ( nrhs < 7 ){
     std::cout << "pltf: Factorization operation requires at least 7 arguments. " << std::endl
-	      << "Number iterations, example 30" << std::endl
+              << "Number iterations, example 30" << std::endl
               << "V, index set of factorization operation, example ['i', 'j', 'k']" << std::endl
               << "cardinalities, cardinality for each index provided in V, example [2, 3, 4]" << std::endl
               << "X, index set and data elements for the tensor to be factorized, example ['i','j'], X" << std::endl
@@ -90,9 +90,9 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     tmp_m_tensor.cards_char = (char*) malloc(mxGetNumberOfElements(prhs[5+t])+1);
     for (size_t i=0; i<=mxGetNumberOfElements(prhs[5+t]) ; i++)
       if ( i == mxGetNumberOfElements(prhs[5+t]) )
-	tmp_m_tensor.cards_char[i] = '\0';
+        tmp_m_tensor.cards_char[i] = '\0';
       else
-	tmp_m_tensor.cards_char[i] = (char) mxGetChars(prhs[5+t])[i] ;
+        tmp_m_tensor.cards_char[i] = (char) mxGetChars(prhs[5+t])[i] ;
 
     if ( mxGetNumberOfElements(prhs[5+t+1]) == 0 ){
       // tensor init data is not given
@@ -146,12 +146,12 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
   for (size_t t=0; t<model_elements.size(); t++){
-     // size_t non_zero_dims=0;
-     // for (size_t i=0; i<ndims; i++) {
-     //   if ( model_elements[t].cards_numeric[i] != 0){
-     // 	non_zero_dims++;
-     //   }
-     // }
+    // size_t non_zero_dims=0;
+    // for (size_t i=0; i<ndims; i++) {
+    //   if ( model_elements[t].cards_numeric[i] != 0){
+    //  non_zero_dims++;
+    //   }
+    // }
 
     //mwSize argMatDims[non_zero_dims];
     //size_t j=0;
@@ -161,8 +161,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       if (val == 0) argMatDims[i] = 1; // MATLAB needs to get 1 instead of 0
       else          argMatDims[i] = val;
       // if (val != 0){
-      //  	argMatDims[j] = val;
-      // 	j++;
+      //        argMatDims[j] = val;
+      //        j++;
       // }
     }
 
@@ -187,22 +187,22 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
     for (size_t t=0; t<model_elements.size(); t++){ // for each model
       for (size_t card=0; card<strlen(model_elements[t].cards_char); card++){ // for each dimension of the model
-	if (model_elements[t].cards_char[card] == V_char[dim]){ // if this dimension character matches current dimension's
-	  size_t tensor_dim_card = model_elements[t].cards_numeric[dim]; //see above//
-	  if ( max_dim_card < tensor_dim_card )
-	    max_dim_card = tensor_dim_card;
-	  break; // only one dimension of each model can match with current dimension
-	}
+        if (model_elements[t].cards_char[card] == V_char[dim]){ // if this dimension character matches current dimension's
+          size_t tensor_dim_card = model_elements[t].cards_numeric[dim]; //see above//
+          if ( max_dim_card < tensor_dim_card )
+            max_dim_card = tensor_dim_card;
+          break; // only one dimension of each model can match with current dimension
+        }
       }
     }
 
     // also check X tensor
     for (size_t card=0; card<strlen(x_tensor.cards_char); card++){ // for each dimension of the X tensor
       if (x_tensor.cards_char[card] == V_char[dim]){ // if this dimension matches current dimension
-	size_t tensor_dim_card = x_tensor.cards_numeric[dim] ;
-	if ( max_dim_card < tensor_dim_card )
-	  max_dim_card = tensor_dim_card;
-	break; // only one dimension of X tensor can match with current dimension
+        size_t tensor_dim_card = x_tensor.cards_numeric[dim] ;
+        if ( max_dim_card < tensor_dim_card )
+          max_dim_card = tensor_dim_card;
+        break; // only one dimension of X tensor can match with current dimension
       }
     }
 
@@ -295,6 +295,8 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
     std::stringstream d_name1;
     d_name1 << "D1_Z" << z;
+    std::cout << "registering: "<< d_name1.str() << "with ct"<< std::endl;
+    print_ct("ct:" ,  &D_tensors[z*2], true);
     register_ct( d_name1.str().c_str(), &D_tensors[z*2]);
 
     std::stringstream d_name2;
@@ -326,6 +328,47 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   }
   gen_operation_arguments(z_tensors_str, &ops_Z0_ZN_Xhat);
 
+  std::vector<operands> ops_A_otherZ_D1_Z;
+  std::vector<operands> ops_M_otherZ_D2_Z;
+  for( size_t z=0; z<Z_tensors.size(); z++ ){
+    std::cout << " process z " << z << std::endl;
+    operands ops_A;
+    operands ops_M;
+
+    std::vector<std::string> tmp_A;
+    std::vector<std::string> tmp_M;
+    
+    tmp_A.push_back(std::string("A"));
+    tmp_M.push_back(std::string("M"));
+
+    for( size_t other_Z=0; other_Z<Z_tensors.size(); other_Z++ ){
+      if( other_Z == z ){
+	std::cout << "skip other_Z " << other_Z << std::endl; 
+	continue;
+      }else{
+	std::stringstream name;
+	name << 'Z' << other_Z;
+
+	tmp_A.push_back(name.str());
+	tmp_M.push_back(name.str());
+	std::cout << "pushing to tmp_A and tmp_M: " << other_Z  << std::endl;
+      }
+    }
+
+    std::cout << " ops_A_otherZ_D1_Z" << z << " operands ";
+    for(size_t i=0; i<tmp_A.size(); i++)
+      std::cout << tmp_A[i] << " ";
+    std::cout << std::endl;
+    gen_operation_arguments(tmp_A, &ops_A);
+    ops_A_otherZ_D1_Z.push_back(ops_A);
+
+    std::cout << " ops_M_otherZ_D2_Z" << z << " operands ";
+    for(size_t i=0; i<tmp_A.size(); i++)
+      std::cout << tmp_M[i] << " ";
+    std::cout << std::endl;
+    gen_operation_arguments(tmp_M, &ops_M);
+    ops_M_otherZ_D2_Z.push_back(ops_M);
+  }
 
 
   unsigned int timer = 0;
@@ -337,45 +380,142 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
   for (int iter=0; iter<op_iter_count; iter++){
-    
+
     if (COUT) std::cout << "iteration number "<< iter << std::endl;
-
-    // Z0 * Z1 * ... * ZN -> Xhat
-    calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims, 
-							(size_t) (Z_tensors.size()), 
-
-							(size_t**) (ops_Z0_ZN_Xhat.d_strides_operand_pointers),
-
-							(size_t*) (get_d_obj_strides()["Xhat"]),
-							(size_t*) (get_d_obj_cards()["F"]), 
-
-							(size_t**) (ops_Z0_ZN_Xhat.d_cards_operand_pointers),
-							(double**) (ops_Z0_ZN_Xhat.d_operand_pointers),
-
-							(double*) (get_d_obj_data()["Xhat"]),
-							//(double*) (get_d_obj_data()["Z0"]),
-							(size_t) (Xhat.element_number),
-							(size_t) 1, 
-							true);
     
-    // h: X / Xhat -> A
+    //for all ZN
+    for (size_t cur_z=0; cur_z<Z_tensors.size(); cur_z++){
+      //size_t z=0;
 
-    // for all ZN
-    //   h: M * A -> A
-    //   A * other_Z  -> D1_Z1 
-    //   M * other_Z -> D2_Z1
-    //   h: D1_Z1 / D2_Z1 -> D1_Z1
-    //   h: Z1 * D1_Z1 -> Z1
+      std::stringstream d1;
+      d1 << "D1_Z" << cur_z;
+      std::stringstream d2;
+      d2 << "D2_Z" << cur_z;
+      std::stringstream zname;
+      zname << "Z" << cur_z;
+
+      // Z0 * Z1 * ... * ZN -> Xhat
+      std::cout << "Z0 * Z1 * ... * ZN -> Xhat" << std::endl;
+
+      calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+                                                          (size_t) (Z_tensors.size()),
+
+                                                          (size_t**) (ops_Z0_ZN_Xhat.d_strides_operand_pointers),
+
+                                                          (size_t*) (get_d_obj_strides()["Xhat"]),
+                                                          (size_t*) (get_d_obj_cards()["F"]),
+
+                                                          (size_t**) (ops_Z0_ZN_Xhat.d_cards_operand_pointers),
+                                                          (double**) (ops_Z0_ZN_Xhat.d_operand_pointers),
+
+                                                          (double*) (get_d_obj_data()["Xhat"]),
+                                                          //(double*) (get_d_obj_data()["Z0"]),
+                                                          (size_t) (Xhat.element_number),
+                                                          (size_t) 1,
+                                                          CUPRINTF,1);
+      transferFromDevice(h_objs["Xhat"]->data, "Xhat");
+      print_ct("hello 1 ", h_objs["Xhat"], true);
+
+
+
+      // // h: X / Xhat -> A
+      std::cout << "h: X / Xhat -> A" << std::endl;
+      hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(get_d_obj_data()["X"],
+                                                      get_d_obj_data()["Xhat"],
+                                                      get_d_obj_data()["A"],
+                                                      h_objs["A"]->element_number,
+                                                      CUPRINTF);
+
+      transferFromDevice(h_objs["A"]->data, "A");
+      print_ct("hello 2 ", h_objs["A"], true);
+
+      //,
+      //to_power_A,
+      //to_power_B);
+
+
+      //   h: M * A -> A
+      
+      //   A * other_Z  -> D1_Z1      
+      std::cout << "A*other_Z -> " << d1.str().c_str() << " cur_z " << cur_z << std::endl;
+
+      for( size_t i=0; i<ndims; i++)
+      	std::cout << h_objs[d1.str().c_str()]->strides[i];
+      std::cout << std::endl;
+      calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+                                                          (size_t) (Z_tensors.size()),
+
+                                                          (size_t**) (ops_A_otherZ_D1_Z[cur_z].d_strides_operand_pointers),
+
+                                                          (size_t*) (get_d_obj_strides()[d1.str().c_str()]),
+                                                          (size_t*) (get_d_obj_cards()["F"]),
+
+                                                          (size_t**) (ops_A_otherZ_D1_Z[cur_z].d_cards_operand_pointers),
+                                                          (double**) (ops_A_otherZ_D1_Z[cur_z].d_operand_pointers),
+
+                                                          (double*) (get_d_obj_data()[d1.str().c_str()]),
+                                                          //(double*) (get_d_obj_data()["Z0"]),
+                                                          (size_t) (D_tensors[cur_z*2].element_number),
+                                                          (size_t) 1,
+                                                          CUPRINTF,2);
+
+      transferFromDevice(h_objs[d1.str().c_str()]->data, d1.str().c_str());
+      print_ct("hello 3 ", h_objs[d1.str().c_str()], true);
+
+      
+      //   M * other_Z -> D2_Z1
+      std::cout << "M*other_Z -> " << d2.str().c_str() << std::endl;
+      calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+                                                          (size_t) (Z_tensors.size()),
+
+                                                          (size_t**) (ops_M_otherZ_D2_Z[cur_z].d_strides_operand_pointers),
+
+                                                          (size_t*) (get_d_obj_strides()[d2.str().c_str()]),
+                                                          (size_t*) (get_d_obj_cards()["F"]),
+
+                                                          (size_t**) (ops_M_otherZ_D2_Z[cur_z].d_cards_operand_pointers),
+                                                          (double**) (ops_M_otherZ_D2_Z[cur_z].d_operand_pointers),
+
+                                                          (double*) (get_d_obj_data()[d2.str().c_str()]),
+                                                          //(double*) (get_d_obj_data()["Z0"]),
+                                                          (size_t) (D_tensors[cur_z*2+1].element_number),
+                                                          (size_t) 1,
+                                                          CUPRINTF,3);
+
+      transferFromDevice(h_objs[d2.str().c_str()]->data, d2.str().c_str());
+      print_ct("hello 4 ", h_objs[d2.str().c_str()], true);
+
+
+      //   h: D1_Z1 / D2_Z1 -> D1_Z1
+      hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(get_d_obj_data()[d1.str().c_str()],
+      						      get_d_obj_data()[d2.str().c_str()],
+      						      get_d_obj_data()[d1.str().c_str()],
+      						      h_objs[d1.str().c_str()]->element_number,
+      						      CUPRINTF);
+
+      transferFromDevice(h_objs[d1.str().c_str()]->data, d1.str().c_str());
+      print_ct("hello 5 ", h_objs[d1.str().c_str()], true);
+
+      //   h: Z1 * D1_Z1 -> Z1
+      hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(get_d_obj_data()[zname.str().c_str()],
+      						      get_d_obj_data()[d1.str().c_str()],
+      						      get_d_obj_data()[zname.str().c_str()],
+      						      h_objs[zname.str().c_str()]->element_number,
+      						      CUPRINTF);
+      transferFromDevice(h_objs[zname.str().c_str()]->data, zname.str().c_str());
+      print_ct("hello 6 ", h_objs[zname.str().c_str()], true);
+
+    }
   }
 
 
 
 
 
-  if ( PRINT_CT ) {
-    transferFromDevice(h_objs["Xhat"]->data, "Xhat");
-    print_ct("tensorop gpu Xhat ", h_objs["Xhat"], true);
-  }
+  // if ( PRINT_CT ) {
+  //   transferFromDevice(h_objs["Xhat"]->data, "Xhat");
+  //   print_ct("tensorop gpu Xhat ", h_objs["Xhat"], true);
+  // }
 
 
   // check if kernel execution generated and error
@@ -387,8 +527,6 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     cudaPrintfEnd();
   }
 
-  cudaThreadExit();
-
 
 
 
@@ -398,21 +536,21 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   // transfer results to matlab /////////////////////////////////////////////////////////////
 
-  // if ( is_parallel ){
-  //   for (size_t z=0; z<model_elements.size(); z++){
-  //     std::stringstream Zn;
-  //     Zn << 'Z' << z;
-  //     transferFromDevice(output_data_ptr[z], Zn.str().c_str());
-  //   }
-  //   //transferFromDevice(m_Z1, "Z1");
-  //   //transferFromDevice(m_Z2, "Z2");
-  // }else{
-  //   for (size_t z=0; z<model_elements.size(); z++){
-  //     memcpy(output_data_ptr[z], Z_tensors[z].data, Z_tensors[z].mem_size);
-  //   }
-  //   //memcpy(m_Z1, Z1.data, Z1.mem_size);
-  //   //memcpy(m_Z2, Z2.data, Z2.mem_size);
-  // }
+  if ( is_parallel ){
+    for (size_t z=0; z<model_elements.size(); z++){
+      std::stringstream Zn;
+      Zn << 'Z' << z;
+      transferFromDevice(output_data_ptr[z], Zn.str().c_str());
+    }
+    //transferFromDevice(m_Z1, "Z1");
+    //transferFromDevice(m_Z2, "Z2");
+  }else{
+    for (size_t z=0; z<model_elements.size(); z++){
+      memcpy(output_data_ptr[z], Z_tensors[z].data, Z_tensors[z].mem_size);
+    }
+    //memcpy(m_Z1, Z1.data, Z1.mem_size);
+    //memcpy(m_Z2, Z2.data, Z2.mem_size);
+  }
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -421,16 +559,16 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   if ( is_parallel )
     resetDevice();
 
-
+  cudaThreadExit();
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
 
   /*
 
-  std::vector<operation> operation_chain;
+    std::vector<operation> operation_chain;
 
-  for ( size_t t=0; t<model_elements.size(); t++){
+    for ( size_t t=0; t<model_elements.size(); t++){
     // zN update
 
     // Z0 * Z1 -> Xhat
@@ -440,28 +578,28 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
     for (size_t z=0; z<Z_tensors.size(); z++){
-      if (z==0) continue;
-      if (z==1) {
-	// if this is the last operation (2 factor problem) store result in Xhat
-	if ( Z_tensors.size() == 2 ){
-	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "Xhat", is_parallel);
-	}else{
-	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "F", is_parallel);
-	}
-      }
-      else{
-        std::stringstream Zn;
-        Zn << 'Z' << z;
+    if (z==0) continue;
+    if (z==1) {
+    // if this is the last operation (2 factor problem) store result in Xhat
+    if ( Z_tensors.size() == 2 ){
+    oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "Xhat", is_parallel);
+    }else{
+    //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
+    oc_push_back(&operation_chain, GMULT, ndims, "Z0", "Z1", "F", is_parallel);
+    }
+    }
+    else{
+    std::stringstream Zn;
+    Zn << 'Z' << z;
 
-	if (z!=(Z_tensors.size()-1)){
-	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "F", is_parallel);
-	}else{
-	  // in last operation store result into Xhat
-	  oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "Xhat", is_parallel);
-	}
-      }
+    if (z!=(Z_tensors.size()-1)){
+    // in all non last operations store result in F to avoid mis-contraction
+    oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "F", is_parallel);
+    }else{
+    // in last operation store result into Xhat
+    oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "Xhat", is_parallel);
+    }
+    }
     }
 
 
@@ -472,56 +610,56 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     d1 << "D1_Z" << t;
     size_t tmp_op_count=0;
     for (size_t other_z=0; other_z < Z_tensors.size(); other_z++){
-      if (other_z == t) continue;
+    if (other_z == t) continue;
 
-      std::stringstream other_z_name;
-      other_z_name << "Z" << other_z;
+    std::stringstream other_z_name;
+    other_z_name << "Z" << other_z;
 
-      if ( tmp_op_count == 0 ){
-	if ( Z_tensors.size() == 2){
-	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
-	}else{
-	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), "F", is_parallel);
-	}
-      }else{
-	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
-	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
-	}else{
-	  // in last operation store result into d1
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), is_parallel);
-	}
-      }
-      tmp_op_count++;
+    if ( tmp_op_count == 0 ){
+    if ( Z_tensors.size() == 2){
+    oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
+    }else{
+    //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
+    oc_push_back(&operation_chain, GMULT, ndims, "A", other_z_name.str().c_str(), "F", is_parallel);
+    }
+    }else{
+    if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
+    // in all non last operations store result in F to avoid mis-contraction
+    oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
+    }else{
+    // in last operation store result into d1
+    oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d1.str().c_str(), is_parallel);
+    }
+    }
+    tmp_op_count++;
     }
 
     std::stringstream d2;
     d2 << "D2_Z" << t;
     tmp_op_count=0;
     for (size_t other_z=0; other_z < Z_tensors.size(); other_z++){
-      if (other_z == t) continue;
+    if (other_z == t) continue;
 
-      std::stringstream other_z_name;
-      other_z_name << "Z" << other_z;
+    std::stringstream other_z_name;
+    other_z_name << "Z" << other_z;
 
-      if ( tmp_op_count == 0 ){
-	if ( Z_tensors.size() == 2) {
-	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), is_parallel);
-	}else{
-	  //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
-	  oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), "F", is_parallel); 
-	}
-      }else{
-	if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
-	  // in all non last operations store result in F to avoid mis-contraction
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
-	}else{
-	  // in last operation store result into d2
-	  oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), is_parallel);
-	}
-      }
-      tmp_op_count++;
+    if ( tmp_op_count == 0 ){
+    if ( Z_tensors.size() == 2) {
+    oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), d2.str().c_str(), is_parallel);
+    }else{
+    //oc_push_back(&operation_chain, true, 1, ndims, "Fzeros", "Fzeros", "F", is_parallel); // reset F to zero
+    oc_push_back(&operation_chain, GMULT, ndims, "M", other_z_name.str().c_str(), "F", is_parallel);
+    }
+    }else{
+    if (tmp_op_count!=Z_tensors.size()-2){ // -1 for index starts from 0 -1 for Zn itself does not loop
+    // in all non last operations store result in F to avoid mis-contraction
+    oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", "F", is_parallel);
+    }else{
+    // in last operation store result into d2
+    oc_push_back(&operation_chain, GMULT, ndims, other_z_name.str().c_str(), "F", d2.str().c_str(), is_parallel);
+    }
+    }
+    tmp_op_count++;
     }
 
     oc_push_back(&operation_chain, HADAMARD_DIV, ndims, d1.str().c_str(), d2.str().c_str(), d1.str().c_str(), is_parallel);
@@ -529,14 +667,14 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     std::stringstream Zn;
     Zn << 'Z' << t ;
     oc_push_back(&operation_chain, HADAMARD_MUL, ndims, Zn.str().c_str(), d1.str().c_str(), Zn.str().c_str(), is_parallel);
-  }
+    }
 
 
 
-  if (PRINT_CHAIN) print_oc(&operation_chain);
+    if (PRINT_CHAIN) print_oc(&operation_chain);
 
 
-  for (int iter=0; iter<op_iter_count; iter++){
+    for (int iter=0; iter<op_iter_count; iter++){
 
     if (COUT) std::cout << "iteration number "<< iter << std::endl;
     //if (is_parallel == nmf_gpu)
@@ -555,7 +693,7 @@ void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     // print_ct("current Z2", &Z2, true);
     //}
 
-  }
+    }
   */
 
 

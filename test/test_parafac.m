@@ -58,7 +58,7 @@ for i = [ 1:iter_num ]
                                                    A_card_sym, A_init, ...
                                                    B_card_sym, B_init, ...
                                                    C_card_sym, C_init ); toc;
-    kl_parafac_seq(i) = get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)));
+    kl_parafac_seq(i) = get_KL_div(X, get_parafac(factor_A,factor_B,factor_C,I,J,K,A,size(X)))
 end
 plot ( [1:iter_num ], kl_parafac_seq)
 

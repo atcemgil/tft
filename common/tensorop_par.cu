@@ -448,6 +448,8 @@ void transferFromDevice(double* matlab_storage, std::string d_storage_key){
               << " data mem size " << h_objs[d_storage_key]->mem_size
               << " element number " << h_objs[d_storage_key]->element_number
               << " for key " << d_storage_key
+	      << " matlab_storage " << matlab_storage
+	      << " d_obj_data[d_storage_key] " << d_obj_data[d_storage_key]
               << std::endl;
 
   cutilSafeCall(cudaMemcpy(matlab_storage,
