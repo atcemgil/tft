@@ -149,7 +149,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
 
   if ( init_data ){
     if (data == NULL){
-      std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL" << std::endl;
+      //std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL" << std::endl;
 
       //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
       h_ct->data = (double*) malloc(h_ct->mem_size);
@@ -164,7 +164,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
         }
 
     }else{
-      std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL DEGIL" << std::endl;
+      //std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL DEGIL" << std::endl;
       h_ct->data = (double*)malloc( h_ct->mem_size );
       memcpy(h_ct->data, data, h_ct->mem_size);
     }
@@ -547,29 +547,29 @@ size_t gen_operation_arguments(std::vector<std::string> ops_str, operands* ops, 
 
   // copy to device
   cur_mem += sizeof(size_t*)*operand_elnum;
-  std::cout << "   cur_mem increment by " << sizeof(size_t*)*operand_elnum << " new cur_mem " << cur_mem;
+  //std::cout << "   cur_mem increment by " << sizeof(size_t*)*operand_elnum << " new cur_mem " << cur_mem;
   cutilSafeCall(cudaMalloc((void**)&(ops->d_strides_operand_pointers), sizeof(size_t*)*operand_elnum));
   cutilSafeCall(cudaMemcpy(ops->d_strides_operand_pointers, h_strides_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
 
   cur_mem += sizeof(size_t*)*operand_elnum;
-  std::cout << "   cur_mem increment by " << sizeof(size_t*)*operand_elnum << " new cur_mem " << cur_mem;
+  //std::cout << "   cur_mem increment by " << sizeof(size_t*)*operand_elnum << " new cur_mem " << cur_mem;
   cutilSafeCall(cudaMalloc((void**)&(ops->d_cards_operand_pointers), sizeof(size_t*)*operand_elnum));
   cutilSafeCall(cudaMemcpy(ops->d_cards_operand_pointers, h_cards_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
 
   cur_mem += sizeof(double*)*operand_elnum;
-  std::cout << "   cur_mem increment by " << sizeof(double*)*operand_elnum << " new cur_mem " << cur_mem;
+  //std::cout << "   cur_mem increment by " << sizeof(double*)*operand_elnum << " new cur_mem " << cur_mem;
   cutilSafeCall(cudaMalloc((void**)&(ops->d_operand_pointers), sizeof(double*)*operand_elnum));
   cutilSafeCall(cudaMemcpy(ops->d_operand_pointers, h_operand_pointers, sizeof(double*)*operand_elnum, cudaMemcpyHostToDevice));
 
 
   if( h_to_power != NULL ){
     cur_mem += sizeof(int)*operand_elnum;
-    std::cout << "   cur_mem increment by " << sizeof(int)*operand_elnum << " new cur_mem " << cur_mem;
+    //std::cout << "   cur_mem increment by " << sizeof(int)*operand_elnum << " new cur_mem " << cur_mem;
     cutilSafeCall(cudaMalloc((void**)&(ops->d_to_power), sizeof(int)*operand_elnum));
     cutilSafeCall(cudaMemcpy(ops->d_to_power, h_to_power, sizeof(int)*operand_elnum, cudaMemcpyHostToDevice));
   }
 
-  std::cout << " gen_operation_arguments elnum " << operand_elnum << " curmem " << cur_mem << std::endl;
+  //std::cout << " gen_operation_arguments elnum " << operand_elnum << " curmem " << cur_mem << std::endl;
   return cur_mem;
 }
 

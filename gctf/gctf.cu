@@ -338,7 +338,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   if (is_parallel)
     cur_mem = transferToDevice(ndims);
 
-  std::cout << "transferToDevice " << cur_mem << " bytes " << std::endl;
+  if( COUT ) std::cout << "transferToDevice " << cur_mem << " bytes " << std::endl;
   ///////////////////////////////////////////////////////////////////////////////////////////
 
   // perform GCTF operation //////////////////////////////////////////////////////////////////
@@ -371,14 +371,14 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
           z_tensors_str.push_back(name.str());
         }
 
-	std::cout << "operand num z_tensors_str.size() " << z_tensors_str.size() << std::endl;
-	for( size_t i=0; i<z_tensors_str.size(); i++){
-	}
+	// std::cout << "operand num z_tensors_str.size() " << z_tensors_str.size() << std::endl;
+	// for( size_t i=0; i<z_tensors_str.size(); i++){
+	// }
 	
         cur_mem = gen_operation_arguments(z_tensors_str, &ops_Z0_ZN_Xhat, cur_mem);
 
         // Z0 * Z1 * ... * ZN -> Xhat
-        std::cout << "Z0 * Z1 * ... * ZN -> " << hat_Xv.str() << std::endl;
+        //std::cout << "Z0 * Z1 * ... * ZN -> " << hat_Xv.str() << std::endl;
         calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
                                                             (size_t) (z_tensors_str.size()),
 
@@ -395,7 +395,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                             (size_t) (h_objs[hat_Xv.str()]->element_number),
                                                             (size_t) 1,
                                                             CUPRINTF,1);
-	//std::cout << " z0 * z1 * .. * zn -> " << hat_Xv << " done " << std::endl;
+	////std::cout << " z0 * z1 * .. * zn -> " << hat_Xv << " done " << std::endl;
         std::stringstream Xv;
         Xv << 'X' << cur_v ;
 
@@ -449,7 +449,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
         for (size_t other_z=0; other_z < max_alpha; other_z++){
-          std::cout << " process alpha " << alpha << " other_z " << other_z << std::endl;
+          //std::cout << " process alpha " << alpha << " other_z " << other_z << std::endl;
           if (other_z == alpha || R[cur_v + other_z*max_v] == false ) continue;
 
           std::stringstream other_z_name;
@@ -457,11 +457,11 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
           tmp_A.push_back(other_z_name.str());
           tmp_M.push_back(other_z_name.str());
-          std::cout << "pushing to tmp_A and tmp_M: " << other_z_name.str()  << std::endl;
+          //std::cout << "pushing to tmp_A and tmp_M: " << other_z_name.str()  << std::endl;
 
         }
 
-	std::cout << "operand num tmp_A.size() " << tmp_A.size() << std::endl;
+	//std::cout << "operand num tmp_A.size() " << tmp_A.size() << std::endl;
 	for( size_t i=0; i<tmp_A.size(); i++){
 	}
 
