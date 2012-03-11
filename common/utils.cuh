@@ -23,7 +23,7 @@ void print_ct(const char* txt, ct* ct, bool printdata=false);
 size_t* gen_range_permutation(std::vector<size_t> permutation_list, size_t* elnum);
 void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, 
 			      const char* txt=NULL, bool rand=false,
-			      bool init_to_one=false);
+			      bool init_to_one=false, bool init_data=true);
 
 void free_ct(ct* c);
 
@@ -101,6 +101,18 @@ inline bool is_division(operation_type op_type){
   if ( op_type == HADAMARD_DIV ){  return true; }
   else{  return false; }
 }
+
+
+
+struct operands{
+  size_t** d_strides_operand_pointers; // pointer to stride list, one for each operand
+  size_t** d_cards_operand_pointers;
+  double** d_operand_pointers;
+  int* d_to_power;
+};
+
+size_t gen_operation_arguments(std::vector<std::string> ops_str, operands* ops, size_t cur_mem=0, int* h_to_power=NULL);
+
 
 
 #endif

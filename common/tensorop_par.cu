@@ -11,7 +11,7 @@
 #include "../common/kernels.cuh"
 
 #include "../common/cuPrintf.cuh"
-
+#include "../common/cuPrintf.cu"
 
 std::map<std::string,size_t*> d_obj_strides;
 std::map<std::string,size_t*> d_obj_cards;
@@ -200,10 +200,11 @@ void tensorop_par(bool isHadamard, const ct& h_A, const ct& h_B, ct& h_C, double
 
 
 
-void transferToDevice(size_t full_ndims){
+size_t transferToDevice(size_t full_ndims, size_t cur_mem){
   std::map<std::string,ct*>::iterator it;
 
   // copy h_full_cardinalities to device manually
+  cur_mem += sizeof(size_t)*full_ndims;
   cutilSafeCall(cudaMalloc((void**)&(d_full_cardinalities), sizeof(size_t)*full_ndims));
 
   cutilSafeCall(cudaMemcpy(d_full_cardinalities, h_full_cardinalities, sizeof(size_t)*full_ndims, cudaMemcpyHostToDevice));
@@ -219,9 +220,11 @@ void transferToDevice(size_t full_ndims){
     double* d_data;
 
     // copy to device
+    cur_mem += sizeof(size_t)*obj->ndims;
     cutilSafeCall(cudaMalloc((void**)&(d_strides), sizeof(size_t)*obj->ndims));
     cutilSafeCall(cudaMemcpy(d_strides, obj->strides, sizeof(size_t)*obj->ndims, cudaMemcpyHostToDevice));
 
+    cur_mem += sizeof(size_t)*obj->ndims;
     cutilSafeCall(cudaMalloc((void**)&(d_cards), sizeof(size_t)*obj->ndims));
     cutilSafeCall(cudaMemcpy(d_cards, obj->cardinalities, sizeof(size_t)*obj->ndims, cudaMemcpyHostToDevice));
 
@@ -229,17 +232,24 @@ void transferToDevice(size_t full_ndims){
     // for(int i=0; i<obj->element_number; i++)
     //   std::cout << " selam" << obj->data[i] << std::endl;
 
-    cutilSafeCall(cudaMalloc((void**)&(d_data), obj->mem_size));
-    cutilSafeCall(cudaMemcpy(d_data, obj->data, obj->mem_size, cudaMemcpyHostToDevice));
+    if( obj->data != NULL ){
+      cur_mem += obj->mem_size;
+      cutilSafeCall(cudaMalloc((void**)&(d_data), obj->mem_size));
+      cutilSafeCall(cudaMemcpy(d_data, obj->data, obj->mem_size, cudaMemcpyHostToDevice));
+    }
 
     // store pointers in global storage
     d_obj_strides[key] = d_strides;
     d_obj_cards  [key] = d_cards;
-    d_obj_data   [key] = d_data;
 
+    if( obj->data != NULL ){
+      d_obj_data   [key] = d_data;
+    }
 
     //printData<<<1,1>>>(d_data, obj->mem_size, 123123123);
   }
+
+  return cur_mem;
 }
 
 

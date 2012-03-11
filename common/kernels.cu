@@ -123,19 +123,19 @@ __global__ void genFullResult(size_t* d_total_cards, size_t ndims,
       d_F[F_ind] = pow(d_A[A_ind], to_power_A) / pow(d_B[B_ind], to_power_B);
 
 
-    if( print ){
-      double tmpval = 0;
+    // if( print ){
+    //   double tmpval = 0;
 
-      if (use_multiplication == 1)
-        tmpval = pow(d_A[A_ind], to_power_A) * pow(d_B[B_ind], to_power_B);
-      else
-        tmpval = pow(d_A[A_ind], to_power_A) / pow(d_B[B_ind], to_power_B);
+    //   if (use_multiplication == 1)
+    //     tmpval = pow(d_A[A_ind], to_power_A) * pow(d_B[B_ind], to_power_B);
+    //   else
+    //     tmpval = pow(d_A[A_ind], to_power_A) / pow(d_B[B_ind], to_power_B);
 
-      double Aval = d_A[A_ind];
-      double Bval = d_B[B_ind];
+    //   double Aval = d_A[A_ind];
+    //   double Bval = d_B[B_ind];
 
-      //cuPrintf("tidABC %d: d_F[%d] = d_A[%d] * d_B[%d] = %f op %f = %f \n", tid, F_ind, A_ind, B_ind, Aval, Bval, tmpval);
-    }
+    //   cuPrintf("tidABC %d: d_F[%d] = d_A[%d] * d_B[%d] = %f op %f = %f \n", tid, F_ind, A_ind, B_ind, Aval, Bval, tmpval);
+    // }
 
   }
 }
@@ -276,8 +276,8 @@ __global__ void calculate_C_mops(size_t ndims,
                                  size_t output_element_number,
                                  size_t use_multiplication,
                                  bool print,
-                                 size_t opnum
-                                 //int* to_power_operands             // -
+                                 size_t opnum,
+                                 int* to_power_operands
                                  ){
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -352,7 +352,11 @@ __global__ void calculate_C_mops(size_t ndims,
           }
         }
 
-        val *= d_operand_pointers[operand][ op_inds ];
+	if( to_power_operands == NULL ){
+	  val *= d_operand_pointers[operand][ op_inds ];
+	}else{
+	  val *= pow(d_operand_pointers[operand][ op_inds ], to_power_operands[operand]);
+	}
         ////cuPrintf("val increment operand %d op_inds %d d_operand_pointers %f new val %f\n", operand, op_inds, d_operand_pointers[operand][ op_inds ], val);
       }
 

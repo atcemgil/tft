@@ -19,38 +19,6 @@
 // sil??
 #include "../common/cuPrintf.cu"
 
-struct operands{
-  size_t** d_strides_operand_pointers; // pointer to stride list, one for each operand
-  size_t** d_cards_operand_pointers;
-  double** d_operand_pointers;
-};
-
-void gen_operation_arguments(std::vector<std::string> ops_str, operands* ops){
-  size_t operand_elnum = ops_str.size();
-
-  size_t** h_strides_operand_pointers = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
-  size_t** h_cards_operand_pointers   = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
-  double** h_operand_pointers         = (double**) malloc( operand_elnum * sizeof(double*) );
-
-  for( size_t o=0; o<ops_str.size(); o++){
-    h_strides_operand_pointers[o] = get_d_obj_strides()[ops_str[o]];
-    h_cards_operand_pointers[o] = get_d_obj_cards()[ops_str[o]];
-    h_operand_pointers[o] = get_d_obj_data()[ops_str[o]];
-  }
-
-  // copy to device
-  cutilSafeCall(cudaMalloc((void**)&(ops->d_strides_operand_pointers), sizeof(size_t*)*operand_elnum));
-  cutilSafeCall(cudaMemcpy(ops->d_strides_operand_pointers, h_strides_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
-
-  cutilSafeCall(cudaMalloc((void**)&(ops->d_cards_operand_pointers), sizeof(size_t*)*operand_elnum));
-  cutilSafeCall(cudaMemcpy(ops->d_cards_operand_pointers, h_cards_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
-
-  cutilSafeCall(cudaMalloc((void**)&(ops->d_operand_pointers), sizeof(double*)*operand_elnum));
-  cutilSafeCall(cudaMemcpy(ops->d_operand_pointers, h_operand_pointers, sizeof(double*)*operand_elnum, cudaMemcpyHostToDevice));
-
-}
-
-
 
 void pltf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_parallel){
 

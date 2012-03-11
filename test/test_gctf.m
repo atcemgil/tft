@@ -52,7 +52,7 @@ init_z3=rand(size(Z3_true))
 for i = [ 1:iter_num ]
 %i=iter_num
 
-    tic; [factor_A factor_B factor_C] = gctf_seq ( i, ...
+    tic; [factor_A factor_B factor_C] = gctf_par ( i, ...
                                                    V_card_sym, ...
                                                    V_cards, ...
                                                    p, ...
@@ -65,15 +65,15 @@ for i = [ 1:iter_num ]
                                                    );
     toc
 
-    kl_parafac_seq(i)= get_KL_div(X1, get_parafac(factor_A, factor_B,factor_C,I,J,K,A,size(X1)));
-    kl_paracan_seq(i)= get_KL_div(X2, get_paracan(factor_A,factor_B,I,J, A,size(X2)));
+    kl_parafac_seq(i)= get_KL_div(X1, get_parafac(factor_A, factor_B,factor_C,I,J,K,A,size(X1)))
+    kl_paracan_seq(i)= get_KL_div(X2, get_paracan(factor_A,factor_B,I,J, A,size(X2)))
 end
 
 plot ( [1:iter_num ], kl_parafac_seq)
 figure
 plot ( [1:iter_num ], kl_paracan_seq)
 
-
+return
 
 kl_parafac_par = zeros(1, length(1:iter_num))
 kl_paracan_par = zeros(1, length(1:iter_num))

@@ -112,7 +112,7 @@ void prepareHostTensor(ct* h_ct, const mxArray* m_data, const mxArray* tensor_ca
 
 
 
-void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, const char* txt, bool rand, bool init_to_one){
+void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_t ndims, const char* txt, bool rand, bool init_to_one, bool init_data){
   h_ct->ndims = ndims;
   h_ct->cardinalities = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
   h_ct->strides = (size_t*) malloc( sizeof(size_t) * h_ct->ndims );
@@ -145,28 +145,41 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   h_ct->mem_size= sizeof(double) * elnum;
   h_ct->element_number = elnum;
 
-  if (data == NULL){
-    std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL" << std::endl;
 
-    //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
-    h_ct->data = (double*) malloc(h_ct->mem_size);
-    for (size_t i=0; i<h_ct->element_number; i++ )
-      if (rand)
-        h_ct->data[i]= ((double) std::rand()) / (double)(RAND_MAX+1.0);
-      else{
-	if ( init_to_one )
-	  h_ct->data[i]=(double)1;
-	else
-	  h_ct->data[i]=(double)0;
-      }
 
+  if ( init_data ){
+    if (data == NULL){
+      std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL" << std::endl;
+
+      //h_ct->data = (double*)calloc( h_ct->element_number, sizeof(double) );
+      h_ct->data = (double*) malloc(h_ct->mem_size);
+      for (size_t i=0; i<h_ct->element_number; i++ )
+        if (rand)
+          h_ct->data[i]= ((double) std::rand()) / (double)(RAND_MAX+1.0);
+        else{
+          if ( init_to_one )
+            h_ct->data[i]=(double)1;
+          else
+            h_ct->data[i]=(double)0;
+        }
+
+    }else{
+      std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL DEGIL" << std::endl;
+      h_ct->data = (double*)malloc( h_ct->mem_size );
+      memcpy(h_ct->data, data, h_ct->mem_size);
+    }
   }else{
-    std::cout << " prepareHostTensorFromCpp " << txt << " data = NULL DEGIL" << std::endl;
-    h_ct->data = (double*)malloc( h_ct->mem_size );
-    memcpy(h_ct->data, data, h_ct->mem_size);
+    h_ct->data = NULL;
   }
 
-  if ( PRINT_CT ) print_ct("prepareDeviceTensorFromCpp h_ct",h_ct,true);
+
+  if ( PRINT_CT ){
+    if( init_data ) {
+      print_ct("prepareDeviceTensorFromCpp h_ct",h_ct,true);
+    }else{
+      print_ct("prepareDeviceTensorFromCpp h_ct",h_ct,false);
+    }
+  }
 
 }
 
@@ -261,7 +274,7 @@ void operate(std::vector<operation>* operation_chain){
       std::cout << "operation chain number " << opnum << " " << std::endl;
       opnum++;
     }
-    
+
 
     std::string A = it->A;
     std::string B = it->B;
@@ -283,10 +296,10 @@ void operate(std::vector<operation>* operation_chain){
     // //   // but instead use the object pointed by F in previous operation
 
     //   if ( it->A.compare( (it-1)->C ) == 0)
-    // 	A = (it-1)->F;
+    //  A = (it-1)->F;
 
     //   if ( it->B.compare( (it-1)->C ) == 0)
-    // 	B = (it-1)->F;
+    //  B = (it-1)->F;
 
     // }
 
@@ -299,7 +312,7 @@ void operate(std::vector<operation>* operation_chain){
                    &(it->result_in_F),
                    A, B, it->C,
                    it->F,
-		   it->to_power_A, it->to_power_B);
+                   it->to_power_A, it->to_power_B);
 
     if (COUT_operate)
       std::cout << " operate end: result_in_F " << it->result_in_F
@@ -310,18 +323,18 @@ void operate(std::vector<operation>* operation_chain){
 }
 
 void print_oc_element(operation* oc){
-    std::cout << (*oc).A;
-    //if ( (*oc).op_type ) std::cout << " . ";
-    //else std::cout << " / " ;
+  std::cout << (*oc).A;
+  //if ( (*oc).op_type ) std::cout << " . ";
+  //else std::cout << " / " ;
 
-    if ( is_multiplication(oc->op_type) ) std::cout << " * " ;
-    else if ( is_division(oc->op_type) )  std::cout << " / " ;
-    else if ( is_addition(oc->op_type) )  std::cout << " + " ;
+  if ( is_multiplication(oc->op_type) ) std::cout << " * " ;
+  else if ( is_division(oc->op_type) )  std::cout << " / " ;
+  else if ( is_addition(oc->op_type) )  std::cout << " + " ;
 
-    std::cout << (*oc).B << " -> " << (*oc).C << " (F: " << (*oc).F << ")"
-              << " \t\t  ndims "<< (*oc).ndims << " result_in_F " << (*oc).result_in_F 
-	      << " isHadamard " << (*oc).isHadamard << " operation_type " << (*oc).op_type 
-	      << " \t to_power_A " << oc->to_power_A << "\t to_power_B " << oc->to_power_B << std::endl;
+  std::cout << (*oc).B << " -> " << (*oc).C << " (F: " << (*oc).F << ")"
+            << " \t\t  ndims "<< (*oc).ndims << " result_in_F " << (*oc).result_in_F
+            << " isHadamard " << (*oc).isHadamard << " operation_type " << (*oc).op_type
+            << " \t to_power_A " << oc->to_power_A << "\t to_power_B " << oc->to_power_B << std::endl;
 }
 
 void print_oc(std::vector<operation>* operation_chain){
@@ -510,3 +523,53 @@ int get_latent_tensor_num(bool* R, size_t v, size_t max_alpha, size_t max_v){
   }
   return count;
 }
+
+
+
+
+
+#include "cutil_inline.h"
+#include "../common/kernels.cuh"
+#include "../common/cuPrintf.cuh"
+
+size_t gen_operation_arguments(std::vector<std::string> ops_str, operands* ops, size_t cur_mem, int* h_to_power){
+  size_t operand_elnum = ops_str.size();
+
+  size_t** h_strides_operand_pointers = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
+  size_t** h_cards_operand_pointers   = (size_t**) malloc( operand_elnum * sizeof(size_t*) );
+  double** h_operand_pointers         = (double**) malloc( operand_elnum * sizeof(double*) );
+
+  for( size_t o=0; o<ops_str.size(); o++){
+    h_strides_operand_pointers[o] = get_d_obj_strides()[ops_str[o]];
+    h_cards_operand_pointers[o] = get_d_obj_cards()[ops_str[o]];
+    h_operand_pointers[o] = get_d_obj_data()[ops_str[o]];
+  }
+
+  // copy to device
+  cur_mem += sizeof(size_t*)*operand_elnum;
+  std::cout << "   cur_mem increment by " << sizeof(size_t*)*operand_elnum << " new cur_mem " << cur_mem;
+  cutilSafeCall(cudaMalloc((void**)&(ops->d_strides_operand_pointers), sizeof(size_t*)*operand_elnum));
+  cutilSafeCall(cudaMemcpy(ops->d_strides_operand_pointers, h_strides_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
+
+  cur_mem += sizeof(size_t*)*operand_elnum;
+  std::cout << "   cur_mem increment by " << sizeof(size_t*)*operand_elnum << " new cur_mem " << cur_mem;
+  cutilSafeCall(cudaMalloc((void**)&(ops->d_cards_operand_pointers), sizeof(size_t*)*operand_elnum));
+  cutilSafeCall(cudaMemcpy(ops->d_cards_operand_pointers, h_cards_operand_pointers, sizeof(size_t*)*operand_elnum, cudaMemcpyHostToDevice));
+
+  cur_mem += sizeof(double*)*operand_elnum;
+  std::cout << "   cur_mem increment by " << sizeof(double*)*operand_elnum << " new cur_mem " << cur_mem;
+  cutilSafeCall(cudaMalloc((void**)&(ops->d_operand_pointers), sizeof(double*)*operand_elnum));
+  cutilSafeCall(cudaMemcpy(ops->d_operand_pointers, h_operand_pointers, sizeof(double*)*operand_elnum, cudaMemcpyHostToDevice));
+
+
+  if( h_to_power != NULL ){
+    cur_mem += sizeof(int)*operand_elnum;
+    std::cout << "   cur_mem increment by " << sizeof(int)*operand_elnum << " new cur_mem " << cur_mem;
+    cutilSafeCall(cudaMalloc((void**)&(ops->d_to_power), sizeof(int)*operand_elnum));
+    cutilSafeCall(cudaMemcpy(ops->d_to_power, h_to_power, sizeof(int)*operand_elnum, cudaMemcpyHostToDevice));
+  }
+
+  std::cout << " gen_operation_arguments elnum " << operand_elnum << " curmem " << cur_mem << std::endl;
+  return cur_mem;
+}
+

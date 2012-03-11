@@ -9,6 +9,14 @@
 
 #include "../common/utils.cuh"
 
+
+
+#include "cutil_inline.h"
+#include "../common/kernels.cuh"
+#include "../common/cuPrintf.cuh"
+
+
+
 void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_parallel){
   // prepare model elements  //////////////////////////////////////////////////////
 
@@ -260,12 +268,12 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
     // prepareHostTensorFromCpp(&tmp_ct_D2_sum, NULL, Z_card, ndims, d2.str().c_str());
 
     // D_tensors.push_back(tmp_ct_D1_sum);
-    // D_tensors.push_back(tmp_ct_D2_sum);    
+    // D_tensors.push_back(tmp_ct_D2_sum);
   }
 
 
   ct F;
-  prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F");
+  prepareHostTensorFromCpp(&F, NULL, h_full_cardinalities, ndims, "Host F", true, true, false);
 
 
   ///////////////////////////////////////////////////////////////////////////////////////////
@@ -289,7 +297,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
       //     name_update << "Zup" << alpha << "X" << v;
       //     register_ct( name_update.str().c_str(), &(Z_update_tensors[k]) );
     }
-  
+
     // std::stringstream d_name1, d_name2;
     // d_name1 << "D1_Z" << alpha << "sum";
     // d_name2 << "D2_Z" << alpha << "sum";
@@ -323,10 +331,297 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   REGISTER_CT(F);
 
+  if (CUPRINTF == true)
+    cudaPrintfInit();
+   
+  size_t cur_mem;
   if (is_parallel)
-    transferToDevice(ndims);
+    cur_mem = transferToDevice(ndims);
 
+  std::cout << "transferToDevice " << cur_mem << " bytes " << std::endl;
   ///////////////////////////////////////////////////////////////////////////////////////////
+
+  // perform GCTF operation //////////////////////////////////////////////////////////////////
+
+
+  for (int iter=0; iter<op_iter_count; iter++){
+
+
+
+
+    // calculate all hatX_v and A_v
+    for (size_t alpha=0; alpha<max_alpha; alpha++){
+      if ( latent_elements[alpha].is_updateable == false) continue;
+
+
+
+      // update all hatX
+      for ( size_t cur_v=0; cur_v<max_v; cur_v++){
+        std::stringstream hat_Xv;
+        hat_Xv << "hatX" << cur_v;
+
+
+        operands ops_Z0_ZN_Xhat;
+        std::vector<std::string> z_tensors_str;
+        for (size_t tmp_alpha=0; tmp_alpha<max_alpha; tmp_alpha++){
+          if ( R[cur_v + tmp_alpha*max_v] == false )  continue;
+
+          std::stringstream name;
+          name << 'Z' << tmp_alpha;
+          z_tensors_str.push_back(name.str());
+        }
+
+	std::cout << "operand num z_tensors_str.size() " << z_tensors_str.size() << std::endl;
+	for( size_t i=0; i<z_tensors_str.size(); i++){
+	}
+	
+        cur_mem = gen_operation_arguments(z_tensors_str, &ops_Z0_ZN_Xhat, cur_mem);
+
+        // Z0 * Z1 * ... * ZN -> Xhat
+        std::cout << "Z0 * Z1 * ... * ZN -> " << hat_Xv.str() << std::endl;
+        calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+                                                            (size_t) (z_tensors_str.size()),
+
+                                                            (size_t**) (ops_Z0_ZN_Xhat.d_strides_operand_pointers),
+
+                                                            (size_t*) (get_d_obj_strides()[hat_Xv.str()]),
+                                                            (size_t*) (get_d_obj_cards()["F"]),
+
+                                                            (size_t**) (ops_Z0_ZN_Xhat.d_cards_operand_pointers),
+                                                            (double**) (ops_Z0_ZN_Xhat.d_operand_pointers),
+
+                                                            (double*) (get_d_obj_data()[hat_Xv.str()]),
+                                                            //(double*) (get_d_obj_data()["Z0"]),
+                                                            (size_t) (h_objs[hat_Xv.str()]->element_number),
+                                                            (size_t) 1,
+                                                            CUPRINTF,1);
+	//std::cout << " z0 * z1 * .. * zn -> " << hat_Xv << " done " << std::endl;
+        std::stringstream Xv;
+        Xv << 'X' << cur_v ;
+
+        std::stringstream Av;
+        Av << 'A' << cur_v;
+
+        hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()[hat_Xv.str().c_str()],
+                                                         get_d_obj_data()[Xv.str().c_str()],
+                                                         get_d_obj_data()[Av.str().c_str()],
+                                                         h_objs[Av.str().c_str()]->element_number,
+                                                         CUPRINTF,
+                                                         p, 1);
+      }
+
+
+
+
+
+
+
+
+
+      // for each Xv
+      for (size_t cur_v=0; cur_v<max_v; cur_v++){
+        if ( R[cur_v + alpha*max_v] == false ) continue; // if this Xv does not have this Zalpha dothing to do
+
+        std::stringstream hat_Xv;
+        hat_Xv << "hatX" << cur_v;
+
+        // calculate D1_Zalpha_Xv
+        std::stringstream d1;
+        d1 << "D1_Z" << alpha << "X" << cur_v;
+
+        // calculate D2_Zalpha_Xv
+        std::stringstream d2;
+        d2 << "D2_Z" << alpha << "X" << cur_v;
+
+        std::stringstream Av;
+        Av << 'A' << cur_v;
+
+
+        operands ops_A;
+        operands ops_M;
+
+
+        std::vector<std::string> tmp_A;
+        std::vector<std::string> tmp_M;
+
+        tmp_A.push_back(Av.str());
+        tmp_M.push_back(hat_Xv.str());
+
+
+        for (size_t other_z=0; other_z < max_alpha; other_z++){
+          std::cout << " process alpha " << alpha << " other_z " << other_z << std::endl;
+          if (other_z == alpha || R[cur_v + other_z*max_v] == false ) continue;
+
+          std::stringstream other_z_name;
+          other_z_name << "Z" << other_z;
+
+          tmp_A.push_back(other_z_name.str());
+          tmp_M.push_back(other_z_name.str());
+          std::cout << "pushing to tmp_A and tmp_M: " << other_z_name.str()  << std::endl;
+
+        }
+
+	std::cout << "operand num tmp_A.size() " << tmp_A.size() << std::endl;
+	for( size_t i=0; i<tmp_A.size(); i++){
+	}
+
+
+        cur_mem = gen_operation_arguments(tmp_A, &ops_A, cur_mem);
+
+        //oc_push_back(&operation_chain, GMULT, ndims, Av.str().c_str(), other_z_name.str().c_str(), d1.str().c_str(), is_parallel);
+        calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+                                                            (size_t) (tmp_A.size()),
+
+                                                            (size_t**) (ops_A.d_strides_operand_pointers),
+
+                                                            (size_t*) (get_d_obj_strides()[d1.str().c_str()]),
+                                                            (size_t*) (get_d_obj_cards()["F"]),
+
+                                                            (size_t**) (ops_A.d_cards_operand_pointers),
+                                                            (double**) (ops_A.d_operand_pointers),
+
+                                                            (double*) (get_d_obj_data()[d1.str().c_str()]),
+                                                            //(double*) (get_d_obj_data()["Z0"]),
+                                                            (size_t) (h_objs[d1.str()]->element_number),
+                                                            (size_t) 1,
+                                                            CUPRINTF,2);
+
+        //oc_push_back(&operation_chain, GMULT, ndims, hat_Xv.str().c_str(), other_z_name.str().c_str(), d2.str().c_str(), is_parallel, "F", p+1, 1);
+
+	int to_power[tmp_M.size()];
+	to_power[0]=p+1;
+	for (size_t i=0; i<tmp_M.size(); i++){
+	  to_power[i] = 0;
+	}
+        cur_mem = gen_operation_arguments(tmp_M, &ops_M, cur_mem, to_power);
+
+        calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+                                                            (size_t) (tmp_M.size()),
+
+                                                            (size_t**) (ops_M.d_strides_operand_pointers),
+
+                                                            (size_t*) (get_d_obj_strides()[d2.str().c_str()]),
+                                                            (size_t*) (get_d_obj_cards()["F"]),
+
+                                                            (size_t**) (ops_M.d_cards_operand_pointers),
+                                                            (double**) (ops_M.d_operand_pointers),
+
+                                                            (double*) (get_d_obj_data()[d2.str().c_str()]),
+                                                            //(double*) (get_d_obj_data()["Z0"]),
+                                                            (size_t) (h_objs[d2.str()]->element_number),
+                                                            (size_t) 1,
+                                                            CUPRINTF,3,
+							    ops_M.d_to_power
+							    );
+
+
+      }
+
+
+
+
+
+
+
+      // sum D1_Zalpha_Xv and D2_Zalpha_Xv for all v to update Zalpha
+      std::stringstream D1_Zalpha_sum, D2_Zalpha_sum; // will sum into these
+
+      bool first = true;
+      for (size_t v=0; v<max_v; v++){
+        if ( R[v + alpha*max_v] ){
+          if ( first ){
+            D1_Zalpha_sum << "D1_Z" << alpha << "X" << v;
+            D2_Zalpha_sum << "D2_Z" << alpha << "X" << v;
+            first = false;
+          }else{
+            std::stringstream other_d1, other_d2;
+            other_d1 << "D1_Z" << alpha << "X" << v;
+            other_d2 << "D2_Z" << alpha << "X" << v;
+
+	    hadamard_sum<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(get_d_obj_data()[D1_Zalpha_sum.str().c_str()],
+							    get_d_obj_data()[other_d1.str().c_str()],
+							    get_d_obj_data()[D1_Zalpha_sum.str().c_str()],
+							    h_objs[D1_Zalpha_sum.str().c_str()]->element_number,
+							    CUPRINTF);
+
+	    hadamard_sum<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>(get_d_obj_data()[D2_Zalpha_sum.str().c_str()],
+							    get_d_obj_data()[other_d2.str().c_str()],
+							    get_d_obj_data()[D2_Zalpha_sum.str().c_str()],
+							    h_objs[D2_Zalpha_sum.str().c_str()]->element_number,
+							    CUPRINTF);
+
+          }
+        }
+      }
+
+      hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()[D1_Zalpha_sum.str().c_str()],
+						       get_d_obj_data()[D2_Zalpha_sum.str().c_str()],
+						       get_d_obj_data()[D1_Zalpha_sum.str().c_str()],
+						       h_objs[D1_Zalpha_sum.str().c_str()]->element_number,
+						       CUPRINTF);
+
+      std::stringstream Zalpha;
+      Zalpha << 'Z' << alpha ;
+      hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()[Zalpha.str().c_str()],
+						       get_d_obj_data()[D1_Zalpha_sum.str().c_str()],
+						       get_d_obj_data()[Zalpha.str().c_str()],
+						       h_objs[Zalpha.str().c_str()]->element_number,
+						       CUPRINTF);
+
+    }
+
+  }
+
+
+
+
+
+  // check if kernel execution generated and error
+  cutilCheckMsg("Kernel execution failed");
+  cudaDeviceSynchronize();
+
+  if ( CUPRINTF == true ){
+    cudaPrintfDisplay(stdout, true);
+    cudaPrintfEnd();
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /*
 
   // perform GCTF operation //////////////////////////////////////////////////////////////////
 
@@ -346,69 +641,69 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
 
-  // update all hatX
-  for ( size_t cur_v=0; cur_v<max_v; cur_v++){
+    // update all hatX
+    for ( size_t cur_v=0; cur_v<max_v; cur_v++){
 
-    std::stringstream hat_Xv;
-    hat_Xv << "hatX" << cur_v;
+      std::stringstream hat_Xv;
+      hat_Xv << "hatX" << cur_v;
 
 
-    // zN update
+      // zN update
 
-    // Z0 * Z1 -> hatX1
-    // Z2 * Xhat -> hatX1
-    // ...
+      // Z0 * Z1 -> hatX1
+      // Z2 * Xhat -> hatX1
+      // ...
 
-    int used_Z_count = 0;
-    std::stringstream first_Z;
+      int used_Z_count = 0;
+      std::stringstream first_Z;
 
-    for ( size_t alpha=0; alpha<max_alpha; alpha++){
-      //for (size_t z=0; z<Z_tensors.size(); z++){
+      for ( size_t alpha=0; alpha<max_alpha; alpha++){
+        //for (size_t z=0; z<Z_tensors.size(); z++){
 
-      if ( R[cur_v + alpha*max_v] == false )  continue;
+        if ( R[cur_v + alpha*max_v] == false )  continue;
 
-      else if ( used_Z_count == 0 ) {
-        first_Z << "Z" << alpha;
-        used_Z_count++;
-        continue;
-      }
-
-      std::stringstream Zn;
-      Zn << 'Z' << alpha;
-
-      // in the second operand must check if this is the last operation (2 factor problem) store result in Xhat
-      if (used_Z_count==1){
-        if ( get_latent_tensor_num(R, cur_v, max_alpha, max_v) == 2 ){
-          oc_push_back(&operation_chain, GMULT, ndims, first_Z.str().c_str(), Zn.str().c_str(), hat_Xv.str().c_str(), is_parallel);
+        else if ( used_Z_count == 0 ) {
+          first_Z << "Z" << alpha;
           used_Z_count++;
-          break; // do not need to loop any more for this hatX
-        }else{
-          // there will be more Zn to operate on save the result in F
-          oc_push_back(&operation_chain, GMULT, ndims, first_Z.str().c_str(), Zn.str().c_str(), "F", is_parallel);
-          used_Z_count++;
+          continue;
         }
 
-      }else{
-        // third or later Zn
+        std::stringstream Zn;
+        Zn << 'Z' << alpha;
 
-        if (alpha != (Z_tensors.size()-1)){
-          // in all non last operations store result in F to avoid mis-contraction
-          oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "F", is_parallel);
+        // in the second operand must check if this is the last operation (2 factor problem) store result in Xhat
+        if (used_Z_count==1){
+          if ( get_latent_tensor_num(R, cur_v, max_alpha, max_v) == 2 ){
+            oc_push_back(&operation_chain, GMULT, ndims, first_Z.str().c_str(), Zn.str().c_str(), hat_Xv.str().c_str(), is_parallel);
+            used_Z_count++;
+            break; // do not need to loop any more for this hatX
+          }else{
+            // there will be more Zn to operate on save the result in F
+            oc_push_back(&operation_chain, GMULT, ndims, first_Z.str().c_str(), Zn.str().c_str(), "F", is_parallel);
+            used_Z_count++;
+          }
+
         }else{
-          // in last operation store result into Xhat
-          oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", hat_Xv.str().c_str(), is_parallel);
+          // third or later Zn
+
+          if (alpha != (Z_tensors.size()-1)){
+            // in all non last operations store result in F to avoid mis-contraction
+            oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", "F", is_parallel);
+          }else{
+            // in last operation store result into Xhat
+            oc_push_back(&operation_chain, GMULT, ndims, Zn.str().c_str(), "F", hat_Xv.str().c_str(), is_parallel);
+          }
         }
       }
+
+      std::stringstream Xv;
+      Xv << 'X' << cur_v ;
+
+      std::stringstream Av;
+      Av << 'A' << cur_v;
+
+      oc_push_back(&operation_chain, HADAMARD_MUL, ndims, hat_Xv.str().c_str(), Xv.str().c_str(), Av.str().c_str(), is_parallel, "F", p, 1);
     }
-
-    std::stringstream Xv;
-    Xv << 'X' << cur_v ;
-
-    std::stringstream Av;
-    Av << 'A' << cur_v;
-
-    oc_push_back(&operation_chain, HADAMARD_MUL, ndims, hat_Xv.str().c_str(), Xv.str().c_str(), Av.str().c_str(), is_parallel, "F", p, 1);
-  }
 
 
 
@@ -428,6 +723,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
       std::stringstream hat_Xv;
       hat_Xv << "hatX" << cur_v;
+
 
       // calculate D1_Zalpha_Xv
 
@@ -465,6 +761,9 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
         tmp_op_count++;
       }
+
+
+
 
 
       // calculate D2_Zalpha_Xv
@@ -508,23 +807,25 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
 
+
+
     // sum D1_Zalpha_Xv and D2_Zalpha_Xv for all v to update Zalpha
     std::stringstream D1_Zalpha_sum, D2_Zalpha_sum; // will sum into these
 
     bool first = true;
     for (size_t v=0; v<max_v; v++){
       if ( R[v + alpha*max_v] ){
-	if ( first ){
-	  D1_Zalpha_sum << "D1_Z" << alpha << "X" << v;
-	  D2_Zalpha_sum << "D2_Z" << alpha << "X" << v;
-	  first = false;
-	}else{
-	  std::stringstream other_d1, other_d2;
-	  other_d1 << "D1_Z" << alpha << "X" << v;
-	  other_d2 << "D2_Z" << alpha << "X" << v;
-	  oc_push_back(&operation_chain, HADAMARD_SUM, ndims, D1_Zalpha_sum.str().c_str(), other_d1.str().c_str(), D1_Zalpha_sum.str().c_str(), is_parallel);
-	  oc_push_back(&operation_chain, HADAMARD_SUM, ndims, D2_Zalpha_sum.str().c_str(), other_d2.str().c_str(), D2_Zalpha_sum.str().c_str(), is_parallel);
-	}
+        if ( first ){
+          D1_Zalpha_sum << "D1_Z" << alpha << "X" << v;
+          D2_Zalpha_sum << "D2_Z" << alpha << "X" << v;
+          first = false;
+        }else{
+          std::stringstream other_d1, other_d2;
+          other_d1 << "D1_Z" << alpha << "X" << v;
+          other_d2 << "D2_Z" << alpha << "X" << v;
+          oc_push_back(&operation_chain, HADAMARD_SUM, ndims, D1_Zalpha_sum.str().c_str(), other_d1.str().c_str(), D1_Zalpha_sum.str().c_str(), is_parallel);
+          oc_push_back(&operation_chain, HADAMARD_SUM, ndims, D2_Zalpha_sum.str().c_str(), other_d2.str().c_str(), D2_Zalpha_sum.str().c_str(), is_parallel);
+        }
       }
     }
 
@@ -559,6 +860,23 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   }
 
+  */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -587,5 +905,5 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
   if ( is_parallel )
     resetDevice();
 
-
+  cudaThreadExit();
 }

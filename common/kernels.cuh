@@ -47,8 +47,8 @@ __global__ void calculate_C_mops(size_t ndims,
                                  size_t output_element_number,
                                  size_t use_multiplication,
                                  bool print,
-				 size_t opnum
-                                 //int* to_power_operands             // -
+				 size_t opnum,
+                                 int* to_power_operands = NULL
                                  );
 
 
