@@ -333,7 +333,8 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
   if (CUPRINTF == true)
     cudaPrintfInit();
-   
+
+
   size_t cur_mem;
   if (is_parallel)
     cur_mem = transferToDevice(ndims);
@@ -345,7 +346,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
 
 
   for (int iter=0; iter<op_iter_count; iter++){
-
+    std::cout << "iter " << iter << std::endl;
 
 
 
@@ -371,9 +372,10 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
           z_tensors_str.push_back(name.str());
         }
 
-	// std::cout << "operand num z_tensors_str.size() " << z_tensors_str.size() << std::endl;
-	// for( size_t i=0; i<z_tensors_str.size(); i++){
-	// }
+	std::cout << "operand num z_tensors_str.size() " << z_tensors_str.size() << std::endl;
+	for( size_t i=0; i<z_tensors_str.size(); i++){
+	  std::cout << "z_tensors_str[" << i << "] = " << z_tensors_str[i] << std::endl;
+	}
 	
         cur_mem = gen_operation_arguments(z_tensors_str, &ops_Z0_ZN_Xhat, cur_mem);
 
@@ -395,6 +397,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                             (size_t) (h_objs[hat_Xv.str()]->element_number),
                                                             (size_t) 1,
                                                             CUPRINTF,1);
+
 	////std::cout << " z0 * z1 * .. * zn -> " << hat_Xv << " done " << std::endl;
         std::stringstream Xv;
         Xv << 'X' << cur_v ;
@@ -409,7 +412,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                          CUPRINTF,
                                                          p, 1);
       }
-
+      return;
 
 
 

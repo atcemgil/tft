@@ -7,7 +7,7 @@
 
 #include "settings.h"
 
-//#include "cuPrintf.cu"
+#include "cuPrintf.cu"
 
 
 
@@ -281,15 +281,17 @@ __global__ void calculate_C_mops(size_t ndims,
                                  ){
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-  size_t d_inds_output[20] = {0}; // 20 dimensions limit
 
   if ( tid < output_element_number ){
+    
+    size_t d_inds_output[20] = {0}; // 20 dimensions limit
 
-    //cuPrintf("selam %d\n",opnum);
+    cuPrintf("selam %d\n",opnum);
 
-    // for( size_t i=0; i<ndims; i++ ){
-    //   cuPrintf("calculate_C_mops d_strides_output[%d] = %d , output element number %d\n", i, d_strides_output[i], output_element_number);
-    // }
+    for( size_t i=0; i<ndims; i++ ){
+      cuPrintf("calculate_C_mops d_strides_output[%d] = %d , output element number %d\n", i, d_strides_output[i], output_element_number);
+    }
+
 
     size_t global_index[20] = {0}; // 20 dimensions limit
     size_t contract_dims[20] = {0}; // 20 dimensions limit
@@ -310,6 +312,7 @@ __global__ void calculate_C_mops(size_t ndims,
         global_index[dim] = d_inds_output[dim];
 
       }else{
+	// global_index[dim] = 0 by init
         //this dimension is not fixed, will iterate over for contraction
         contract_dims[contract_dim_num] = dim;
         contract_dim_num++;
@@ -320,16 +323,15 @@ __global__ void calculate_C_mops(size_t ndims,
       if(dim == 0) break;
     }
 
-    // if ( print ){
-    //   for(size_t i=0; i<ndims; i++){
-    //     size_t tmp=d_inds_output[i];
-    //     cuPrintf("d_inds_output dim %d : %d \n", i, tmp);
-    //   }
-    //   cuPrintf("OUTPUT IND %d\n",output_ind);
-    // }
+    if ( print ){
+      for(size_t i=0; i<ndims; i++){
+        size_t tmp=d_inds_output[i];
+        cuPrintf("d_inds_output dim %d : %d \n", i, tmp);
+      }
+      cuPrintf("OUTPUT IND %d\n",output_ind);
+    }
 
     d_output[output_ind]=0;
-
 
     /////////////////////////////////////////////
 
@@ -338,11 +340,29 @@ __global__ void calculate_C_mops(size_t ndims,
 
     bool not_done = true;
 
+
+    size_t counter=0;
+
+
     do{
+      cuPrintf("counter %d", counter);
+      cuPrintf("global_index %d %d %d %d %d %d %d %d %d %d", 
+	       global_index[0], 
+	       global_index[1], 
+	       global_index[2], 
+	       global_index[3], 
+	       global_index[4], 
+	       global_index[5], 
+	       global_index[6], 
+	       global_index[7], 
+	       global_index[8], 
+	       global_index[9]);
+
       // for each global index to be contracted, find multiplication of operands and sum them
       double val=1;
 
       for( size_t operand=0; operand<operand_num; operand++){
+
 
         // find operand index corresponding to current global index
         size_t op_inds=0;
@@ -361,7 +381,7 @@ __global__ void calculate_C_mops(size_t ndims,
       }
 
       d_output[output_ind] += val;
-      //cuPrintf("d_output increment output_ind %d val %f new d_output %f\n", output_ind, val, d_output[output_ind]);
+      cuPrintf("d_output increment output_ind %d val %f new d_output %f\n", output_ind, val, d_output[output_ind]);
 
 
 
@@ -369,7 +389,7 @@ __global__ void calculate_C_mops(size_t ndims,
 
 
 
-      // increment d_contraction_ind for next loop OR end iteration if done
+      // increment global_index for next loop OR end iteration if done
       for (size_t dim=0; dim<ndims; dim++){
 
         // iterate only over indices which must be contracted -> dim \in contract_dims[]
@@ -391,17 +411,26 @@ __global__ void calculate_C_mops(size_t ndims,
         }
 
 
-
-
+	// oldu
 
 
         // if we have NOT reached limit of this dimension
         if( global_index[dim] != (d_cards_F[dim]-1) ){
           // increment this dimension
-          ////cuPrintf("INCREMENT %d %d\n",d_contraction_ind[dim], (d_contraction_dim_cards[dim]-1));
+          cuPrintf("INCREMENT %d %d\n",global_index[dim], d_cards_F[dim]-1);
           global_index[dim]++;
+
+	  // if(counter++ == 1000) {
+	  //   cuPrintf("counter limited\n\n\n");
+	  //   not_done=false;
+	  //   return;
+	  // }
+
           break;
         }else{
+
+
+
           // we have reached limit of this dimension
 
           // if next dimension is at limit as well, skip this dimension, operation will take place in next dimension
@@ -424,7 +453,7 @@ __global__ void calculate_C_mops(size_t ndims,
 
               bool is_prev_dim_contracted=false;
               for( size_t cd=0; cd<contract_dim_num; cd++){
-                if( contract_dims[cd] == (dim+1) ){
+                if( contract_dims[cd] == dim_prev ){
                   is_prev_dim_contracted = true;
                   break;
                 }

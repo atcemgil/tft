@@ -141,7 +141,7 @@ void prepareHostTensorFromCpp(ct* h_ct, double* data, size_t* tensor_card, size_
   if ( txt != NULL && ( COUT || PRINT_CT) ){
     std::cout << txt << std::endl;
   }
-  if ( COUT ) std::cout << "prepareDeviceTensorFromCpp elnum " << elnum << std::endl;
+  if ( COUT ) std::cout << "prepareDeviceTensorFromCpp elnum " << elnum << " mem size " << sizeof(double) * elnum << std::endl;
   h_ct->mem_size= sizeof(double) * elnum;
   h_ct->element_number = elnum;
 
@@ -567,6 +567,8 @@ size_t gen_operation_arguments(std::vector<std::string> ops_str, operands* ops, 
     //std::cout << "   cur_mem increment by " << sizeof(int)*operand_elnum << " new cur_mem " << cur_mem;
     cutilSafeCall(cudaMalloc((void**)&(ops->d_to_power), sizeof(int)*operand_elnum));
     cutilSafeCall(cudaMemcpy(ops->d_to_power, h_to_power, sizeof(int)*operand_elnum, cudaMemcpyHostToDevice));
+  }else{
+    ops->d_to_power = NULL;
   }
 
   //std::cout << " gen_operation_arguments elnum " << operand_elnum << " curmem " << cur_mem << std::endl;

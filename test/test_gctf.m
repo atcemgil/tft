@@ -4,10 +4,10 @@
 format ('compact')
 clear
 
-I=3;
-J=4;
-K=5;
-A=2;
+I=11;
+J=12;
+K=13;
+A=14;
 
 iter_num=10;
 
