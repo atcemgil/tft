@@ -298,7 +298,7 @@ __global__ void calculate_C_mops(size_t ndims,
     size_t contract_dim_num=0;
     ///// calculate output index for this tid
     size_t output_ind=0;
-    for ( size_t dim=ndims-1; ; dim--){
+    for ( int dim=ndims-1; ; dim--){
       if (d_strides_output[dim] != 0){
         if ( tid / d_strides_output[dim] > 0 ){
           d_inds_output[dim] = tid / d_strides_output[dim];
@@ -316,7 +316,7 @@ __global__ void calculate_C_mops(size_t ndims,
 
 
 	// if any of operands have data in this dimension we need to contract
-	for( size_t operand=0; operand<operand_num; operand++){
+	for( int operand=0; operand<operand_num; operand++){
 
 	  if ( d_strides_operand_pointers[operand][dim] != 0 ){
 	    //cuPrintf(" nedir: operand %d operand stride on dim %d : %d, opnum %d\n", operand, dim, d_strides_operand_pointers[operand][dim], opnum);
@@ -377,12 +377,12 @@ __global__ void calculate_C_mops(size_t ndims,
       // for each global index to be contracted, find multiplication of operands and sum them
       double val=1;
 
-      for( size_t operand=0; operand<operand_num; operand++){
+      for( int operand=0; operand<operand_num; operand++){
 
 
         // find operand index corresponding to current global index
         size_t op_inds=0;
-        for( size_t dim=0; dim<ndims; dim++){
+        for( int dim=0; dim<ndims; dim++){
           if (d_strides_operand_pointers[operand][dim] != 0){
             op_inds += global_index[dim] * d_strides_operand_pointers[operand][dim];
           }
@@ -409,11 +409,11 @@ __global__ void calculate_C_mops(size_t ndims,
 
 
       // increment global_index for next loop OR end iteration if done
-      for (size_t dim=0; dim<ndims; dim++){
+      for ( int dim=0; dim<ndims; dim++){
 
         // iterate only over indices which must be contracted -> dim \in contract_dims[] and dim \in any operands
         bool contract_over=false;
-        for( size_t cd=0; cd<contract_dim_num; cd++){
+        for( int cd=0; cd<contract_dim_num; cd++){
           if( contract_dims[cd] == dim ){
             contract_over = true;
             break;
@@ -485,7 +485,7 @@ __global__ void calculate_C_mops(size_t ndims,
             for (int dim_prev=dim; dim_prev>=0 ; dim_prev--){
 
               bool is_prev_dim_contracted=false;
-              for( size_t cd=0; cd<contract_dim_num; cd++){
+              for( int cd=0; cd<contract_dim_num; cd++){
                 if( contract_dims[cd] == dim_prev ){
                   is_prev_dim_contracted = true;
                   break;
@@ -501,11 +501,11 @@ __global__ void calculate_C_mops(size_t ndims,
 
 
             // increment next dimension non-zero, contracted dimension
-	    for( size_t nd=dim+1; nd<ndims; nd++ ){
+	    for( int nd=dim+1; nd<ndims; nd++ ){
 	      if( d_strides_output[nd] != 0 ){
 
 		bool is_next_dim_contracted = false;
-		for( size_t cd=0; cd<contract_dim_num; cd++){
+		for( int cd=0; cd<contract_dim_num; cd++){
 		  if( contract_dims[cd] == nd ){
 		    is_next_dim_contracted = true;
 		    break;
