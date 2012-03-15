@@ -16,6 +16,8 @@
 #include "../common/cuPrintf.cuh"
 
 
+size_t call_calculate_C_mops_opnum=0;
+
 void call_calculate_C_mops(size_t ndims, size_t operand_num, operands* ops, std::string output_tensor, bool print, int* d_to_power = NULL){
   calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
 						      (size_t) (operand_num),
@@ -23,7 +25,7 @@ void call_calculate_C_mops(size_t ndims, size_t operand_num, operands* ops, std:
 						      (size_t**) (ops->d_strides_operand_pointers),
 
 						      (size_t*) (get_d_obj_strides()[output_tensor]),
-						      (size_t*) (get_d_obj_cards()["F"]),
+						      (size_t*) (get_d_obj_cards()["F"]), // used to calculate contraction indices of required dimensions
 
 						      (size_t**) (ops->d_cards_operand_pointers),
 						      (double**) (ops->d_operand_pointers),
@@ -32,10 +34,68 @@ void call_calculate_C_mops(size_t ndims, size_t operand_num, operands* ops, std:
 						      //(double*) (get_d_obj_data()["Z0"]),
 						      (size_t) (h_objs[output_tensor]->element_number),
 						      (size_t) 1,
-						      print, 1,
+						      print, call_calculate_C_mops_opnum,
 						      d_to_power);
+  call_calculate_C_mops_opnum++;
 }
 
+void call_genFullResult(size_t ndims, std::string A, std::string B, std::string F, int to_power_A=1, int to_power_B=1){
+  genFullResult<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(get_d_obj_cards()[F], ndims,
+						  get_d_obj_strides()[A], get_d_obj_strides()[B], get_d_obj_strides()[F],
+						  get_d_obj_data()[A], get_d_obj_data()[B], get_d_obj_data()[F], 
+						  h_objs[F]->element_number, h_objs[A]->element_number, h_objs[B]->element_number, 
+						  1, false, to_power_A, to_power_B);
+}
+
+
+void call_contractFintoC(size_t ndims, std::string F, std::string C){
+
+
+  // prepare range permutation vector //////////////////////////////////////////////////////
+  size_t zero_cardinality_dim_tuple_size_C = 0;
+  size_t zero_cardinality_dim_tuples_C_element_number = 0;
+  size_t* h_zero_cardinality_dim_tuples_C = NULL;
+  size_t* d_zero_cardinality_dim_tuples_C = NULL;
+
+  std::vector<size_t> zero_cardinality_dims;
+  for ( size_t dim=0; dim<ndims; dim++ ){
+    if ( h_objs[C]->cardinalities[dim] == 0 && h_objs[F]->cardinalities[dim] != 0 ){
+      zero_cardinality_dims.push_back(h_objs[F]->cardinalities[dim]);
+    }
+  }
+
+  if ( COUT ) {
+    std::cout << "zero_cardinality_dims" << std::endl;
+    for ( size_t j=0; j<zero_cardinality_dims.size(); j++){
+      std::cout << zero_cardinality_dims.at(j) << std::endl;
+    }
+  }
+
+  zero_cardinality_dim_tuple_size_C = zero_cardinality_dims.size();
+
+  h_zero_cardinality_dim_tuples_C =
+    gen_range_permutation(zero_cardinality_dims,
+			  &(zero_cardinality_dim_tuples_C_element_number));
+
+  // transfer to device
+  cutilSafeCall(cudaMalloc((void**)&(d_zero_cardinality_dim_tuples_C),
+			   sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number));
+  cutilSafeCall(cudaMemcpy(d_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuples_C,
+			   sizeof(size_t)*zero_cardinality_dim_tuples_C_element_number, cudaMemcpyHostToDevice));
+
+  ////////////////////////////////////////////////////////////////////////////////////////
+
+
+  contractFintoC<<<NUM_BLOCKS,THREADS_FOR_BLOCK>>>(ndims,
+						   get_d_obj_strides()[F], get_d_obj_strides()[C],
+						   get_d_obj_data()[F], get_d_obj_data()[C],
+						   h_objs[C]->element_number,
+						   d_zero_cardinality_dim_tuples_C,
+						   zero_cardinality_dim_tuple_size_C,
+						   zero_cardinality_dim_tuples_C_element_number,
+						   CUPRINTF);
+
+}
 
 void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_parallel){
   // prepare model elements  //////////////////////////////////////////////////////
@@ -249,6 +309,7 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
 
     size_t Z_card[ndims];
     for (size_t i=0; i<ndims; i++) Z_card[i] = latent_elements[el].cards_numeric[i];
+
     std::stringstream z;
     z << "Host Z" << el;
     prepareHostTensorFromCpp(&tmp_ct, latent_elements[el].data, Z_card, ndims, z.str().c_str(), true); // init with given data, if null init with rand
@@ -350,13 +411,15 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
 
 
   // 'f','i','k','t','m','n'
-  ct BC, BZ, FT;
+  ct BC, BC_F, BZ, FT;
   size_t* BC_card = (size_t*) calloc(ndims, sizeof(size_t));
-  // BC(i,k,t) others 0
+  // BC(i,t) others 0
   BC_card[1] = V_cards[1]; // i
-  BC_card[2] = V_cards[2]; // k
   BC_card[3] = V_cards[3]; // t
   prepareHostTensorFromCpp(&BC, NULL, BC_card, ndims, "Host BC");
+  BC_card[2] = V_cards[2]; // k
+  prepareHostTensorFromCpp(&BC_F, NULL, BC_card, ndims, "Host BC_F");
+
 
   size_t* BZ_card = (size_t*) calloc(ndims, sizeof(size_t));
   // BZ(i,k) others 0
@@ -392,23 +455,38 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
   prepareHostTensorFromCpp(&X2_tmp1, NULL, X2_cards, ndims, "Host X2_tmp1", false, true);
   prepareHostTensorFromCpp(&X2_tmp2, NULL, X2_cards, ndims, "Host X2_tmp2", false, true);
 
-  ct ikt;
-  size_t* ikt_card = (size_t*) calloc(3, sizeof(size_t));
-  prepareHostTensorFromCpp(&ikt, NULL, ikt_card, 3, "Host ikt", false, false, false);
+
+  ct fit;
+  size_t* fit_card = (size_t*) calloc(ndims, sizeof(size_t));
+  fit_card[0] = V_cards[0]; //f
+  fit_card[1] = V_cards[1]; //i
+  fit_card[3] = V_cards[3]; //t
+  prepareHostTensorFromCpp(&fit, NULL, fit_card, ndims, "Host fit", false, false, false);
+
+  ct fin;
+  size_t* fin_card = (size_t*) calloc(ndims, sizeof(size_t));
+  fin_card[0] = V_cards[0]; //f
+  fin_card[1] = V_cards[1]; //i
+  fin_card[5] = V_cards[5]; //n
+  prepareHostTensorFromCpp(&fin, NULL, fin_card, ndims, "Host fin", false, false, false);
+  
+
 
   REGISTER_CT(F);
 
-  REGISTER_CT(BC); REGISTER_CT(BZ); REGISTER_CT(FT);
+  REGISTER_CT(fit);
+  REGISTER_CT(fin);
+
+  REGISTER_CT(BC); REGISTER_CT(BC_F); REGISTER_CT(BZ); REGISTER_CT(FT);
   REGISTER_CT(X0_ones); REGISTER_CT(X1_ones); REGISTER_CT(X2_ones);
   REGISTER_CT(X0_tmp1); REGISTER_CT(X1_tmp1); REGISTER_CT(X2_tmp1);
   REGISTER_CT(X0_tmp2); REGISTER_CT(X1_tmp2); REGISTER_CT(X2_tmp2);
 
-  REGISTER_CT(ikt);
 
   if (CUPRINTF == true)
     cudaPrintfInit();
 
-  std::cout << " selam 1 " << std::endl;
+  //std::cout << " selam 1 " << std::endl;
   size_t cur_mem;
   if (is_parallel)
     cur_mem = transferToDevice(ndims);
@@ -419,11 +497,11 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
   // perform GCTF operation //////////////////////////////////////////////////////////////////
 
 
-  std::vector<std::string> sops_1;
-  operands ops_1;
-  sops_1.push_back("BZ");
-  sops_1.push_back("Z3");
-  cur_mem = gen_operation_arguments( sops_1, &ops_1, cur_mem );
+  // std::vector<std::string> sops_1;
+  // operands ops_1;
+  // sops_1.push_back("BZ");
+  // sops_1.push_back("Z3");
+  // cur_mem = gen_operation_arguments( sops_1, &ops_1, cur_mem );
 
   std::vector<std::string> sops_2;
   operands ops_2;
@@ -451,7 +529,7 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
 
   std::vector<std::string> sops_6;
   operands ops_6;
-  sops_6.push_back("X2_tmp0");
+  sops_6.push_back("X2_tmp1");
   sops_6.push_back("FT");
   cur_mem = gen_operation_arguments( sops_6, &ops_6, cur_mem );
 
@@ -476,7 +554,6 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
     std::cout << "iter " << iter << std::endl;
 
 
-
     // D -> Z0
     // B -> Z1
     // Z -> Z2
@@ -486,154 +563,60 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
     // F -> Z6
     // T -> Z7
 
-
-
-
-
-
-
-
-    // update D
-    
-    // compute x1hat
-
-    // B.*Z -> BZ
+    // B .* Z -> BZ
+    //std::cout << " NUM_BLOCKS " << NUM_BLOCKS <<  " THREADS_FOR_BLOCK " << THREADS_FOR_BLOCK << std::endl;
     hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["Z1"],
-						     get_d_obj_data()["Z2"],
-						     get_d_obj_data()["BZ"],
-						     h_objs["BZ"]->element_number,
-						     CUPRINTF);
+    						     get_d_obj_data()["Z2"],
+    						     get_d_obj_data()["BZ"],
+    						     h_objs["BZ"]->element_number,
+    						     CUPRINTF);
 
-    // BZ(i,k)*C(k,t) -> BC(i,k,t)
-    calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) 3,
-							(size_t) (sops_1.size()),
+    // BZ(i,k) * C(k,t) -> BC(i,k,t)
+    call_genFullResult(ndims, "BZ", "Z3", "BC_F");
+    call_contractFintoC(ndims, "BC_F", "BC");
 
-							(size_t**) (ops_1.d_strides_operand_pointers),
 
-							(size_t*) (get_d_obj_strides()["BC"]),
-							(size_t*) (get_d_obj_cards()["ikt"]),
-
-							(size_t**) (ops_1.d_cards_operand_pointers),
-							(double**) (ops_1.d_operand_pointers),
-
-							(double*) (get_d_obj_data()["BC"]),
-							//(double*) (get_d_obj_data()["Z0"]),
-							(size_t) (h_objs["BC"]->element_number),
-							(size_t) 1,
-							CUPRINTF,1);
-
-    break;
-
-    // X1hat = D*BC;
-    calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
-							(size_t) (sops_2.size()),
-
-							(size_t**) (ops_2.d_strides_operand_pointers),
-
-							(size_t*) (get_d_obj_strides()["hatX0"]),
-							(size_t*) (get_d_obj_cards()["F"]),
-
-							(size_t**) (ops_2.d_cards_operand_pointers),
-							(double**) (ops_2.d_operand_pointers),
-
-							(double*) (get_d_obj_data()["hatX0"]),
-							//(double*) (get_d_obj_data()["Z0"]),
-							(size_t) (h_objs["hatX0"]->element_number),
-							(size_t) 1,
-							CUPRINTF,1);
+    // X1hat(f,t) = D(f,i) * BC(i,t);
+    // full -> f,i,t
+    // call_genFullResult(ndims, "Z0", "BC", "fit");
+    // call_contractFintoC(ndims, "fit", "hatX0");
+    call_calculate_C_mops(ndims, 2, &ops_2, "hatX0", CUPRINTF);
 
 
     //arg_D_n_1 =  M1.* X1 .* (X1hat.^(-p));
     hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X0"],
-						     get_d_obj_data()["hatX0"],
-						     get_d_obj_data()["X0_tmp1"],
-						     h_objs["X0"]->element_number,
-						     CUPRINTF, 1, -p);
+    						     get_d_obj_data()["hatX0"],
+    						     get_d_obj_data()["X0_tmp1"],
+    						     h_objs["X0"]->element_number,
+    						     CUPRINTF, 1, -p);
 
     //arg_D_d_1 =  M1.* (X1hat.^(1-p));
     hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X0_ones"],
-						     get_d_obj_data()["hatX0"],
-						     get_d_obj_data()["X0_tmp2"],
-						     h_objs["X0"]->element_number,
-						     CUPRINTF, 1, 1-p);
+    						     get_d_obj_data()["hatX0"],
+    						     get_d_obj_data()["X0_tmp2"],
+    						     h_objs["X0"]->element_number,
+    						     CUPRINTF, 1, 1-p);
 
-
-    // deltaD_n_1 = arg_D_n_1 * (BC)';
-    calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
-							(size_t) (sops_3.size()),
-
-							(size_t**) (ops_3.d_strides_operand_pointers),
-
-							(size_t*) (get_d_obj_strides()["D1_Z0X0"]),
-							(size_t*) (get_d_obj_cards()["F"]),
-
-							(size_t**) (ops_3.d_cards_operand_pointers),
-							(double**) (ops_3.d_operand_pointers),
-
-							(double*) (get_d_obj_data()["D1_Z0X0"]),
-							//(double*) (get_d_obj_data()["Z0"]),
-							(size_t) (h_objs["D1_Z0X0"]->element_number),
-							(size_t) 1,
-							CUPRINTF,1);
+    //deltaD_n_1(f,t) = arg_D_n_1(f,t) * (BC(i,t))'
+    call_calculate_C_mops(ndims, 2, &ops_3, "D1_Z0X0", CUPRINTF);
 
     //deltaD_d_1 = arg_D_d_1 * (BC)';
-    calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
-							(size_t) (sops_4.size()),
+    call_calculate_C_mops(ndims, 2, &ops_4, "D2_Z0X0", CUPRINTF);
 
-							(size_t**) (ops_4.d_strides_operand_pointers),
+    
+    // skip mask
 
-							(size_t*) (get_d_obj_strides()["D2_Z0X0"]),
-							(size_t*) (get_d_obj_cards()["F"]),
-
-							(size_t**) (ops_4.d_cards_operand_pointers),
-							(double**) (ops_4.d_operand_pointers),
-
-							(double*) (get_d_obj_data()["D2_Z0X0"]),
-							//(double*) (get_d_obj_data()["Z0"]),
-							(size_t) (h_objs["D2_Z0X0"]->element_number),
-							(size_t) 1,
-							CUPRINTF,1);
 
     //Compute X3hat
     // FT = F.*T;
     hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["Z6"],
-						     get_d_obj_data()["Z7"],
-						     get_d_obj_data()["FT"],
-						     h_objs["Z6"]->element_number,
-						     CUPRINTF);
-    
-    // X3hat = D*FT;
-    calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
-							(size_t) (sops_5.size()),
+    						     get_d_obj_data()["Z7"],
+    						     get_d_obj_data()["FT"],
+    						     h_objs["Z6"]->element_number,
+    						     CUPRINTF);
 
-							(size_t**) (ops_5.d_strides_operand_pointers),
-
-							(size_t*) (get_d_obj_strides()["hatX2"]),
-							(size_t*) (get_d_obj_cards()["F"]),
-
-							(size_t**) (ops_5.d_cards_operand_pointers),
-							(double**) (ops_5.d_operand_pointers),
-
-							(double*) (get_d_obj_data()["hatX2"]),
-							//(double*) (get_d_obj_data()["Z0"]),
-							(size_t) (h_objs["hatX2"]->element_number),
-							(size_t) 1,
-							CUPRINTF,1);
-    
-    // arg_D_n_2 =  X3 .* (X3hat.^(-p));
-    hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X2"],
-						     get_d_obj_data()["hatX2"],
-						     get_d_obj_data()["X2_tmp0"],
-						     h_objs["X2"]->element_number,
-						     CUPRINTF, 1, -p);
-
-    // arg_D_d_2 =  X3hat.^(1-p);
-    // skip
-    // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X2"],
-    // 						     get_d_obj_data()["hatX2"],
-    // 						     get_d_obj_data()["D2_Z0X2"],
-    // 						     h_objs["X2"]->element_number,
-    // 						     CUPRINTF, 1, 1-p);
+    // X3hat(f,n) = D(f,i) * FT(i,n);
+    call_calculate_C_mops(ndims, 2, &ops_5, "hatX2", CUPRINTF);
 
 
     //deltaD_n_2 = arg_D_n_2 * (FT)';
@@ -641,33 +624,256 @@ void umut01(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_
 
 
     //deltaD_d_2 = arg_D_d_2 * (FT)';
-    call_calculate_C_mops(ndims, 2, &ops_7, "D2_Z0X2", CUPRINTF);
+    call_calculate_C_mops(ndims, 2, &ops_7, "D2_Z0X2", CUPRINTF, ops_7.d_to_power);
+
 
     //D = D.* ( (deltaD_n_1 + deltaD_n_2 ) ./ (deltaD_d_1 + deltaD_d_2 ));
     hadamard_sum<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["D1_Z0X0"],
-						     get_d_obj_data()["D1_Z0X2"],
-						     get_d_obj_data()["D1_Z0X0"],
-						     h_objs["D1_Z0X0"]->element_number,
-						     CUPRINTF);
+    						     get_d_obj_data()["D1_Z0X2"],
+    						     get_d_obj_data()["D1_Z0X0"],
+    						     h_objs["D1_Z0X0"]->element_number,
+    						     CUPRINTF);
     hadamard_sum<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["D2_Z0X0"],
-						     get_d_obj_data()["D2_Z0X2"],
-						     get_d_obj_data()["D2_Z0X0"],
-						     h_objs["D2_Z0X0"]->element_number,
-						     CUPRINTF);
+    						     get_d_obj_data()["D2_Z0X2"],
+    						     get_d_obj_data()["D2_Z0X0"],
+    						     h_objs["D2_Z0X0"]->element_number,
+    						     CUPRINTF);
     hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["D1_Z0X0"],
-						     get_d_obj_data()["D2_Z0X0"],
-						     get_d_obj_data()["D1_Z0X0"],
-						     h_objs["D1_Z0X0"]->element_number,
-						     CUPRINTF);
+    						     get_d_obj_data()["D2_Z0X0"],
+    						     get_d_obj_data()["D1_Z0X0"],
+    						     h_objs["D1_Z0X0"]->element_number,
+    						     CUPRINTF);
     hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["Z0"],
-						     get_d_obj_data()["D1_Z0X0"],
-						     get_d_obj_data()["Z0"],
-						     h_objs["Z0"]->element_number,
-						     CUPRINTF);
+    						     get_d_obj_data()["D1_Z0X0"],
+    						     get_d_obj_data()["Z0"],
+    						     h_objs["Z0"]->element_number,
+    						     CUPRINTF);
+    
 
 
 
-    break;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+    // // update D
+    
+    // // compute x1hat
+
+    // // B.*Z -> BZ
+    // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["Z1"],
+    // 						     get_d_obj_data()["Z2"],
+    // 						     get_d_obj_data()["BZ"],
+    // 						     h_objs["BZ"]->element_number,
+    // 						     CUPRINTF);
+
+    // // BZ(i,k)*C(k,t) -> BC(i,k,t)
+    // calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) 3,
+    // 							(size_t) (sops_1.size()),
+
+    // 							(size_t**) (ops_1.d_strides_operand_pointers),
+
+    // 							(size_t*) (get_d_obj_strides()["BC"]),
+    // 							(size_t*) (get_d_obj_cards()["ikt"]),
+
+    // 							(size_t**) (ops_1.d_cards_operand_pointers),
+    // 							(double**) (ops_1.d_operand_pointers),
+
+    // 							(double*) (get_d_obj_data()["BC"]),
+    // 							//(double*) (get_d_obj_data()["Z0"]),
+    // 							(size_t) (h_objs["BC"]->element_number),
+    // 							(size_t) 1,
+    // 							CUPRINTF,1);
+
+    // break;
+
+    // // X1hat = D*BC;
+    // calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+    // 							(size_t) (sops_2.size()),
+
+    // 							(size_t**) (ops_2.d_strides_operand_pointers),
+
+    // 							(size_t*) (get_d_obj_strides()["hatX0"]),
+    // 							(size_t*) (get_d_obj_cards()["F"]),
+
+    // 							(size_t**) (ops_2.d_cards_operand_pointers),
+    // 							(double**) (ops_2.d_operand_pointers),
+
+    // 							(double*) (get_d_obj_data()["hatX0"]),
+    // 							//(double*) (get_d_obj_data()["Z0"]),
+    // 							(size_t) (h_objs["hatX0"]->element_number),
+    // 							(size_t) 1,
+    // 							CUPRINTF,1);
+
+
+    // //arg_D_n_1 =  M1.* X1 .* (X1hat.^(-p));
+    // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X0"],
+    // 						     get_d_obj_data()["hatX0"],
+    // 						     get_d_obj_data()["X0_tmp1"],
+    // 						     h_objs["X0"]->element_number,
+    // 						     CUPRINTF, 1, -p);
+
+    // //arg_D_d_1 =  M1.* (X1hat.^(1-p));
+    // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X0_ones"],
+    // 						     get_d_obj_data()["hatX0"],
+    // 						     get_d_obj_data()["X0_tmp2"],
+    // 						     h_objs["X0"]->element_number,
+    // 						     CUPRINTF, 1, 1-p);
+
+
+    // // deltaD_n_1 = arg_D_n_1 * (BC)';
+    // calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+    // 							(size_t) (sops_3.size()),
+
+    // 							(size_t**) (ops_3.d_strides_operand_pointers),
+
+    // 							(size_t*) (get_d_obj_strides()["D1_Z0X0"]),
+    // 							(size_t*) (get_d_obj_cards()["F"]),
+
+    // 							(size_t**) (ops_3.d_cards_operand_pointers),
+    // 							(double**) (ops_3.d_operand_pointers),
+
+    // 							(double*) (get_d_obj_data()["D1_Z0X0"]),
+    // 							//(double*) (get_d_obj_data()["Z0"]),
+    // 							(size_t) (h_objs["D1_Z0X0"]->element_number),
+    // 							(size_t) 1,
+    // 							CUPRINTF,1);
+
+    // //deltaD_d_1 = arg_D_d_1 * (BC)';
+    // calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+    // 							(size_t) (sops_4.size()),
+
+    // 							(size_t**) (ops_4.d_strides_operand_pointers),
+
+    // 							(size_t*) (get_d_obj_strides()["D2_Z0X0"]),
+    // 							(size_t*) (get_d_obj_cards()["F"]),
+
+    // 							(size_t**) (ops_4.d_cards_operand_pointers),
+    // 							(double**) (ops_4.d_operand_pointers),
+
+    // 							(double*) (get_d_obj_data()["D2_Z0X0"]),
+    // 							//(double*) (get_d_obj_data()["Z0"]),
+    // 							(size_t) (h_objs["D2_Z0X0"]->element_number),
+    // 							(size_t) 1,
+    // 							CUPRINTF,1);
+
+    // //Compute X3hat
+    // // FT = F.*T;
+    // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["Z6"],
+    // 						     get_d_obj_data()["Z7"],
+    // 						     get_d_obj_data()["FT"],
+    // 						     h_objs["Z6"]->element_number,
+    // 						     CUPRINTF);
+    
+    // // X3hat = D*FT;
+    // calculate_C_mops<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>((size_t) ndims,
+    // 							(size_t) (sops_5.size()),
+
+    // 							(size_t**) (ops_5.d_strides_operand_pointers),
+
+    // 							(size_t*) (get_d_obj_strides()["hatX2"]),
+    // 							(size_t*) (get_d_obj_cards()["F"]),
+
+    // 							(size_t**) (ops_5.d_cards_operand_pointers),
+    // 							(double**) (ops_5.d_operand_pointers),
+
+    // 							(double*) (get_d_obj_data()["hatX2"]),
+    // 							//(double*) (get_d_obj_data()["Z0"]),
+    // 							(size_t) (h_objs["hatX2"]->element_number),
+    // 							(size_t) 1,
+    // 							CUPRINTF,1);
+    
+    // // arg_D_n_2 =  X3 .* (X3hat.^(-p));
+    // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X2"],
+    // 						     get_d_obj_data()["hatX2"],
+    // 						     get_d_obj_data()["X2_tmp0"],
+    // 						     h_objs["X2"]->element_number,
+    // 						     CUPRINTF, 1, -p);
+
+    // // arg_D_d_2 =  X3hat.^(1-p);
+    // // skip
+    // // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["X2"],
+    // // 						     get_d_obj_data()["hatX2"],
+    // // 						     get_d_obj_data()["D2_Z0X2"],
+    // // 						     h_objs["X2"]->element_number,
+    // // 						     CUPRINTF, 1, 1-p);
+
+
+    // //deltaD_n_2 = arg_D_n_2 * (FT)';
+    // call_calculate_C_mops(ndims, 2, &ops_6, "D1_Z0X2", CUPRINTF);
+
+
+    // //deltaD_d_2 = arg_D_d_2 * (FT)';
+    // call_calculate_C_mops(ndims, 2, &ops_7, "D2_Z0X2", CUPRINTF);
+
+    // //D = D.* ( (deltaD_n_1 + deltaD_n_2 ) ./ (deltaD_d_1 + deltaD_d_2 ));
+    // hadamard_sum<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["D1_Z0X0"],
+    // 						     get_d_obj_data()["D1_Z0X2"],
+    // 						     get_d_obj_data()["D1_Z0X0"],
+    // 						     h_objs["D1_Z0X0"]->element_number,
+    // 						     CUPRINTF);
+    // hadamard_sum<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["D2_Z0X0"],
+    // 						     get_d_obj_data()["D2_Z0X2"],
+    // 						     get_d_obj_data()["D2_Z0X0"],
+    // 						     h_objs["D2_Z0X0"]->element_number,
+    // 						     CUPRINTF);
+    // hadamard_div<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["D1_Z0X0"],
+    // 						     get_d_obj_data()["D2_Z0X0"],
+    // 						     get_d_obj_data()["D1_Z0X0"],
+    // 						     h_objs["D1_Z0X0"]->element_number,
+    // 						     CUPRINTF);
+    // hadamard_mul<<<NUM_BLOCKS, THREADS_FOR_BLOCK>>>( get_d_obj_data()["Z0"],
+    // 						     get_d_obj_data()["D1_Z0X0"],
+    // 						     get_d_obj_data()["Z0"],
+    // 						     h_objs["Z0"]->element_number,
+    // 						     CUPRINTF);
+
+
+
+    // break;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // // calculate all hatX_v and A_v
     // for (size_t alpha=0; alpha<max_alpha; alpha++){

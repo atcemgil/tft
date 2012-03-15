@@ -266,7 +266,7 @@ for nn = 1:numRepeats
         deltaD_n_1 = arg_D_n_1 * (BC)';
         deltaD_d_1 = arg_D_d_1 * (BC)';
         
-        
+        //atla
         deltaD_n_1 = deltaD_n_1.*maskD1;
         deltaD_d_1 = deltaD_d_1.*maskD1;
         
