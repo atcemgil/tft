@@ -440,7 +440,7 @@ __global__ void calculate_C_mops(size_t ndims,
           //cuPrintf("INCREMENT %d %d\n",global_index[dim], d_cards_F[dim]-1);
           global_index[dim]++;
 
-	  if(counter++ == 1000) {
+	  if(counter++ == 10000) {
 	    cuPrintf("INCREMENT %d %d\n",global_index[dim], d_cards_F[dim]-1);
 	    // cuPrintf("global_index %d %d %d %d %d %d %d %d %d %d\n", 
 	    // 	     global_index[0], 

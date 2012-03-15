@@ -289,7 +289,7 @@ for nn = 1:numRepeats
     
     tic; 
     % DO NOT CHANGE TENSOR ORDER!
-    [r_D r_B r_Z r_C r_G r_Y r_F r_T ] = ...
+    [D B Z C G Y F T] = ...
         umut01_par ( 1, ...
                    V_card_sym, ...
                    V_cards, ...
@@ -324,6 +324,8 @@ for nn = 1:numRepeats
     
     if(plotOn)
         
+        BC = (B.*Z)*C;
+
         set(0,'CurrentFigure',f1)
         subplot(6,6,[3 4]);
         imagesc(BC(1:I1,:)); set(gca,'ydir','n');

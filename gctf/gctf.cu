@@ -412,7 +412,7 @@ void gctf(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool is_pa
                                                          CUPRINTF,
                                                          p, 1);
       }
-      return;
+
 
 
 
