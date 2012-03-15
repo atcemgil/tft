@@ -324,7 +324,18 @@ for nn = 1:numRepeats
     
     if(plotOn)
         
-        BC = (reshape(B,[I K]).*reshape(Z,[I K]))*reshape(C,[K, numTimeFrames_test]);
+        B=reshape(B,[I K]);
+        Z=reshape(Z,[I K]);
+        C=reshape(C,[K, numTimeFrames_test]);
+        BC = (B.*Z)*C;
+        F = reshape(F,[I,numTimeFrames_train]);
+        T = reshape(T,[I,numTimeFrames_train]);
+        D = reshape(D,[numFreq, I]);
+        FT = F.*T;
+        B = reshape(B,[I,K]);
+        G = reshape(G, [K,numTimeFramesMidi]);
+        Y = reshape(Y,[K,numTimeFramesMidi]);
+        X2hat = D*(F.*T);
 
         set(0,'CurrentFigure',f1)
         subplot(6,6,[3 4]);
@@ -338,12 +349,12 @@ for nn = 1:numRepeats
         colorbar;
         
         subplot(6,6,[5 6 11 12]);
-        imagesc(reshape(F,[I, numTimeFrames_train]).*reshape(T,[I, numTimeFrames_train])); set(gca,'ydir','n');
+        imagesc(F.*T); set(gca,'ydir','n');
         title('F');
         colorbar;
         
         subplot(6,6,[27 28 33 34]);
-        imagesc(log(M1.*reshape(X1,size(M1)))); set(gca,'ydir','n');
+        imagesc(log(M1.*X1)); set(gca,'ydir','n');
         title('X1');
         clr1 = caxis;
         colorbar;
@@ -355,12 +366,14 @@ for nn = 1:numRepeats
         colorbar;
         
         subplot(6,6,[15 16 21 22]);
+        X1hat = D*BC;
         imagesc(log(X1hat)); set(gca,'ydir','n');
         title('X1hat');
         caxis(clr1);
         colorbar;
         
         subplot(6,6,[17 18 23 24]);
+        X3hat = D*FT;
         imagesc(log(X3hat)); set(gca,'ydir','n');
         title('X3hat');
         caxis(clr3);
@@ -381,12 +394,12 @@ for nn = 1:numRepeats
         
         set(0,'CurrentFigure',f2)
         subplot(5,3,[10 13]);
-        imagesc(reshape(B,[I,K]).*reshape(Z,[I,K])); set(gca,'ydir','n');
+        imagesc(B.*Z); set(gca,'ydir','n');
         colorbar;
         title('B');
         
         subplot(5,3,[2 3]);
-        imagesc(reshape(G,[K, numTimeFramesMidi]).*reshape(Y,[K, numTimeFramesMidi])); set(gca,'ydir','n');
+        imagesc(G.*Y); set(gca,'ydir','n');
         colorbar;
         title('G');
         
