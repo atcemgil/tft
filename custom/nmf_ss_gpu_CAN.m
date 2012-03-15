@@ -324,7 +324,7 @@ for nn = 1:numRepeats
     
     if(plotOn)
         
-        BC = (B.*Z)*C;
+        BC = (reshape(B,[I K]).*reshape(Z,[I K]))*reshape(C,[K, numTimeFrames_test]);
 
         set(0,'CurrentFigure',f1)
         subplot(6,6,[3 4]);
@@ -338,12 +338,12 @@ for nn = 1:numRepeats
         colorbar;
         
         subplot(6,6,[5 6 11 12]);
-        imagesc(F.*T); set(gca,'ydir','n');
+        imagesc(reshape(F,[I, numTimeFrames_train]).*reshape(T,[I, numTimeFrames_train])); set(gca,'ydir','n');
         title('F');
         colorbar;
         
         subplot(6,6,[27 28 33 34]);
-        imagesc(log(M1.*X1)); set(gca,'ydir','n');
+        imagesc(log(M1.*reshape(X1,size(M1)))); set(gca,'ydir','n');
         title('X1');
         clr1 = caxis;
         colorbar;
@@ -381,12 +381,12 @@ for nn = 1:numRepeats
         
         set(0,'CurrentFigure',f2)
         subplot(5,3,[10 13]);
-        imagesc(B.*Z); set(gca,'ydir','n');
+        imagesc(reshape(B,[I,K]).*reshape(Z,[I,K])); set(gca,'ydir','n');
         colorbar;
         title('B');
         
         subplot(5,3,[2 3]);
-        imagesc(G.*Y); set(gca,'ydir','n');
+        imagesc(reshape(G,[K, numTimeFramesMidi]).*reshape(Y,[K, numTimeFramesMidi])); set(gca,'ydir','n');
         colorbar;
         title('G');
         
