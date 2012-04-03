@@ -16,10 +16,11 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool i
     return;
   }
 
-  if ( nrhs != 6 ){
-    std::cout << "gmult: tensor operation requires 6 arguments. "
+  if ( nrhs != 6 || nrhs != 9 ){
+    std::cout << "gmult: tensor operation requires 6 or 9 arguments. "
               << "A, dimensions of A, B, dimensions of B, dimensions of C,"
               << " use_multiplication(1 uses multiplication, 0 uses division)"
+              << " [use_F episode_num iter_num]"
               << std::endl;
     return;
   }
@@ -33,6 +34,20 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool i
   const mxArray* m_C_card = prhs[4];
 
   size_t use_multiplication = ((double *)mxGetData(prhs[5]))[0];
+
+  bool m_use_F;
+  size_t episode_num;
+  size_t iter_num;
+
+  if( nrhs == 9 ){
+      m_use_F = ((double*)mxGetData(prhs[6]))[0] == 1;
+      episode_num = ((double*)mxGetData(prhs[7]))[0];
+      iter_num = ((double*)mxGetData(prhs[8]))[0];
+  }else{
+      m_use_F = true;
+      episode_num = 1;
+      iter_num = 1;
+  }
 
   // assume same size cardinalities for all objects
   size_t ndims = mxGetNumberOfElements(m_A_card);
@@ -167,10 +182,37 @@ void tensorop(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[], bool i
   }
 
 
-  if ( is_parallel) 
-    tensorop_par(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuple_size_C, use_multiplication);
-  else
-    tensorop_seq(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
+  register_ct("A", &h_A);
+  register_ct("B", &h_B);
+  register_ct("C", &h_C);
+  if (m_use_F) register_ct("F", &h_F);
+
+  operation_type op_type;
+  if( isHadamard ) op_type=HADAMARD_MUL;
+  else             op_type=GMULT;
+
+  bool result_in_F;
+
+  if ( is_parallel) {
+    //tensorop_par(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C, h_zero_cardinality_dim_tuple_size_C, use_multiplication, m_use_F, episode_num, iter_num);
+
+    transferToDevice(ndims);
+    tensorop_par_keys( op_type,
+		       ndims,
+		       &result_in_F,
+		       "A", "B", "C",
+		       "F"
+		       );
+  } else {
+    //tensorop_seq(isHadamard, h_A, h_B, h_C, m_C, h_F, ndims, h_zero_cardinality_dim_tuples_C_element_number, h_zero_cardinality_dim_tuples_C);
+
+    tensorop_par_keys( op_type,
+		       ndims,
+		       &result_in_F,
+		       "A", "B", "C",
+		       "F"
+		       );
+  }
 
 
   free_ct(&h_A);

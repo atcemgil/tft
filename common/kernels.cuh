@@ -52,6 +52,7 @@ __global__ void calculate_C_mops(size_t ndims,
                                  );
 
 
-//__global__ void printData(double* data, size_t count, size_t id);
+__global__ void printData(double* data, size_t count, size_t id);
+__global__ void printData(size_t* data, size_t count, size_t id);
 
 #endif

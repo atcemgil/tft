@@ -16,5 +16,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   read_config();
   //print_config();
 
-  gctf(nlhs, plhs, nrhs, prhs, false);
+  //gctf(nlhs, plhs, nrhs, prhs, false);
+  std::cout << "not implemented" << std::endl;
 }

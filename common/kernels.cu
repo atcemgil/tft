@@ -283,16 +283,16 @@ __global__ void calculate_C_mops(size_t ndims,
 
 
   if ( tid < output_element_number ){
-    ndims=6;
+    ndims=3;
     operand_num=2;
 
     
     size_t d_inds_output[7] = {0}; // 20 dimensions limit
 
-    __shared__ int d_strides_operand_pointers_shr[2][6];
-    __shared__ int d_strides_output_shr[6];
-    __shared__ int d_cards_F_shr[6];
-    //__shared__ int d_cards_operand_pointers_shr[2][6];
+    __shared__ int d_strides_operand_pointers_shr[2][3];
+    __shared__ int d_strides_output_shr[3];
+    __shared__ int d_cards_F_shr[3];
+    //__shared__ int d_cards_operand_pointers_shr[2][3];
     //__shared__ int to_power_operands_shr[2];
 
     for( int o=0; o<operand_num; o++ ){
@@ -378,22 +378,20 @@ __global__ void calculate_C_mops(size_t ndims,
     bool not_done = true;
 
 
-    size_t counter=0;
+    //size_t counter=0;
 
 
     do{
-      // cuPrintf("counter %d", counter);
-      // cuPrintf("global_index %d %d %d %d %d %d %d %d %d %d\n", 
+      // cuPrintf("counter %d\n", counter);
+      // cuPrintf("global_index %d %d %d %d %d %d %d\n", 
       // 	       global_index[0], 
       // 	       global_index[1], 
       // 	       global_index[2], 
       // 	       global_index[3], 
       // 	       global_index[4], 
       // 	       global_index[5], 
-      // 	       global_index[6], 
-      // 	       global_index[7], 
-      // 	       global_index[8], 
-      // 	       global_index[9]);
+      // 	       global_index[6]
+      // 	       );
 
       // for each global index to be contracted, find multiplication of operands and sum them
       double val=1;
@@ -418,7 +416,9 @@ __global__ void calculate_C_mops(size_t ndims,
       }
 
       d_output[output_ind] += val;
-      //cuPrintf("d_output increment output_ind %d val %f new d_output %f\n", output_ind, val, d_output[output_ind]);
+
+      //double tmp = d_output[output_ind];
+      //cuPrintf("d_output increment output_ind %d val %f new d_output %f\n", output_ind, val, tmp);
 
 
 
@@ -452,33 +452,34 @@ __global__ void calculate_C_mops(size_t ndims,
         }
 
 
-	// oldu
+
 
 
         // if we have NOT reached limit of this dimension
         if( global_index[dim] != (d_cards_F_shr[dim]-1) ){
           // increment this dimension
           //cuPrintf("INCREMENT %d %d\n",global_index[dim], d_cards_F_shr[dim]-1);
+
           global_index[dim]++;
 
-	  if(counter++ == 10000) {
-	    cuPrintf("INCREMENT %d %d\n",global_index[dim], d_cards_F_shr[dim]-1);
-	    // cuPrintf("global_index %d %d %d %d %d %d %d %d %d %d\n", 
-	    // 	     global_index[0], 
-	    // 	     global_index[1], 
-	    // 	     global_index[2], 
-	    // 	     global_index[3], 
-	    // 	     global_index[4], 
-	    // 	     global_index[5], 
-	    // 	     global_index[6], 
-	    // 	     global_index[7], 
-	    // 	     global_index[8], 
-	    // 	     global_index[9]);
+	  // if(counter++ == 10000) {
+	  //   cuPrintf("INCREMENT %d %d\n",global_index[dim], d_cards_F_shr[dim]-1);
+	  //   // cuPrintf("global_index %d %d %d %d %d %d %d %d %d %d\n", 
+	  //   // 	     global_index[0], 
+	  //   // 	     global_index[1], 
+	  //   // 	     global_index[2], 
+	  //   // 	     global_index[3], 
+	  //   // 	     global_index[4], 
+	  //   // 	     global_index[5], 
+	  //   // 	     global_index[6], 
+	  //   // 	     global_index[7], 
+	  //   // 	     global_index[8], 
+	  //   // 	     global_index[9]);
 	    
-	    cuPrintf("counter limited opnum %d\n", opnum);
-	    not_done=false;
-	    return;
-	  }
+	  //   cuPrintf("counter limited opnum %d\n", opnum);
+	  //   not_done=false;
+	  //   return;
+	  // }
 
           break;
         }else{
@@ -501,6 +502,32 @@ __global__ void calculate_C_mops(size_t ndims,
               not_done = false;
               break;
             }
+
+	    // if there are no other dimensions to increment we are done
+	    bool found_dim_to_increment = false;
+	    for( int nd=dim+1; nd<ndims; nd++){
+	      bool found=false;
+	      //cuPrintf("dim %d\n", nd); 
+	      for( int cd=0; cd<contract_dim_num; cd++){
+		if( contract_dims[cd] == nd ){
+		  //cuPrintf("contract_dims[%d] %d\n" , cd, contract_dims[cd]);
+		  found = true;
+		  break;
+		}
+	      }
+	      if( found ){
+		found_dim_to_increment = true;
+		break;
+	      }
+	    }
+	    if( found_dim_to_increment == false ){
+	      not_done = false;
+	      //cuPrintf("found_dim_to_increment BREAK\n");
+	      break;
+	    }else{
+	      //cuPrintf("found_dim_to_increment NOT BREAK\n");
+	    }
+
 
             // make this and all previous dimensions zero
             for (int dim_prev=dim; dim_prev>=0 ; dim_prev--){
@@ -551,11 +578,19 @@ __global__ void calculate_C_mops(size_t ndims,
 
 
 
-// __global__ void printData(double* data, size_t count, size_t id){
-//   //cuPrintf("printData id %d", id);
-//   for(int i=0; i<6; i++){
-//     double tmp=data[i];
-//     cuPrintf("data[%d] = %e\n", i, tmp);
-//   }
-// }
+__global__ void printData(double* data, size_t count, size_t id){
+  //cuPrintf("printData id %d", id);
+  for(int i=0; i<count; i++){
+    double tmp=data[i];
+    cuPrintf("data[%d] = %e\n", i, tmp);
+  }
+}
+
+__global__ void printData(size_t* data, size_t count, size_t id){
+  //cuPrintf("printData id %d", id);
+  for(int i=0; i<count; i++){
+    size_t tmp=data[i];
+    cuPrintf("data[%d] = %d\n", i, tmp);
+  }
+}
 

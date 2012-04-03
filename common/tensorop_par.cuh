@@ -34,6 +34,16 @@ bool tensorop_par_keys( operation_type op_type,
                         int to_power_A=1, int to_power_B=1
                         );
 
+// bool tensorop_par_keys_timer( operation_type op_type,
+// 			      size_t ndims,
+// 			      bool* result_in_F,
+// 			      std::string A, std::string B, std::string C,
+// 			      std::string F="F",
+// 			      int to_power_A=1, int to_power_B=1,
+			      
+// 			      );
+
+
 size_t transferToDevice(size_t full_ndims, size_t cur_mem=0);
 void resetDevice();
 void transferFromDevice(double* matlab_storage, std::string d_storage_key);
