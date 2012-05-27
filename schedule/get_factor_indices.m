@@ -1,10 +1,12 @@
 % returns indices of a selected factor
 
-function [inds] = get_factor_indices(gctf_model, factor_char)
+function [inds] = get_factor_indices(tf_model, factor_char)
 
-factor_ind=find(not(cellfun('isempty', ...
-                            strfind(gctf_model{4}, factor_char) )));
-inds = char(gctf_model{4}( factor_ind + 1 ));
+factor_indices=tf_model{2};
 
-% if same factor appears in to models pick one
-inds=inds(1,:);
+for i = 1:length(factor_indices)
+    if factor_indices(i).factor_char == factor_char
+        inds = factor_indices(i).index_char;
+        return
+    end
+end
