@@ -31,5 +31,11 @@ classdef ElimState
                 r=logical(0);
             end
         end
+
+        function [obj] = gen_cost(obj, tf_model)
+            for i = 1:length(obj.index_list)
+                obj.cost = obj.cost + get_temp_factor_size(tf_model, obj.index_list{i});
+            end
+        end
     end
 end

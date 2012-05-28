@@ -7,6 +7,7 @@ states = [];
 initstate = ElimState;
 initstate.elimination_dims = get_contraction_dims(model);
 initstate.index_list = get_all_factor_indices(model);
+initstate = initstate.gen_cost(model);
 
 states = [states initstate];
 
@@ -32,7 +33,9 @@ for s=1:size(all_sequences,1)
 
         if found == 0
             newstate.parents = [parent];
+            newstate = newstate.gen_cost(model)
             states = [states newstate];
+
             parent = length(states);
         else
             if sum( states(found).parents == parent ) == 0
@@ -43,6 +46,12 @@ for s=1:size(all_sequences,1)
         end
     end
 end
+
+
+
+
+
+
 
 
 
@@ -65,9 +74,11 @@ end
 
 
 l='';
+c='';
 for s=1:length(states)
     if s ~= 1
         l = [ l ',' ];
+        c = [ c ',' ];
     end
 
     if length(states(s).elimination_dims) == 0
@@ -75,6 +86,8 @@ for s=1:length(states)
     else
         l = [ l ' ''' states(s).elimination_dims '''' ];
     end
+
+    c=[c num2str(states(s).cost) ];
 end
 
-system(['python treeplot.py "[' p ']" "[' l  ']"']);
+system(['python treeplot.py "[' p ']" "[' l ']" "[' c ']"  ']);

@@ -13,6 +13,7 @@ G.clear()
 p = jsonpickle.decode(sys.argv[1])
 #l = '[ "pqr", "pq" , "p", "", "q", "pr", "r" , "qr"]'
 l = jsonpickle.decode(sys.argv[2].replace("'",'"'))
+c = jsonpickle.decode(sys.argv[3])
 
 print "plotting model with p"
 print p
@@ -20,9 +21,10 @@ print "labels"
 print l
 
 node_list=[]
-for label in l:
+for ind, label in enumerate(l):
   v = G.new_vertex()
-  G.set_vertex_attribute(v, "label", label)
+  G.set_vertex_attribute(v, "label", label + " (" +str(c[ind])+ ")" )
+  G.set_vertex_attribute(v, "fontsize", "15")
   node_list.append(v)
 
 for node_ind, parent_inds in enumerate(p):
