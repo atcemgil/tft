@@ -1,5 +1,4 @@
 
-
 % gctf model: cell containing following elements
 % 1 : gctf_model : array of model structures with following elements
 %                  latent_factors: example : { 'ABC' }
@@ -12,21 +11,15 @@
 %                           example : { 'A', 'klm', 'B', 'mno', ...
 %                                       factor_M, factor_M_indices }
 
-function [] = schedule_2(gctf_model)
+function [] = schedule_2(tf_model)
 
 
-    models           = gctf_model{1};
-    index_chars      = gctf_model{2};
-    index_cards      = gctf_model{3};
-    observed_factors = gctf_model{4};
-
-
-    rules=gen_gctf_rules(gctf_model)
+    rules=gen_gctf_rules(tf_model)
 
     all_contract_dims = {};
     for r = 1:(length(rules)/2)
 
-        cd = get_contraction_dims(gctf_model, ...
+        cd = get_contraction_dims(tf_model, ...
                                   rules{(r-1)*2+1}, ...
                                   rules{(r-1)*2+2} );
 
