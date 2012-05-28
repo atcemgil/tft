@@ -9,11 +9,10 @@ G = server.ubigraph
 
 G.clear()
 
-#p = "[ [], [ 1 ]  , [ 2,6 ]  , [ 3,5,7 ]  , [ 2,8 ]  , [ 1 ]  , [ 6,8 ]  , [ 1 ] ]"
 p = jsonpickle.decode(sys.argv[1])
-#l = '[ "pqr", "pq" , "p", "", "q", "pr", "r" , "qr"]'
 l = jsonpickle.decode(sys.argv[2].replace("'",'"'))
 c = jsonpickle.decode(sys.argv[3])
+global_min_path = jsonpickle.decode(sys.argv[4])
 
 print "plotting model with p"
 print p
@@ -25,6 +24,10 @@ for ind, label in enumerate(l):
   v = G.new_vertex()
   G.set_vertex_attribute(v, "label", label + " (" +str(c[ind])+ ")" )
   G.set_vertex_attribute(v, "fontsize", "15")
+  if ind == 0:
+    G.set_vertex_attribute(v, "color", "#ff0000")
+  if (ind+1) in global_min_path:
+    G.set_vertex_attribute(v, "color", "#00FF00")
   node_list.append(v)
 
 for node_ind, parent_inds in enumerate(p):

@@ -2,7 +2,7 @@
 % contract with returns a new cell with contracted dimension
 % chracters
 
-function [newdims] = get_contracted_dims(dims, contract_char)
+function [newdims] = get_contracted_dims(tf_model, dims, contract_char)
 
 newdims={};
 
@@ -21,4 +21,6 @@ for i=1:length(dims)
     end
 end
 
-newdims{count} = contracted_dim_chars;
+newdims{count} = order_index_chars(tf_model, contracted_dim_chars);
+
+newdims = unique(newdims);

@@ -6,6 +6,7 @@ classdef ElimState
 
         % index of parent ElimState in the array
         parents=[];
+        children=[];
     end
 
     methods
@@ -33,6 +34,7 @@ classdef ElimState
         end
 
         function [obj] = gen_cost(obj, tf_model)
+            obj.cost=0;
             for i = 1:length(obj.index_list)
                 obj.cost = obj.cost + get_temp_factor_size(tf_model, obj.index_list{i});
             end
