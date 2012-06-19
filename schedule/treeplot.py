@@ -2,12 +2,6 @@ import sys
 import jsonpickle
 import xmlrpclib
 
-# Create an object to represent our server.
-server_url = 'http://127.0.0.1:20738/RPC2'
-server = xmlrpclib.Server(server_url)
-G = server.ubigraph
-
-G.clear()
 
 p = jsonpickle.decode(sys.argv[1])
 l = jsonpickle.decode(sys.argv[2].replace("'",'"'))
@@ -18,6 +12,15 @@ print "plotting model with p"
 print p
 print "labels"
 print l
+
+
+# Create an object to represent our server.
+server_url = 'http://127.0.0.1:20738/RPC2'
+server = xmlrpclib.Server(server_url)
+G = server.ubigraph
+
+G.clear()
+
 
 node_list=[]
 for ind, label in enumerate(l):
