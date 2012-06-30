@@ -54,6 +54,7 @@ X.isObserved=1;
 X.dims=[dim_i dim_j dim_k];
 
 tucker_model = TFModel;
+tucker_model.name = 'Tucker3';
 tucker_model.factors = [A B C G X];
 tucker_model.dims=[dim_i dim_j dim_k dim_p dim_q dim_r];
 
@@ -77,6 +78,7 @@ p_C.isLatent=1;
 p_C.dims=[dim_k dim_r];
 
 parafac_model = TFModel;
+parafac_model.name = 'Parafac';
 parafac_model.factors = [p_A p_B p_C X];
 parafac_model.dims=[dim_i dim_j dim_k dim_r];
 
