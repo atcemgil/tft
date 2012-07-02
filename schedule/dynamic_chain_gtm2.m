@@ -7,13 +7,12 @@ initmodel = tucker_model;
 models = [initmodel];
 
 for s=1:size(all_sequences,1)
-
     parent=1; % reset parent
 
     for d=1:size(all_sequences,2)
-
         newmodel = models(parent).contract(all_sequences(s,d));
 
+        % memoization
         found=0;
         for i=1:length(models)
             if models(i) == newmodel
