@@ -25,48 +25,135 @@ classdef TFModel
 
     methods
 
-        function [hat_X] = pltf(obj, iternum, contraction_order)
+        function [hat_X] = pltf(obj, iternum)
         % performs PLTF update operations on the model
         % returns estimated TFFactor (\hat(X))
         % iternum: number of iterations
-        % contraction_order: array of TFDimension, if specified
         % defines order of contraction operations
 
             hat_X = obj.observed_factor;
-            hat_X.data = rand(size(hat_X.data));
+            hat_X.name = 'hat_X';
 
-            for alpha=1:length(obj.latent_factor_indices)
-                obj.factors(alpha).data = ...
-                    obj.factors(alpha).data  .* ...
-                    obj.delta(alpha, obj.observed_factor(obj.observed_factor) ./ ...
-                              hat_X, contraction_order)  ./ ...
-                    obj.delta(alpha, ones(size(hat_X.data)), contraction_order);
+            eval( [ 'global ' obj.observed_factor.get_data_name() ...
+                    ';' ] );
+            global hat_X_data;
+            hat_X.rand_init(obj.dims, 100);
+
+            mask = obj.observed_factor;
+            mask.name = 'mask';
+            global mask_data;
+            mask_data = ones(size(hat_X_data));
+
+            KL=zeros(1,iternum);
+            for iter = 1:iternum
+                for alpha=1:length(obj.latent_factor_indices)
+                    % access global data
+                    X_name = ...
+                        obj.factors(obj.observed_factor_index) ...
+                        .get_data_name();
+                    eval(['global ' X_name ';']);
+                    Z_alpha_name = ...
+                        obj.factors(alpha).get_data_name();
+                    eval( [ 'global ' Z_alpha_name ';' ] );
+
+
+
+
+                    % recalculate hat_X
+                    newmodel = obj;
+
+                    % perform contraction
+                    newmodel=newmodel.contract_all();
+
+                    % store result in hat_X_data
+                    result_name = ...
+                        newmodel.get_first_non_observed_factor() ...
+                        .get_data_name();
+                    eval(['global ' result_name]);
+                    eval(['hat_X_data = ' result_name ';' ] ); 
+
+
+
+                    % store X / hat_X in hat_X data
+                    eval( [ 'hat_X_data  =  ' ...
+                            X_name ...
+                            ' ./ ' ...
+                            ' hat_X_data ;' ] );
+
+
+                    % generate D1
+                    obj.delta(alpha, 'D1_data', hat_X);
+
+                    % generate D2
+                    obj.delta(alpha, 'D2_data', mask);
+
+                    % update Z_alpha
+                    global D1_data D2_data;
+                    'bura'
+                    eval( [ Z_alpha_name '=' Z_alpha_name ' .* ' ...
+                            'D1_data'                     ' ./ ' ...
+                            'D2_data ' ] );
+
+
+                    % calculate KL divergence
+                    eval ( [ 'KL(iter) = sum(sum(sum( (hat_X_data .* ' X_name ') .* ' ...
+                             ' (log( (hat_X_data .* ' X_name ') ) - ' ...
+                             'log(' X_name ...
+                             ') ) - (hat_X_data .* ' X_name ')' ...
+                             '+ ' X_name ...
+                             ')));' ]);
+
+                end
             end
+
+            plot(KL)
         end
 
-        function [] = delta(obj, alpha, A, contraction_order)
+        function [] = delta(obj, alpha, output_name, A)
         % PLTF delta function implementation
         % alpha: index of latent factor in TFModel.factors array
         % which will be updated
-        % A: operand element of delta function
-        % contraction_order: array of TFDimension defines order of
-        % contraction operations
-
-            for c = 1:length(contraction_order)
-                % for each contraction dimension
-                %   find latent and temporary factors using this
-                %   dimension perform multiplication and
-                %   contraction with these elements and delta
-                %   operand factor A, generating any necessary
-                %   temporary factors
-                
-                
-            end
+        % name: unique name used as the name of calculated delta
+        % factor data
+        % A: operand element of delta function assumed all ones if
+        % not given
             
+            % create new model for delta operation
+            d_model = obj;
+
+            % remove observed factor
+            d_model.factors(d_model.observed_factor_index) = [];
+
+            % add Z_alpha as new observed factor
+            d_model.factors(alpha).isLatent = 0;
+            d_model.factors(alpha).isObserved= 1;
+
+            % if given, add A as a new latent factor
+            if nargin == 4
+                A.isLatent = 1;
+                A.isObserved = 0;
+                d_model.factors = [d_model.factors A];
+            end
+
+            % perform contraction
+            'delta contract_all'
+            d_model.factors.name
+            d_model.factors.isObserved
+            d_model=d_model.contract_all();
+            d_model.factors.dims
+
+            eval( [ 'global ' output_name ] );
+            eval( [ 'global ' ...
+                    d_model.get_first_non_observed_factor().get_data_name() ...
+                  ] );
+
+            eval( [ output_name '=' ...
+                    d_model.get_first_non_observed_factor().get_data_name() ...
+                    ';' ]);
         end
 
         function [r] = eq(a,b)
-            r = logical(0);
+            r = false;
 
             if length(a.factors) == length(b.factors)
                 for f_a = 1:length(a.factors)
@@ -83,7 +170,7 @@ classdef TFModel
                     end
                 end
 
-                r = logical(1);
+                r = true;
             end
         end
 
@@ -94,7 +181,7 @@ classdef TFModel
         % the dimension
 
             if isa(dim, 'TFDimension')
-                dim = dim.name
+                dim = dim.name;
             elseif isa(dim, 'char') || isa(dim, 'cell')
                 dim = char(dim);
             else
@@ -130,6 +217,11 @@ classdef TFModel
             tmp.isTemp = 1;
             tmp.name = 'tmp';
             name={};
+            ['contracting dim ' num2str(dim)]
+            ['factors ']
+            obj.factors.name
+            ['contracted factor inds ' num2str(contracted_factor_inds)]
+            
             for cfii = 1:length(contracted_factor_inds)
                 % for each dimension of the contracted factor
                 for cfi_dim = 1:length(newmodel.factors(contracted_factor_inds(cfii)).dims)
@@ -159,18 +251,104 @@ classdef TFModel
                 tmp.name = [tmp.name '_' char(name(d))];
             end
             tmp.name = [tmp.name '_minus_' dim];
+
+
+
+
+            eval( [ 'global ' tmp.get_data_name()  ] );
+            ['tmp name ' tmp.get_data_name ]
+
+            if length(contracted_factor_inds) == 1
+                % no multiplication
+                eval( [ 'global ' ...
+                        obj.factors(contracted_factor_inds(1)) ...
+                        .get_data_name() ] );
+                eval( [ tmp.get_data_name() ' = ' ...
+                        obj.factors(contracted_factor_inds(1)) ...
+                        .get_data_name() ';'] );
+            else
+
+                % multiply first two into tmp data
+                ['multiply 1 ' ...
+                 obj.factors(contracted_factor_inds(1)) ...
+                 .get_data_name() ' ' ...
+                 obj.factors(contracted_factor_inds(2)).get_data_name() ...
+                ]
+
+                eval( [ 'global' ...
+                        ' ' obj.factors(contracted_factor_inds(1)).get_data_name() ...
+                        ' ' obj.factors(contracted_factor_inds(2)).get_data_name() ] );
+
+                ['size of operands 1 ']
+                eval(['size(' ...
+                      obj.factors(contracted_factor_inds(1)) ...
+                      .get_data_name() ')']);
+                eval(['size(' ...
+                      obj.factors(contracted_factor_inds(2)) ...
+                      .get_data_name() ')']);
+
+
+
+                eval( [ tmp.get_data_name() ' = bsxfun (@times, ' ...
+                        obj.factors(contracted_factor_inds(1)).get_data_name() ', '...
+                        obj.factors(contracted_factor_inds(2)).get_data_name() ');' ...
+                      ] );
+
+                % multiply tmp data with other factors
+                for cfii = 3:length(contracted_factor_inds)
+                    ['multiply 2' ...
+                     obj.factors(contracted_factor_inds(cfii)) ...
+                     .get_data_name()]
+
+                    ['size of operands 2']
+                    eval(['size(' tmp.get_data_name() ')']);
+                    eval(['size(' ...
+                          obj.factors(contracted_factor_inds(cfii)) ...
+                          .get_data_name() ')']);
+
+
+                    eval( [ 'global '...
+                            obj.factors(contracted_factor_inds(cfii)) ...
+                            .get_data_name() ] );
+                    eval( [ tmp.get_data_name() ' = bsxfun (@times, ' ...
+                            tmp.get_data_name() ','...
+                            obj.factors(contracted_factor_inds(cfii)) ...
+                            .get_data_name() ');' ] );
+                end
+
+                ['size of tmp data 1']
+                eval(['size(' tmp.get_data_name ')']);
+
+            end
+
+
+            % sum contraction dimensions on tmp data
+
+            %['tmp dims' tmp.dims.name]
+            %['observed dims' obj.observed_factor.dims.name]
+
+            
+            con_dim_index = obj.get_dimension_index(dim)
+
+            eval( [ tmp.get_data_name() ' = sum( ' ...
+                    tmp.get_data_name() ', ' ...
+                    num2str(con_dim_index) ');'] );
+
+            ['size of tmp data 2']
+            eval(['size(' tmp.get_data_name ')']);
+            
             newmodel.factors = [newmodel.factors tmp];
 
 
             % remove dim from newmodel's dims array
-            newdims=[];
-            for d = 1:length(newmodel.dims)
-                if newmodel.dims(d) == char(dim)
-                else
-                    newdims = [ newdims newmodel.dims(d) ];
-                end
-            end
-            newmodel.dims = newdims;
+%            newdims=[];
+%            for d = 1:length(newmodel.dims)
+%                if newmodel.dims(d) == char(dim)
+%                else
+%                    newdims = [ newdims newmodel.dims(d) ];
+%                end
+%            end
+%            newmodel.dims = newdims;
 
 
             % remove contracted factors
@@ -256,6 +434,27 @@ classdef TFModel
             end
         end
 
+        function [factor] = get_first_non_observed_factor(obj)
+        % returns first non observed factor index, used to return
+        % index of the output factor
+            for f = 1:length(obj.factors)
+                if obj.factors(f).isObserved == 0
+                    factor = obj.factors(f);
+                    return
+                end
+            end
+        end
+
+        function [ind] = get_first_non_observed_factor_index(obj)
+        % returns first non observed factor index, used to return
+        % index of the output factor
+            for f = 1:length(obj.factors)
+                if obj.factors(f).isObserved == 0
+                    ind = f;
+                    return
+                end
+            end
+        end
 
         function [ind] = find_cell_char(obj, chars)
         % returns index of a given char array in object's dimension array
@@ -264,15 +463,26 @@ classdef TFModel
                     return
                 end
             end
-            ind=0
+            ind=0;
         end
+
+       function [r] = get_dimension_index(obj, dim)
+        % returns index of dimension dim in obj.dims if obj
+        % contains TFDimension (or char) dim returns 0 otherwise
+
+            r=0;
+            for d = 1:length(obj.dims)
+                if obj.dims(d) == dim
+                    r=d;
+                    break;
+                end
+            end           
+       end
 
         function [ordered_index_chars] = order_dims(obj, ...
                                                     dims_array)
             % order given cell of dimension names according to
             % factor.dims order
-
-            dims_array
 
             tmp=cell(length(dims_array), 3);
 
@@ -285,6 +495,30 @@ classdef TFModel
 
             tmp=sortrows(tmp,3); % sort by the order of the model indices
             ordered_index_chars=tmp(:,1)';
+        end
+
+
+        function [newmodel] = contract_all(obj)
+            contract_dims = obj.get_contraction_dims();
+            ['contract dims name ' contract_dims.name]
+            newmodel = obj;
+            for i = 1:length(contract_dims)
+                newmodel = newmodel.contract(contract_dims(i));
+            end
+
+
+
+            % store final result in observed factor's global data
+            %result_name = ...
+            %    newmodel.get_first_non_observed_factor() ...
+            %    .get_data_name();
+
+            % observed_name = obj.observed_factor.get_data_name();
+
+            %eval([ 'global ' result_name ' ' observed_name ]);
+            %eval([ observed_name ' = ' result_name ';']);
+            %eval([ observed_name ]);
+
         end
 
 
@@ -318,17 +552,19 @@ classdef TFModel
 
                 if found == 0
                     contract_dims = [contract_dims obj.dims(d_a)];
+                    %['add '  obj.dims(d_a).name]
                 end
             end
 
+            %['return ' contract_dims.name]
             %contract_dims = obj.order_dims(unique(contract_dims));
         end
 
         function [factor_inds] = latent_factor_indices(obj)
-            factor_inds=[]
+            factor_inds=[];
             for f=1:length(obj.factors)
                 if obj.factors(f).isLatent
-                    factor_inds = [ factor_inds f ]
+                    factor_inds = [ factor_inds f ];
                 end
             end
         end
@@ -343,40 +579,49 @@ classdef TFModel
             end
         end
 
-        function [factor] = observed_factor(obj)
-        % returns first observed factor (useful for PLTF operations)
-            factor
+        function [factor_ind] = observed_factor_index(obj)
+            factor_ind=0;
             for f=1:length(obj.factors)
                 if obj.factors(f).isObserved
-                    factor = obj.factors(f)
+                    factor_ind = f;
+                    return
+                end
+            end
+        end
+
+        function [factor] = observed_factor(obj)
+        % returns first observed factor (useful for PLTF operations)
+            for f=1:length(obj.factors)
+                if obj.factors(f).isObserved
+                    factor = obj.factors(f);
                     return
                 end
             end
         end
 
         function [factors] = observed_factors(obj)
-            factors=[]
+            factors=[];
             for f=1:length(obj.factors)
                 if obj.factors(f).isObserved
-                    factors = [ factors obj.factors(f) ]
+                    factors = [ factors obj.factors(f) ];
                 end
             end
         end
 
         function [factors] = input_factors(obj)
-            factors=[]
+            factors=[];
             for f=1:length(obj.factors)
                 if obj.factors(f).isInput
-                    factors = [ factors obj.factors(f) ]
+                    factors = [ factors obj.factors(f) ];
                 end
             end
         end
 
         function [factors] = temp_factors(obj)
-            factors=[]
+            factors=[];
             for f=1:length(obj.factors)
                 if obj.factors(f).isTemp
-                    factors = [ factors obj.factors(f) ]
+                    factors = [ factors obj.factors(f) ];
                 end
             end
         end

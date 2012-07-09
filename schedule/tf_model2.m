@@ -53,10 +53,19 @@ X.name='X';
 X.isObserved=1;
 X.dims=[dim_i dim_j dim_k];
 
+
 tucker_model = TFModel;
 tucker_model.name = 'Tucker3';
 tucker_model.factors = [A B C G X];
 tucker_model.dims=[dim_i dim_j dim_k dim_p dim_q dim_r];
+
+
+all_dims=tucker_model.dims;
+A.rand_init(all_dims, 100);
+B.rand_init(all_dims, 100);
+C.rand_init(all_dims, 100);
+G.rand_init(all_dims, 100);
+X.rand_init(all_dims, 100);
 
 
 
@@ -66,21 +75,27 @@ p_A=TFFactor;
 p_A.name='p_A';
 p_A.isLatent=1;
 p_A.dims=[dim_i dim_r];
+p_A.rand_init(all_dims, 100);
 
 p_B=TFFactor;
 p_B.name='p_B';
 p_B.isLatent=1;
 p_B.dims=[dim_j dim_r];
+p_B.rand_init(all_dims, 100);
 
 p_C=TFFactor;
 p_C.name='p_C';
 p_C.isLatent=1;
 p_C.dims=[dim_k dim_r];
+p_C.rand_init(all_dims, 100);
 
 parafac_model = TFModel;
 parafac_model.name = 'Parafac';
 parafac_model.factors = [p_A p_B p_C X];
 parafac_model.dims=[dim_i dim_j dim_k dim_r];
+
+
+
 
 
 
