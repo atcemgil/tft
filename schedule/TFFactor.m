@@ -69,7 +69,7 @@ classdef TFFactor
 
         function [] = rand_init(obj, all_dims, imax)
 
-            eval( [ 'global ' obj.get_data_name() ] );
+            eval( [ 'global ' obj.get_data_name() ';' ] );
             sz = '';
             for ad = 1:length(all_dims)
                 if ad ~= 1

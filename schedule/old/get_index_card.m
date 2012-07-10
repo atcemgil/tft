@@ -1,5 +1,10 @@
-function num = get_index_card(gctf_model, index_char)
+% returns cardinality of an index
 
-ind_chars=gctf_model{2};
-ind_cards=gctf_model{3};
-num = ind_cards(find(ind_chars==index_char));
+function [card] = get_index_card(tf_model, index_char)
+
+for i = 1:length(tf_model{3})
+    if tf_model{3}(i).index_char == index_char
+        card = tf_model{3}(i).cardinality;
+        return
+    end
+end

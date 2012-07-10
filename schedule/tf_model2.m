@@ -97,8 +97,28 @@ parafac_model.dims=[dim_i dim_j dim_k dim_r];
 
 
 
-
-
 % GCTF model from tucker + parafac
 gctfmodel=GCTFModel;
 gctfmodel.tfmodels=[tucker_model parafac_model];
+
+
+
+% VISUALIZE
+
+
+[dn fn edges] = tucker_model.print();
+system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+
+pause
+
+[dn fn edges] = parafac_model.print();
+system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+
+pause
+
+% visualize GCTF model
+[dn fn edges] = gctfmodel.print();
+system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+
+
+

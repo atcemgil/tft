@@ -31,7 +31,7 @@ for s=1:size(all_sequences,1)
             parent = length(models);
 
             % mark last model for backward message
-            if length(newmodel.get_contraction_dims()) == 0
+            if length(newmodel.get_current_contraction_dims) == 0
                 lastmodel = length(models);
             end
 
@@ -102,12 +102,12 @@ for s=1:length(models)
     end
 
 
-    if length(models(s).get_contraction_dims()) == 0
+    if length(models(s).get_current_contraction_dims) == 0
         l = [ l ' '''' ' ];
     else
         l = [ l ' ''' ...
-              char(TFDimensionList2cell(models(s).get_contraction_dims()))' '''' ];
-        
+              char(models(s).get_current_contraction_dims())' '''' ...
+            ];
     end
 
     c=[c num2str(models(s).cost) ];
