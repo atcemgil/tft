@@ -105,20 +105,21 @@ gctfmodel.tfmodels=[tucker_model parafac_model];
 
 % VISUALIZE
 
+if exist('VISUALIZE')
+    [dn fn edges] = tucker_model.print();
+    system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 
-[dn fn edges] = tucker_model.print();
-system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+    pause
 
-pause
+    [dn fn edges] = parafac_model.print();
+    system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 
-[dn fn edges] = parafac_model.print();
-system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+    pause
 
-pause
+    % visualize GCTF model
+    [dn fn edges] = gctfmodel.print();
+    system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 
-% visualize GCTF model
-[dn fn edges] = gctfmodel.print();
-system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
-
+end
 
 
