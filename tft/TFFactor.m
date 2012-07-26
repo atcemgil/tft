@@ -3,8 +3,8 @@ classdef TFFactor
     properties
         name='';
 
-        dims=[]; % array of TFDimension
-        data;    % contains data of this factor
+        dims;  % array of TFDimension
+        %data;  % contains data of this factor
 
         isLatent=0;
         isObserved=0;
@@ -14,6 +14,45 @@ classdef TFFactor
 
     methods
 
+        function obj = TFFactor(varargin)
+            p = inputParser;
+            addParamValue(p, 'name', '', @isstr);
+            types={'latent', 'observed', 'temp'};
+            addParamValue(p, 'type', 'latent', @(x) ...
+                          any(validatestring(x,types)));
+            addParamValue(p, 'isClamped', 0, @islogical);
+            addParamValue(p, 'dims', [], @isvector);
+            %addParamValue(p, 'data', [], @isvector);
+
+            parse(p,varargin{:});
+
+            % check if all dims elements are TFDimension objects
+            for i = 1:length(p.Results.dims)
+                if ~isa(p.Results.dims(i), 'TFDimension')
+                    err = MException( ...
+                        ['TFFactor:DimensionNotTFDimension'], ...
+                        ['Dimensions of TFFactor must be ' ...
+                         'TFDimension objects']);
+                    throw(err);
+                end
+            end
+            obj.dims = p.Results.dims;
+
+            obj.name = p.Results.name;
+
+            if strcmp(p.Results.type, 'latent')
+                obj.isLatent = 1;
+            elseif strcmp(p.Results.type, 'observed')
+                obj.isObserved = 1;
+            elseif strcmp(p.Results.type, 'temp')
+                obj.isTemp = 1;
+            end
+
+            obj.isTemp = p.Results.isClamped;
+
+        end
+
+
         function [size] = get_element_size(obj)
         % returns number of elements for this factor
             size=1;
@@ -21,6 +60,13 @@ classdef TFFactor
                 size = size * obj.dims(d).cardinality;
             end
         end
+
+
+        function [obj, idx] = sort(obj, varargin)
+            [~,idx] = sort([obj.name],varargin{:}); 
+            obj = obj(idx);
+        end
+
 
         function r = eq(a,b)
             r=false;
@@ -50,6 +96,12 @@ classdef TFFactor
             end
         end
 
+
+        function r = ne(a,b)
+            r = ~(a==b);
+        end
+
+
         function [r] = got_dimension(obj, dim)
         % returns index of dimension dim in obj.dims if obj
         % contains TFDimension (or char) dim returns 0 otherwise
@@ -63,9 +115,11 @@ classdef TFFactor
             end
         end
 
+
         function [name] = get_data_name(obj)
             name = [obj.name '_data'];
         end
+
 
         function [] = rand_init(obj, all_dims, imax)
 
@@ -117,7 +171,7 @@ classdef TFFactor
                 end
             end
         end
-        
+
 
     end
 

@@ -1,3 +1,4 @@
+addpath('..')
 tf_model2
 
 all_sequences= ...
@@ -123,4 +124,4 @@ for i=1:length(global_min_path)
 end
 
 
-system(['python treeplot.py "[' p ']" "[' l ']" "[' c ']" "[' g ']"' ]);
+system(['python ../visualize/treeplot.py "[' p ']" "[' l ']" "[' c ']" "[' g ']"' ]);

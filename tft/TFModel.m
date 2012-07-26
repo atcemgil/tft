@@ -7,23 +7,59 @@ classdef TFModel
         factors=[]; % array of TFFactor
 
 
-
         dims=[];    % array of TFDimension used by factors defines
                     % order of dimensions on memory
 
-
-        tree_index = 0; % index of current model in externally
-                        % stored model list
-
-        parent_tree_indices=[]; % array of integers representing
-                                % indices of parents of this
-                                % model. list of models are assumed
-                                % to be stored externally
-        children_tree_indices=[];
         cost=0;
+
+
+        %tree_index = 0; % index of current model in externally
+        %                % stored TFModel list
+        %
+        %parent_tree_indices=[]; % array of integers representing
+        %                        % indices of parents of this
+        %                        % model. list of models are assumed
+        %                        % to be stored externally
+        %children_tree_indices=[];
     end
 
     methods
+
+        function obj = TFModel(varargin)
+            p = inputParser;
+            addParamValue(p, 'name', '', @isstr);
+            addParamValue(p, 'factors', [], @isvector);
+            addParamValue(p, 'dims', [], @isvector);
+
+            parse(p,varargin{:});
+
+            % check if all dims elements are TFDimension objects
+            for i = 1:length(p.Results.dims)
+                if ~isa(p.Results.dims(i), 'TFDimension')
+                    err = MException( ...
+                        ['TFModel:DimensionNotTFDimension'], ...
+                        ['Dimensions of TFModel must be ' ...
+                         'TFDimension objects']);
+                    throw(err);
+                end
+            end
+            obj.dims = p.Results.dims;
+
+            % check if all factors are TFFactor objects
+            for i = 1:length(p.Results.factors)
+                if ~isa(p.Results.factors(i), 'TFFactor')
+                    err = MException( ...
+                        ['TFModel:FactorsNotTFFactor'], ...
+                        ['Factors of TFModel must be ' ...
+                         'TFFactor objects']);
+                    throw(err);
+                end
+            end
+            obj.factors = p.Results.factors;
+
+            obj.name = p.Results.name;
+
+        end
 
         function [] = pltf(obj, iternum)
         % performs PLTF update operations on the model
@@ -173,6 +209,236 @@ classdef TFModel
             end
         end
 
+        function [uncontraction_dims] = get_uncontraction_dims(obj)
+        % returns list of TFDimension objects representing
+        % dimensions which are required to be added to the current
+        % TFModel object in order to reach initial model where
+        % uncontraction_dims = {}
+        % Calculation is performed as follows: 
+        % uncontraction_dims = contraction_dims - current_contraction_dims
+
+            contraction_dims = obj.get_contraction_dims();
+            current_contraction_dims = ...
+                obj.get_current_contraction_dims();
+            uncontraction_dims = [];
+
+            for cdi = 1:length(contraction_dims)
+                found=0;
+                for ccdi = 1:length(current_contraction_dims)
+                    if contraction_dims(cdi) == ...
+                            char(current_contraction_dims(ccdi))
+                        found=1;
+                        break;
+                    end
+                end
+                if ~found
+                    uncontraction_dims = [ uncontraction_dims ...
+                                        contraction_dims(cdi) ];
+                end
+            end
+        end
+
+
+        function [graph] = schedule_dp(obj)
+        % returns a tree of TFModel generated as a result of the
+        % search for least memory consuming contraction sequence
+        % with a dynamic programming approach
+
+            output_dims = obj.get_contraction_dims();
+            contraction_dims = obj.get_contraction_dims();
+            
+            % generate final state of contraction operation to be
+            % used as the initial state of dp search
+            end_node = obj.contract_all();
+
+            graph = TFGraph;
+            process_nodes = [end_node];
+            processing_node = 1;
+
+            while length(process_nodes) >= processing_node
+                cur_node = process_nodes(processing_node);
+
+                % init graph.node_list
+                if length(graph.node_list) == 0
+                    graph.node_list = [cur_node];
+                    graph=graph.clear_edges();
+                end
+
+                uncontraction_dims = cur_node.get_uncontraction_dims();
+                for udi = 1:length(uncontraction_dims)
+                    new_node = cur_node.uncontract(obj, ...
+                                                   uncontraction_dims(udi));
+
+
+                    'buney 0'
+                    new_node.factors(3).dims.name
+
+                    % memoization
+                    nnidx = graph.exists(new_node);
+                    if nnidx
+                        graph = graph.update_node(cur_node, new_node, nnidx);
+                    else
+                        'buney 1'
+                        new_node.factors(3).dims.name
+                        graph = graph.append_node(cur_node, new_node);
+                        process_nodes = [ process_nodes new_node ];
+                        'INSERT '
+                        length(graph.node_list)
+                        'buney 2'
+                        graph.node_list(end).factors(3).dims.name
+
+                    end
+                end
+
+                processing_node = processing_node + 1;
+
+            end
+
+        end
+
+
+        function [newmodel] = uncontract(obj, orig_model, dim)
+        % returns a new TFModel generated by adding given
+        % TFDimension object dim to the model.
+        % dim: TFDimension object to uncontract
+        % orig_model: provides original non-contracted model data
+
+            newmodel = obj;
+
+            newmodel.name = [ newmodel.name  ...
+                              '_uncontract_' dim.name ];
+
+            uncontract_dims = obj.get_uncontraction_dims();
+            other_dims = []; % already contracted dimensions
+            for i=1:length(uncontract_dims)
+                if uncontract_dims(i) ~= dim
+                    other_dims = [ other_dims ...
+                                   uncontract_dims(i) ];
+                end
+            end
+
+            % reset newmodel's factors
+            newmodel.factors = [];
+
+            % stores factors which will contribute to the temporary
+            % factor
+            tmp_factor_parents = [];
+
+
+            % populate newmode.factors with factors independant
+            % from uncontraction operation
+            for fi = 1:length(orig_model.factors)
+                found = 0;
+                for fdi = 1:length(orig_model.factors(fi).dims)
+                    for odi = 1:length(other_dims)
+                        % if any factor contains any one of the
+                        % other_dims can not use it as it is, must
+                        % create a temporary factor for those
+                        % here we identify factors we will use
+                        % without modification
+
+                        if other_dims(odi) == ...
+                                orig_model.factors(fi).dims(fdi)
+                            found=1;
+                            break
+                        end
+                    end
+                    if found, break; end
+                end
+
+                if ~found
+                    % if other_dims are not found in this factor then
+                    % use this factor as it is in the new node
+
+                    newmodel.factors = [newmodel.factors ...
+                                        orig_model.factors(fi) ];
+                else
+                    % in other case this factor will be inspected
+                    % further to generate temporary factor
+                    tmp_factor_parents = [ tmp_factor_parents ...
+                                        orig_model.factors(fi) ];
+                end
+            end
+
+            % make sure factors are unique
+            %newmodel.factors = unique(newmodel.factors);
+
+            % inspect tmp_factor_parents and generate a temporary
+            % model
+            tmpf = TFFactor;
+            tmpf.isTemp = 1;
+            tmpf.name = 'tmp';
+            names={};
+            tmpf.dims = [];
+
+            % add all dimensions of all parent factors
+            for tfpi = 1:length(tmp_factor_parents)
+                for di = 1:length(tmp_factor_parents(tfpi).dims)
+                    if tmp_factor_parents(tfpi).isLatent
+                        % if dimension is not one of the other_dims
+                        % then add it to the temporary factor
+                        found = 0;
+                        for odi = 1:length(other_dims)
+                            if other_dims(odi) == ...
+                                    tmp_factor_parents(tfpi).dims(di)
+                                found = 1;
+                                break;
+                            end
+                        end
+
+
+                        if ~found
+                            % if not already added
+                            found2 = 0;
+                            for tmpfdind = 1:length(tmpf.dims)
+                                if tmpf.dims(tmpfdind) == ...
+                                        tmp_factor_parents(tfpi).dims(di)
+                                    found2 = 1;
+                                    break;
+                                end
+                            end
+
+                            if ~found2
+
+                                tmpf.dims = [ tmpf.dims ...
+                                              tmp_factor_parents(tfpi) ...
+                                              .dims(di)]
+                                names = [ names ...
+                                          tmp_factor_parents(tfpi) ...
+                                          .dims(di).name];
+
+                            end
+                        end
+                    end
+                end
+            end
+
+            % if no names are found then there is no temporary
+            % factor added
+            if length(names)
+                % make sure tmp.factor dims are unique
+                %'önce'
+                %tmpf.dims.name
+                %tmpf.dims = unique(tmpf.dims);
+                %'sonra'
+                %tmpf.dims.name
+                
+                names=obj.order_dims(unique(names));
+                for d = 1:length(names)
+                    tmpf.name = [ tmpf.name '_' char(names(d)) ];
+                end
+                %tmpf.name = [tmpf.name '_minus_' ? ];
+                
+                newmodel.factors = [ newmodel.factors tmpf ];
+
+                newmodel.update_cost();
+            end
+
+            'uncontract end'
+            newmodel.factors.name
+
+        end
+
         function [newmodel] = contract(obj, dim)
         % returns a new TFModel generated by contracting obj with
         % dim which may add new temporary factors. 
@@ -307,7 +573,16 @@ classdef TFModel
         end
 
 
-        function [dn fn all_edges] = print(obj)
+        function [] = update_cost(obj)
+            obj.cost = 0;
+            for fi = 1:length(obj.factors)
+                obj.cost = obj.cost + ...
+                    obj.factors(fi).get_element_size();
+            end
+        end
+
+
+        function [dn fn all_edges] = print_ubigraph(obj)
         % returns a string to be used by fgplot
 
         % add dimension nodes
@@ -494,8 +769,8 @@ classdef TFModel
         function [contract_dims] = get_current_contraction_dims(obj)
         % returns cell of dimensions which must be contracted to
         % calculate output factor(s) by using current factors to
-        % calculate all dimension not model.dims which is always
-        % fixed to maximum possible dimension list.
+        % calculate all dimension not model.dims. (model.dims is always
+        % fixed to maximum possible dimension list.)
 
             output_chars = {};
             for f=1:length(obj.factors)
@@ -614,6 +889,31 @@ classdef TFModel
                     factors = [ factors obj.factors(f) ];
                 end
             end
+        end
+
+        function [] = rand_init_latent_factors(obj, type, imax)
+
+            if ~strcmp(type, 'all') && ~strcmp(type, 'nonClamped')
+                throw(MException('TFModel:WrongInitType', ...
+                                 ['Supported init type values: all, ' ...
+                                  'nonClamped']));
+            end
+
+            for fi=1:length(obj.latent_factor_indices)
+
+                if strcmp(type, 'all') || ...
+                        ( strcmp(type, 'nonClamped') && ...
+                          obj.factors(fi).isInput == 0 )
+                    
+                    if nargin==2
+                        obj.factors(fi).rand_init(obj.dims);
+                    else
+                        obj.factors(fi).rand_init(obj.dims, imax);
+                    end
+
+                end
+            end
+
         end
 
     end

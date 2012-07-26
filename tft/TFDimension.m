@@ -1,11 +1,29 @@
 classdef TFDimension
 
     properties
-        name='';
-        cardinality=0;
+        name;
+        cardinality;
     end
 
     methods
+
+        function obj = TFDimension(varargin)
+            p = inputParser;
+            addParamValue(p, 'name', '', @isstr);
+            addParamValue(p, 'cardinality', 0, @isnumeric);
+            parse(p,varargin{:});
+            obj.name = p.Results.name;
+            obj.cardinality = p.Results.cardinality;
+        end
+
+
+        %function [obj,idx,varargout]=sort(obj,varargin)
+        %varargout=cell(1,nargout-2);
+        %    [~,idx,varargout{:}]=sort([obj.name],varargin{:});
+        %        obj=obj(idx);
+        %end
+
+
         function r = eq(a,b)
             r=logical(0);
 
@@ -25,9 +43,10 @@ classdef TFDimension
                 acard=0;
                 bcard=0;
             else
-                display(['ERROR: unsupported input classes ' ...
-                        'a:' class(a) ' '...
-                        'b:' class(b) ' ']);
+                throw(MException('TFDimension:TypeError', ...
+                ['ERROR: unsupported input classes ' ...
+                 'a:' class(a) ' '...
+                 'b:' class(b) ' '] ));
             end
 
 
@@ -44,6 +63,13 @@ classdef TFDimension
                 r=logical(0);
             end
         end
+
+
+        function r = ne(a,b)
+            r = ~(a==b);
+        end
+
+
     end
 
 end
