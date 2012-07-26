@@ -43,6 +43,16 @@ classdef TFGraph
         end
 
 
+        function [m] = get_min_arriving_cost(obj, node_index)
+            A = obj.optimal_edges(:, node_index);
+            A(~A) = inf;
+            m = min(A);
+            if isinf(m)
+                m = 0;
+            end
+        end
+
+
         function [obj] = append_node(obj, parent_node, new_node)
         % adds a new node to the graph object
             obj.node_list = [obj.node_list new_node];
@@ -55,8 +65,10 @@ classdef TFGraph
                 display('ERROR: parent is not in the node_list')
             end
             obj.edges(parent_index, end) = 1;
+
             obj.optimal_edges(parent_index, end) = ...
-                parent_node.cost + new_node.cost;
+                obj.get_min_arriving_cost(parent_index) + ...
+                new_node.cost;
         end
 
 
@@ -70,7 +82,8 @@ classdef TFGraph
             obj.edges(pidx, nnidx) = 1;
 
             obj.optimal_edges(pidx, nnidx) = ...
-                parent_node.cost + child_node.cost;
+                obj.get_min_arriving_cost(pidx) + ...
+                child_node.cost;
         end
 
 
@@ -137,7 +150,7 @@ classdef TFGraph
                                 setdiff(obj ...
                                         .get_current_contraction_dims_string(i), ...
                                         obj.get_current_contraction_dims_string(j)) ...
-                                '" ];' char(10) ];
+                                '(' num2str(obj.optimal_edges(j,i))  ')" ];' char(10) ];
                     end
                 end
             end

@@ -257,6 +257,7 @@ classdef TFModel
 
             while length(process_nodes) >= processing_node
                 cur_node = process_nodes(processing_node);
+                cur_node = cur_node.update_cost_from_latent();
 
                 % init graph.node_list
                 if length(graph.node_list) == 0
@@ -268,25 +269,15 @@ classdef TFModel
                 for udi = 1:length(uncontraction_dims)
                     new_node = cur_node.uncontract(obj, ...
                                                    uncontraction_dims(udi));
-
-
-                    'buney 0'
-                    new_node.factors(3).dims.name
+                    new_node = new_node.update_cost_from_latent();
 
                     % memoization
                     nnidx = graph.exists(new_node);
                     if nnidx
                         graph = graph.update_node(cur_node, new_node, nnidx);
                     else
-                        'buney 1'
-                        new_node.factors(3).dims.name
                         graph = graph.append_node(cur_node, new_node);
                         process_nodes = [ process_nodes new_node ];
-                        'INSERT '
-                        length(graph.node_list)
-                        'buney 2'
-                        graph.node_list(end).factors(3).dims.name
-
                     end
                 end
 
@@ -402,11 +393,10 @@ classdef TFModel
 
                                 tmpf.dims = [ tmpf.dims ...
                                               tmp_factor_parents(tfpi) ...
-                                              .dims(di)]
+                                              .dims(di)];
                                 names = [ names ...
                                           tmp_factor_parents(tfpi) ...
                                           .dims(di).name];
-
                             end
                         end
                     end
@@ -431,11 +421,8 @@ classdef TFModel
                 
                 newmodel.factors = [ newmodel.factors tmpf ];
 
-                newmodel.update_cost();
+                newmodel = newmodel.update_cost_from_latent();
             end
-
-            'uncontract end'
-            newmodel.factors.name
 
         end
 
@@ -573,11 +560,12 @@ classdef TFModel
         end
 
 
-        function [] = update_cost(obj)
+        function [obj] = update_cost_from_latent(obj)
             obj.cost = 0;
-            for fi = 1:length(obj.factors)
+            lfi=obj.latent_factor_indices();
+            for fi = 1:length(lfi)
                 obj.cost = obj.cost + ...
-                    obj.factors(fi).get_element_size();
+                    obj.factors(lfi(fi)).get_element_size();
             end
         end
 
