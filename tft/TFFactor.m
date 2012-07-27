@@ -77,12 +77,25 @@ classdef TFFactor
             %a.isInput == b.isInput && ...
             %a.isTemp == b.isTemp
 
+
+            % from TFModel.eq:
+            % mark matched b factors
+            % if there are any unmarked -> inequal
+            % problematic case: 
+            % a.factors ( ip, jpi ) , b.factors (  ip, pi )
+            % b==a matches all b objects with a.factors(1)
+            % but a~=b !
+
+            b_marks = zeros(size(b.dims));
+
             if length(a.dims) == length(b.dims)% && ...
                 for d_a = 1:length(a.dims)
                     found = 0;
                     for d_b = 1:length(b.dims)
-                        if a.dims(d_a) == b.dims(d_b)
+                        if a.dims(d_a) == b.dims(d_b) && ...
+                                b_marks(d_b) == 0
                             found = 1;
+                            b_marks(d_b) = 1;
                             break;
                         end
                     end

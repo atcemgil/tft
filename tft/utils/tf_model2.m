@@ -27,7 +27,7 @@ C.rand_init(tucker_model.dims, 100) % init clamped
 
 % parafac model
 
-p_A=TFFactor('name', 'p_A', 'type', 'laten', 'dims', [dim_i dim_r]);
+p_A=TFFactor('name', 'p_A', 'type', 'latent', 'dims', [dim_i dim_r]);
 p_B=TFFactor('name', 'p_B', 'type', 'latent', 'dims', [dim_j dim_r]);
 p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);
 

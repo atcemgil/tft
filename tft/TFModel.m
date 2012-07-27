@@ -98,8 +98,16 @@ classdef TFModel
                     % recalculate hat_X
                     newmodel = obj;
 
+                    if iter==1 && alpha==1
+                        g = newmodel.schedule_dp();
+                        system([ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
+                                            ' dot -o /tmp/img.eps; ' ...
+                                            ' display  /tmp/img.eps ' ...
+                                            '& ' ] ] );
+                    end
+
                     % perform contraction
-                    newmodel=newmodel.contract_all();
+                    newmodel = newmodel.contract_all();
 
                     % store result in hat_X_data
                     result_name = ...
@@ -175,6 +183,10 @@ classdef TFModel
             end
 
             % perform contraction
+            g = d_model.schedule_dp();
+            system( [ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
+                                ' dot -o /tmp/img.eps ;  display  /tmp/img.eps; ' ] ] );
+
             d_model=d_model.contract_all();
 
             eval( [ 'global ' output_name ';'] );
@@ -190,12 +202,23 @@ classdef TFModel
         function [r] = eq(a,b)
             r = false;
 
+            % mark matched b factors
+            % if there are any unmarked -> inequal
+            % problematic case: 
+            % a.factors ( ip, jpi ) , b.factors (  ip, pi )
+            % b==a matches all b objects with a.factors(1)
+            % but a~=b !
+
+            b_marks = zeros(size(b.factors));
+
             if length(a.factors) == length(b.factors)
                 for f_a = 1:length(a.factors)
                     found = 0;
                     for f_b = 1:length(b.factors)
-                        if a.factors(f_a) == b.factors(f_b)
+                        if a.factors(f_a) == b.factors(f_b) && ...
+                                b_marks(f_b) == 0
                             found = 1;
+                            b_marks(f_b) = 1;
                             break
                         end
                     end
