@@ -1,3 +1,12 @@
+% Represents a single dimension
+%   Dimensions are represented with two attributes. Name of the
+%   dimension and cardinality of the dimension.
+%   
+%   Examples: 
+%   dim_i = TFDimension('name', 'i', 'cardinality', 5);
+%   dim_j = TFDimension('cardinality', 6, 'name', 'j'); 
+%
+% See also TFFactor, TFModel
 classdef TFDimension
 
     properties

@@ -1,9 +1,25 @@
+% Represents a PLTF factor 
+%   Factors are identified with their names of any length
+%   character array and dimension they occupy data in. dims array
+%   contains an array of TFDimension objects.
+%
+%   Depending on the input arguments 'latent', 'type' and
+%   'isClamped' internal flag variables are set. See examples for
+%   details
+%
+%   Examples:
+%   A = TFFactor('name', 'A', 'type', 'latent', 'dims', [dim_i dim_p]);
+%   C = TFFactor('name', 'C', 'type', 'latent', 'dims', [dim_k dim_r], 'isClamped', true);
+%   X = TFFactor('name', 'X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);
+%
+%   See also TFDimension, TFModel
+
 classdef TFFactor
 
     properties
-        name='';
-
-        dims;  % array of TFDimension
+        name = '';
+ 
+        dims = TFDimension();  % array of TFDimension
         %data;  % contains data of this factor
 
         isLatent=0;

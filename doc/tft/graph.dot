@@ -1,0 +1,17 @@
+/* Created by mdot for Matlab */
+digraph m2html {
+  TFDimension -> TFDimension;
+  TFFactor -> TFDimension;
+  TFFactor -> TFFactor;
+  TFGraph -> TFGraph;
+  TFGraph -> TFModel;
+  TFModel -> TFDimension;
+  TFModel -> TFFactor;
+  TFModel -> TFGraph;
+  TFModel -> TFModel;
+
+  TFDimension [URL="TFDimension.html"];
+  TFFactor [URL="TFFactor.html"];
+  TFGraph [URL="TFGraph.html"];
+  TFModel [URL="TFModel.html"];
+}

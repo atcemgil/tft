@@ -1,9 +1,17 @@
+% Represents a graph of TFModel objects. 
+%
+%   TFModel.schedule_dp() function generates trees of TFModel
+%   objects. TFGraph object stores generated TFModel objects in its
+%   node_list array and stores connectivity information in its
+%   edges half full binary matrix. Cost of moving along an edge is
+%   stored in the optimal_edges matrix.
+%
+%   See also TFModel
+
 classdef TFGraph
-% Class used to store graphs created using TFModels as nodes. Used
-% in contraction scheduling
 
     properties
-        node_list; % list TFModel objects
+        node_list = TFModel(); % list TFModel objects
         edges;     % half full binary matrix of node_list relations
 
         optimal_edges % half full minimal cost node_list edges

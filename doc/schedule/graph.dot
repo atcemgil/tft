@@ -1,0 +1,25 @@
+/* Created by mdot for Matlab */
+digraph m2html {
+  GCTFModel -> GCTFModel;
+  TFDimension -> TFDimension;
+  TFFactor -> TFFactor;
+  TFModel -> TFFactor;
+  TFModel -> TFModel;
+  dynamic_chain_gtm2 -> TFDimensionList2cell;
+  dynamic_chain_gtm2 -> min_backward_message2;
+  dynamic_chain_gtm2 -> tf_model2;
+  tf_model2 -> GCTFModel;
+  tf_model2 -> TFDimension;
+  tf_model2 -> TFFactor;
+  tf_model2 -> TFModel;
+
+  GCTFModel [URL="GCTFModel.html"];
+  TFDimension [URL="TFDimension.html"];
+  TFDimensionList2cell [URL="TFDimensionList2cell.html"];
+  TFFactor [URL="TFFactor.html"];
+  TFModel [URL="TFModel.html"];
+  dynamic_chain_gtm2 [URL="dynamic_chain_gtm2.html"];
+  dynamic_chain_matrix_mul [URL="dynamic_chain_matrix_mul.html"];
+  min_backward_message2 [URL="min_backward_message2.html"];
+  tf_model2 [URL="tf_model2.html"];
+}

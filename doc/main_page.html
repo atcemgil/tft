@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1 style="text-align:center;">Tensor Factorization Toolbox (TFT)</h1>
+
+Matlab Toolbox implementing Probabilistic Latent Tensor Factorization (PLTF)[1] operations. 
+
+<h2>Features</h2>
+<ul>
+<li>PLTF data structures are represented with TFModel, TFFactor and TFDimension classes.</li>
+<li>PLTF update rules: given a PLTF model, PLTF update rules can be performed using TFModel.pltf(iteration_number) function. Function prints and displays a plot of resulting KL divergence values over given number of iterations.</li>
+<li>Model visualization: models can be visualized using TFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
+<li>Contraction scheduling: TFModel.schedule_dp() function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences.
+<li>Contraction scheduling visualization: contraction operations required for PLTF update rules can be visualized using <a href="http://www.graphviz.org/">GraphViz</a> with TFGraph.print_dot() function.
+<li>Global data usage: all essential data elements are stored as global variables so that duplicate copies of large data structures are avoided.</li>
+</ul>
+
+<h2>Examples</h2>
+
+PLTF models are composed of factors and factors are composed data in specified dimensions. TFT defines Matlab objects to store each one of these entities. A TFModel object contains an array of TFFactor objects and TFFactor objects contain a single array of TFDimension objects. This way primitive data structures of the framework are properly represented as Matlab objects.
+
+Following sections describe contents of examples.m file, which contain sample model configurations and operations.
+
+<h3>Tucker3 Model</h3>
+
+Before we can declare a Tucker3 model we must first create a set of TFDimension objects:
+
+<pre>
+dim_i = TFDimension('name', 'i', 'cardinality', 5);
+dim_j = TFDimension('cardinality', 6, 'name', 'j');
+dim_k = TFDimension('cardinality', 7, 'name', 'k');
+dim_p = TFDimension('cardinality', 8, 'name', 'p');
+dim_q = TFDimension('cardinality', 9, 'name', 'q');
+dim_r = TFDimension('cardinality', 10, 'name', 'r');
+</pre>
+
+With these TFDimension objects we can create factors of Tucker3 model:
+
+<pre>
+A = TFFactor('name', 'A', 'type', 'latent', 'dims', [dim_i dim_p]);
+B = TFFactor('name', 'B', 'type', 'latent', 'dims', [dim_j dim_q]);
+C = TFFactor('name', 'C', 'type', 'latent', 'dims', [dim_k dim_r], 'isClamped', true);
+G = TFFactor('name', 'G', 'type', 'latent', 'dims', [dim_p, dim_q, dim_r]);
+X = TFFactor('name', 'X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);
+</pre>
+
+TFFactor objects require specification following paramaters:
+
+<ul>
+<li>type: type of the factor, values: latent, observed, temp.</li>
+<li>isClamped: data belonging to the latent factor is provided as input, values: true, false</li>
+</ul>
+
+All factor data is stored in global workspace of Matlab to avoid duplicate copies of large data structures. Handling global variables requires care with variable naming. To address this issue TFFactor objects contain get_data_name() function, which provides a standardized naming convension.
+
+Once required TFFactor objects are created, we can create a TFModel object to encapsulate these factors:
+
+<pre>
+tucker_model = TFModel('name', 'Tucker3', 'factors', [A B C G X], 'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);
+</pre>
+
+TFModel objects contain an extra dims array. This array holds all dimension objects used in the model for two reasons. First is convenience, whenever necessary this array lists all dimension objects readily available. Second is to define the order of dimensions. Ordering of dimensions is crucial when exporting variables to C++ environment.
+
+To initialize model data conveniently TFModel objects contain the rand_init function. This function takes in two parameters:
+
+<ul>
+<li>all_dims: all dimension objects array, which is used to generate empty dimensions in Matlab array data in case factor does not have data in any one of available dimensions.</li>
+<li>max_int: maximum range of random integers. If not specified values are initialized to random numbers between 0 and 1.</li>
+</ul>
+
+TFModel.rand_init_latent_factors('type') function conveniently executes rand_init function for all latent factors of the model. 'type' parameter can be specified as 'nonClamped' or 'all' in order to initialize only non clampled factors or all factors repectively.
+
+For Tucker3 model we can use following initalization:
+
+<pre>
+tucker_model.rand_init_latent_factors('nonClamped'); % does not initialize clamped factors
+X.rand_init(tucker_model.dims, 100); % init observation tensor
+C.rand_init(tucker_model.dims, 100); % init clamped tensor
+</pre>
+
+<h3>PARAFAC Model</h3>
+
+We can use a set of TFDimension objects in any number of models since TFModel objects do not modify dimension objects. For insance we can create a PARAFAC model using dimension objects used in Tucker3 model:
+
+<pre>
+p_A=TFFactor('name', 'p_A', 'type', 'latent', 'dims', [dim_i dim_r]);
+p_B=TFFactor('name', 'p_B', 'type', 'latent', 'dims', [dim_j dim_r]);
+p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);
+
+parafac_model = TFModel('name', 'Parafac', 'factors', [p_A p_B p_C X], 'dims', [dim_i dim_j dim_k dim_r]);
+
+parafac_model.rand_init_latent_factors('all');
+</pre>
+
+<h3>PLTF Update Rules</h3>
+
+Automatically generated PLTF update rules can be executed using TFModel.pltf(iteration_number) function. KL divergence values are returned and plotted by the function. Following plot is generated with this command: tucker_model.pltf(300)
+<br>
+
+<div align="center">
+  <img src="img/tucker3_pltf_300.jpg"/>
+</div>
+
+<h3>Contraction Scheduling</h3>
+
+PLTF update equations involve a number of Generalized Tensor Multiplication (GTM) operations. Similar to the case in chain matrix multiplication, due to the associativity property of the operation order of chain GTM operations result in different amount of memory usage.
+<br><br>
+TFModel.schedule_dp() function performs a dynamic programming search among all possible contraction sequences and finds the contraction sequence which requires the least amount of memory. Depending on the model specification optimal contraction sequence may improve PLTF operation performance and increase tractable problem size. The function does not manipulate any data. Search operations are conducted on objects which define the required contraction. Once optimal path is discovered, operations on the data are performed only once using the optimal sequence.
+<br><br>
+TFGraph object is used to store the dyanmic acyclic graph (DAG) structures produced during the search. TFGraph.print_dot() function can be used to visualize the graph objects. Following graph displays the DAG generated for the first operation of PLTF in Tucker3 model. Top part of each node shows dimensions on which contraction must be applied. Bottom part of each node describes factors required by the node. Some of these factors are latent factors and some are temporary factors. 
+<br><br>
+Since different contraction sequences utilize different temporary factors, different contraction sequences result in different amounts of memory usage. Numbers in paranthesis display the cumulative memory required for the contraction operation defined by the edge. Edges of the DAG are displayed in the direction of the dynamic programming search. Actual contraction operation is performed in the reverse direction. Once search is complete, selecting the minimal memory using edge suffices to follow the least memory using sequence.
+
+<pre>
+graph = tucker_model.schedule_dp();
+system([ 'echo " ' g.print_dot [ ' " | dot | display' ]]);
+</pre>
+
+<div align="center">
+  <img src="img/tucker3_dp1.png"/>
+</div>
+
+
+
+
+<h3>Model Visualization</h3>
+
+TFModel objects can be visualized using <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> utility. Ubigraph must be setup and running on the host system before following visualization can be achieved.
+
+<pre>
+[dn fn edges] = tucker_model.print();
+system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+</pre>
+
+Tucker3 model defined above produces the following image:
+
+<div align="center">
+<img src="img/tucker3.png">
+</div>
+
+Similarly PARAFAC model can be visualized as well:
+
+<pre>
+[dn fn edges] = parafac_model.print();
+system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+</pre>
+
+<div align="center">
+<img src="img/parafac.png">
+</div>
+
+
+
+<h2>References</h2>
+[1] Yilmaz, K. and Cemgil, A. T., Probabilistic Latent Tensor factorisation, Proc. of International Conference on Latent Variable analysis and Signal Separation, 2010, 6365, 346-353
+<br>
+[2] Yilmaz, K. Y.; Cemgil, A. T. and Simsekli, U. Generalized Coupled Tensor Factorization, NIPS, 2011
+</body>
+</html>

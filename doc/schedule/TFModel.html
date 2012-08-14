@@ -1,0 +1,669 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of TFModel</title>
+  <meta name="keywords" content="TFModel">
+  <meta name="description" content="">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html &copy; 2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../m2html.css">
+  <script type="text/javascript">
+    if (top.frames.length == 0) { top.location = "../index.html"; };
+  </script>
+</head>
+<body>
+<a name="_top"></a>
+<!-- menu.html schedule -->
+<h1>TFModel
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong></strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>This is a script file. </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre class="comment"></pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="TFFactor.html" class="code" title="">TFFactor</a>	</li><li><a href="TFModel.html" class="code" title="">TFModel</a>	</li></ul>
+This function is called by:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="TFModel.html" class="code" title="">TFModel</a>	</li><li><a href="tf_model2.html" class="code" title="">tf_model2</a>	tucker_model</li></ul>
+<!-- crossreference -->
+
+<h2><a name="_subfunctions"></a>SUBFUNCTIONS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="#_sub1" class="code">function [] = pltf(obj, iternum)</a></li><li><a href="#_sub2" class="code">function [] = delta(obj, alpha, output_name, A)</a></li><li><a href="#_sub3" class="code">function [r] = eq(a,b)</a></li><li><a href="#_sub4" class="code">function [newmodel] = contract(obj, dim)</a></li><li><a href="#_sub5" class="code">function [dn fn all_edges] = print(obj)</a></li><li><a href="#_sub6" class="code">function [size] = get_element_size(obj)</a></li><li><a href="#_sub7" class="code">function [card] = get_index_card(obj, index_char)</a></li><li><a href="#_sub8" class="code">function [factor] = get_first_non_observed_factor(obj)</a></li><li><a href="#_sub9" class="code">function [ind] = get_first_non_observed_factor_index(obj)</a></li><li><a href="#_sub10" class="code">function [ind] = find_cell_char(obj, chars)</a></li><li><a href="#_sub11" class="code">function [r] = get_dimension_index(obj, dim)</a></li><li><a href="#_sub12" class="code">function [ordered_index_chars] = order_dims(obj,</a></li><li><a href="#_sub13" class="code">function [newmodel] = contract_all(obj)</a></li><li><a href="#_sub14" class="code">function [contract_dims] = get_contraction_dims(obj)</a></li><li><a href="#_sub15" class="code">function [contract_dims] = get_current_contraction_dims(obj)</a></li><li><a href="#_sub16" class="code">function [factor_inds] = latent_factor_indices(obj)</a></li><li><a href="#_sub17" class="code">function [factors] = latent_factors(obj)</a></li><li><a href="#_sub18" class="code">function [factor_ind] = observed_factor_index(obj)</a></li><li><a href="#_sub19" class="code">function [factor] = observed_factor(obj)</a></li><li><a href="#_sub20" class="code">function [factors] = observed_factors(obj)</a></li><li><a href="#_sub21" class="code">function [factors] = input_factors(obj)</a></li><li><a href="#_sub22" class="code">function [factors] = temp_factors(obj)</a></li></ul>
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre>0001 classdef <a href="TFModel.html" class="code" title="">TFModel</a>
+0002 <span class="comment">% Class representing data required to describe a tensor</span>
+0003 <span class="comment">% factorization model</span>
+0004 
+0005     properties
+0006         name=<span class="string">''</span>;    <span class="comment">% name of the model</span>
+0007         factors=[]; <span class="comment">% array of TFFactor</span>
+0008 
+0009 
+0010 
+0011         dims=[];    <span class="comment">% array of TFDimension used by factors defines</span>
+0012                     <span class="comment">% order of dimensions on memory</span>
+0013 
+0014 
+0015         tree_index = 0; <span class="comment">% index of current model in externally</span>
+0016                         <span class="comment">% stored model list</span>
+0017 
+0018         parent_tree_indices=[]; <span class="comment">% array of integers representing</span>
+0019                                 <span class="comment">% indices of parents of this</span>
+0020                                 <span class="comment">% model. list of models are assumed</span>
+0021                                 <span class="comment">% to be stored externally</span>
+0022         children_tree_indices=[];
+0023         cost=0;
+0024     <span class="keyword">end</span>
+0025 
+0026     methods
+0027 
+0028         <a name="_sub0" href="#_subfunctions" class="code">function [] = pltf(obj, iternum)</a>
+0029         <span class="comment">% performs PLTF update operations on the model</span>
+0030         <span class="comment">% returns estimated TFFactor (\hat(X))</span>
+0031         <span class="comment">% iternum: number of iterations</span>
+0032         <span class="comment">% defines order of contraction operations</span>
+0033 
+0034             hat_X = obj.observed_factor;
+0035             hat_X.name = <span class="string">'hat_X'</span>;
+0036 
+0037             eval( [ <span class="string">'global '</span> obj.observed_factor.get_data_name() <span class="keyword">...</span>
+0038                     <span class="string">';'</span> ] );
+0039             <span class="keyword">global</span> hat_X_data;
+0040             hat_X.rand_init(obj.dims, 100);
+0041 
+0042             mask = obj.observed_factor;
+0043             mask.name = <span class="string">'mask'</span>;
+0044             <span class="keyword">global</span> mask_data;
+0045             mask_data = ones(size(hat_X_data));
+0046 
+0047             KL=zeros(1,iternum);
+0048             <span class="keyword">for</span> iter = 1:iternum
+0049                 <span class="keyword">for</span> alpha=1:length(obj.latent_factor_indices)
+0050                     <span class="comment">% access global data</span>
+0051                     X_name = <span class="keyword">...</span>
+0052                         obj.factors(obj.observed_factor_index) <span class="keyword">...</span>
+0053                         .get_data_name();
+0054                     eval([<span class="string">'global '</span> X_name <span class="string">';'</span>]);
+0055                     Z_alpha_name = <span class="keyword">...</span>
+0056                         obj.factors(alpha).get_data_name();
+0057                     eval( [ <span class="string">'global '</span> Z_alpha_name <span class="string">';'</span> ] );
+0058 
+0059 
+0060 
+0061 
+0062                     <span class="comment">% recalculate hat_X</span>
+0063                     newmodel = obj;
+0064 
+0065                     <span class="comment">% perform contraction</span>
+0066                     newmodel=newmodel.contract_all();
+0067 
+0068                     <span class="comment">% store result in hat_X_data</span>
+0069                     result_name = <span class="keyword">...</span>
+0070                         newmodel.get_first_non_observed_factor() <span class="keyword">...</span>
+0071                         .get_data_name();
+0072                     eval([<span class="string">'global '</span> result_name <span class="string">';'</span>] );
+0073                     eval([<span class="string">'hat_X_data = '</span> result_name <span class="string">';'</span> ] ); 
+0074 
+0075 
+0076 
+0077                     <span class="comment">% store X / hat_X in hat_X data</span>
+0078                     eval( [ <span class="string">'hat_X_data  =  '</span> <span class="keyword">...</span>
+0079                             X_name <span class="keyword">...</span>
+0080                             <span class="string">' ./ '</span> <span class="keyword">...</span>
+0081                             <span class="string">' hat_X_data ;'</span> ] );
+0082 
+0083 
+0084                     <span class="comment">% generate D1</span>
+0085                     obj.delta(alpha, <span class="string">'D1_data'</span>, hat_X);
+0086 
+0087                     <span class="comment">% generate D2</span>
+0088                     obj.delta(alpha, <span class="string">'D2_data'</span>, mask);
+0089 
+0090                     <span class="comment">% update Z_alpha</span>
+0091                     <span class="keyword">global</span> D1_data D2_data;
+0092                     eval( [ Z_alpha_name <span class="string">'='</span> Z_alpha_name <span class="string">' .* '</span> <span class="keyword">...</span>
+0093                             <span class="string">'D1_data'</span>                     <span class="string">' ./ '</span> <span class="keyword">...</span>
+0094                             <span class="string">'D2_data ;'</span> ] );
+0095 
+0096 
+0097                     <span class="comment">% calculate KL divergence</span>
+0098                     eval ( [ <span class="string">'KL(iter) = sum(sum(sum( (hat_X_data .* '</span> X_name <span class="string">') .* '</span> <span class="keyword">...</span>
+0099                              <span class="string">' (log( (hat_X_data .* '</span> X_name <span class="string">') ) - '</span> <span class="keyword">...</span>
+0100                              <span class="string">'log('</span> X_name <span class="keyword">...</span>
+0101                              <span class="string">') ) - (hat_X_data .* '</span> X_name <span class="string">')'</span> <span class="keyword">...</span>
+0102                              <span class="string">'+ '</span> X_name <span class="keyword">...</span>
+0103                              <span class="string">')));'</span> ]);
+0104 
+0105                 <span class="keyword">end</span>
+0106             <span class="keyword">end</span>
+0107             display([<span class="string">'KL divergence over iterations: '</span>]);
+0108             display(KL);
+0109             plot(KL);
+0110             title(<span class="string">'KL divergence over iterations'</span>);
+0111             xlabel(<span class="string">'iteration number'</span>);
+0112             ylabel(<span class="string">'KL divergence'</span>);
+0113         <span class="keyword">end</span>
+0114 
+0115         <a name="_sub1" href="#_subfunctions" class="code">function [] = delta(obj, alpha, output_name, A)</a>
+0116         <span class="comment">% PLTF delta function implementation</span>
+0117         <span class="comment">% alpha: index of latent factor in TFModel.factors array</span>
+0118         <span class="comment">% which will be updated</span>
+0119         <span class="comment">% name: unique name used as the name of calculated delta</span>
+0120         <span class="comment">% factor data</span>
+0121         <span class="comment">% A: operand element of delta function assumed all ones if</span>
+0122         <span class="comment">% not given</span>
+0123             
+0124             <span class="comment">% create new model for delta operation</span>
+0125             d_model = obj;
+0126 
+0127             <span class="comment">% remove observed factor</span>
+0128             d_model.factors(d_model.observed_factor_index) = [];
+0129 
+0130             <span class="comment">% add Z_alpha as new observed factor</span>
+0131             d_model.factors(alpha).isLatent = 0;
+0132             d_model.factors(alpha).isObserved= 1;
+0133 
+0134             <span class="comment">% if given, add A as a new latent factor</span>
+0135             <span class="keyword">if</span> nargin == 4
+0136                 A.isLatent = 1;
+0137                 A.isObserved = 0;
+0138                 d_model.factors = [d_model.factors A];
+0139             <span class="keyword">end</span>
+0140 
+0141             <span class="comment">% perform contraction</span>
+0142             d_model=d_model.contract_all();
+0143 
+0144             eval( [ <span class="string">'global '</span> output_name <span class="string">';'</span>] );
+0145             eval( [ <span class="string">'global '</span> <span class="keyword">...</span>
+0146                     d_model.get_first_non_observed_factor().get_data_name() <span class="string">';'</span><span class="keyword">...</span>
+0147                   ] );
+0148 
+0149             eval( [ output_name <span class="string">'='</span> <span class="keyword">...</span>
+0150                     d_model.get_first_non_observed_factor().get_data_name() <span class="keyword">...</span>
+0151                     <span class="string">';'</span> ]);
+0152         <span class="keyword">end</span>
+0153 
+0154         <a name="_sub2" href="#_subfunctions" class="code">function [r] = eq(a,b)</a>
+0155             r = false;
+0156 
+0157             <span class="keyword">if</span> length(a.factors) == length(b.factors)
+0158                 <span class="keyword">for</span> f_a = 1:length(a.factors)
+0159                     found = 0;
+0160                     <span class="keyword">for</span> f_b = 1:length(b.factors)
+0161                         <span class="keyword">if</span> a.factors(f_a) == b.factors(f_b)
+0162                             found = 1;
+0163                             <span class="keyword">break</span>
+0164                         <span class="keyword">end</span>
+0165                     <span class="keyword">end</span>
+0166 
+0167                     <span class="keyword">if</span> found == 0
+0168                         <span class="keyword">return</span>
+0169                     <span class="keyword">end</span>
+0170                 <span class="keyword">end</span>
+0171 
+0172                 r = true;
+0173             <span class="keyword">end</span>
+0174         <span class="keyword">end</span>
+0175 
+0176         <a name="_sub3" href="#_subfunctions" class="code">function [newmodel] = contract(obj, dim)</a>
+0177         <span class="comment">% returns a new TFModel generated by contracting obj with</span>
+0178         <span class="comment">% dim which may add new temporary factors.</span>
+0179         <span class="comment">% dim: TFDimension or char array or cell with the name of</span>
+0180         <span class="comment">% the dimension</span>
+0181 
+0182             <span class="keyword">if</span> isa(dim, <span class="string">'TFDimension'</span>)
+0183                 dim = dim.name;
+0184             <span class="keyword">elseif</span> isa(dim, <span class="string">'char'</span>) || isa(dim, <span class="string">'cell'</span>)
+0185                 dim = char(dim);
+0186             <span class="keyword">else</span>
+0187                 display([<span class="string">'ERROR: unsupported dim type '</span> class(dim) <span class="keyword">...</span>
+0188                          <span class="string">'was expecting TFDimension, cell or char '</span> <span class="keyword">...</span>
+0189                          <span class="string">'array'</span>]);
+0190                 <span class="keyword">return</span>
+0191             <span class="keyword">end</span>
+0192 
+0193             newmodel = obj;
+0194             newmodel.name = [obj.name <span class="string">'_'</span> dim];
+0195 
+0196             <span class="comment">% remove dim from the new model's factors'</span>
+0197             contracted_factor_inds = [];
+0198             <span class="keyword">for</span> f = 1:length(newmodel.factors)
+0199                 <span class="keyword">if</span> ~newmodel.factors(f).isObserved
+0200                     ind = <span class="keyword">...</span>
+0201                         newmodel.factors(f).got_dimension(char(dim));
+0202                     
+0203                     <span class="keyword">if</span> ind ~= 0
+0204                         <span class="comment">% remove this dimension from this factor</span>
+0205                         newmodel.factors(f).dims(ind) = [];
+0206 
+0207                         contracted_factor_inds = <span class="keyword">...</span>
+0208                             [ contracted_factor_inds f ];
+0209                     <span class="keyword">end</span>
+0210                 <span class="keyword">end</span>
+0211             <span class="keyword">end</span>
+0212 
+0213             <span class="comment">% add a temporary factor including dimensions of</span>
+0214             <span class="comment">% contracted factors other than contracted dimension</span>
+0215             tmp=<a href="TFFactor.html" class="code" title="">TFFactor</a>;
+0216             tmp.isTemp = 1;
+0217             tmp.name = <span class="string">'tmp'</span>;
+0218             names={};
+0219             
+0220             <span class="keyword">for</span> cfii = 1:length(contracted_factor_inds)
+0221                 <span class="comment">% for each dimension of the contracted factor</span>
+0222                 <span class="keyword">for</span> cfi_dim = 1:length(newmodel.factors(contracted_factor_inds(cfii)).dims)
+0223                     found=0;
+0224                     <span class="keyword">for</span> ti = 1:length(tmp.dims)
+0225                         <span class="keyword">if</span> tmp.dims(ti) == <span class="keyword">...</span>
+0226                                 newmodel.factors(contracted_factor_inds(cfii)).dims(cfi_dim)
+0227                             found=1;
+0228                             <span class="keyword">break</span>;
+0229                         <span class="keyword">end</span>
+0230                     <span class="keyword">end</span>
+0231                     <span class="keyword">if</span> found == 0
+0232                         tmp.dims = [tmp.dims <span class="keyword">...</span>
+0233                                     newmodel.factors(contracted_factor_inds(cfii)) <span class="keyword">...</span>
+0234                                     .dims(cfi_dim)];
+0235                         names=[names <span class="keyword">...</span>
+0236                               newmodel.factors(contracted_factor_inds(cfii)).dims(cfi_dim).name];
+0237                         <span class="comment">%display(['added from factor index' ...</span>
+0238                         <span class="comment">%         contracted_factor_inds(cfii)])</span>
+0239                         <span class="comment">%display(['added from factor' newmodel.factors(contracted_factor_inds(cfii)).name])</span>
+0240                         <span class="comment">%display(['addd dim' char(newmodel.factors(contracted_factor_inds(cfii)).dims(cfi_dim).name)])</span>
+0241                     <span class="keyword">end</span>
+0242                 <span class="keyword">end</span>
+0243             <span class="keyword">end</span>
+0244             names=unique(names);
+0245             <span class="keyword">for</span> d = 1:length(names)
+0246                 tmp.name = [tmp.name <span class="string">'_'</span> char(names(d))];
+0247             <span class="keyword">end</span>
+0248             tmp.name = [tmp.name <span class="string">'_minus_'</span> dim];
+0249 
+0250 
+0251 
+0252 
+0253             eval( [ <span class="string">'global '</span> tmp.get_data_name()  <span class="string">';'</span>] );
+0254 
+0255             <span class="keyword">if</span> length(contracted_factor_inds) == 1
+0256                 <span class="comment">% no multiplication</span>
+0257                 eval( [ <span class="string">'global '</span> <span class="keyword">...</span>
+0258                         obj.factors(contracted_factor_inds(1)) <span class="keyword">...</span>
+0259                         .get_data_name() <span class="string">';'</span>] );
+0260                 eval( [ tmp.get_data_name() <span class="string">' = '</span> <span class="keyword">...</span>
+0261                         obj.factors(contracted_factor_inds(1)) <span class="keyword">...</span>
+0262                         .get_data_name() <span class="string">';'</span>] );
+0263             <span class="keyword">else</span>
+0264 
+0265                 <span class="comment">% multiply first two into tmp data</span>
+0266                 eval( [ <span class="string">'global'</span> <span class="keyword">...</span>
+0267                         <span class="string">' '</span> obj.factors(contracted_factor_inds(1)).get_data_name() <span class="keyword">...</span>
+0268                         <span class="string">' '</span> obj.factors(contracted_factor_inds(2)).get_data_name() <span class="string">';'</span>] );
+0269 
+0270                 eval( [ tmp.get_data_name() <span class="string">' = bsxfun (@times, '</span> <span class="keyword">...</span>
+0271                         obj.factors(contracted_factor_inds(1)).get_data_name() <span class="string">', '</span><span class="keyword">...</span>
+0272                         obj.factors(contracted_factor_inds(2)).get_data_name() <span class="string">');'</span> <span class="keyword">...</span>
+0273                       ] );
+0274 
+0275                 <span class="comment">% multiply tmp data with other factors</span>
+0276                 <span class="keyword">for</span> cfii = 3:length(contracted_factor_inds)
+0277                     eval( [ <span class="string">'global '</span><span class="keyword">...</span>
+0278                             obj.factors(contracted_factor_inds(cfii)) <span class="keyword">...</span>
+0279                             .get_data_name() <span class="string">';'</span>] );
+0280                     eval( [ tmp.get_data_name() <span class="string">' = bsxfun (@times, '</span> <span class="keyword">...</span>
+0281                             tmp.get_data_name() <span class="string">','</span><span class="keyword">...</span>
+0282                             obj.factors(contracted_factor_inds(cfii)) <span class="keyword">...</span>
+0283                             .get_data_name() <span class="string">');'</span> ] );
+0284                 <span class="keyword">end</span>
+0285             <span class="keyword">end</span>
+0286 
+0287 
+0288             <span class="comment">% sum contraction dimensions on tmp data</span>
+0289             
+0290             con_dim_index = obj.get_dimension_index(dim);
+0291 
+0292             eval( [ tmp.get_data_name() <span class="string">' = sum( '</span> <span class="keyword">...</span>
+0293                     tmp.get_data_name() <span class="string">', '</span> <span class="keyword">...</span>
+0294                     num2str(con_dim_index) <span class="string">');'</span>] );
+0295             
+0296             newmodel.factors = [newmodel.factors tmp];
+0297 
+0298 
+0299             <span class="comment">% remove contracted factors</span>
+0300             <span class="comment">% other dimensions live within the tmp factor</span>
+0301             removed_num=0; <span class="comment">% removal breaks loop index</span>
+0302             <span class="keyword">for</span> cfii = 1:length(contracted_factor_inds)
+0303                 newmodel.factors(contracted_factor_inds(cfii) <span class="keyword">...</span>
+0304                                  - removed_num) = [];
+0305                 removed_num = removed_num + 1;
+0306             <span class="keyword">end</span>
+0307         <span class="keyword">end</span>
+0308 
+0309 
+0310         <a name="_sub4" href="#_subfunctions" class="code">function [dn fn all_edges] = print(obj)</a>
+0311         <span class="comment">% returns a string to be used by fgplot</span>
+0312 
+0313         <span class="comment">% add dimension nodes</span>
+0314             dn = [ <span class="string">'[ '''</span> ];
+0315             <span class="keyword">for</span> i =1:length(obj.dims)
+0316                 <span class="keyword">if</span> i ~= 1
+0317                     dn = [ dn <span class="string">''','''</span> ];
+0318                 <span class="keyword">end</span>
+0319                 dn = [ dn obj.dims(i).name ];
+0320             <span class="keyword">end</span>
+0321             dn = [ dn <span class="string">''' ] '</span> ];
+0322 
+0323             <span class="comment">% add factor nodes</span>
+0324             fn = [ <span class="string">'[ '''</span> ];
+0325             <span class="keyword">for</span> i =1:length(obj.factors)
+0326                 <span class="keyword">if</span> i ~= 1
+0327                     fn = [ fn <span class="string">''','''</span> ];
+0328                 <span class="keyword">end</span>
+0329                 fn = [ fn obj.factors(i).name ];
+0330             <span class="keyword">end</span>
+0331             fn = [ fn <span class="string">''' ] '</span> ];
+0332 
+0333             <span class="comment">% add edges</span>
+0334             all_edges=[<span class="string">'[ '</span> ];
+0335             <span class="keyword">for</span> d = 1:length(obj.dims)
+0336                 <span class="keyword">if</span> d ~= 1
+0337                     all_edges = [ all_edges <span class="string">' , '</span> ];
+0338                 <span class="keyword">end</span>
+0339 
+0340                 edges=[<span class="string">'[ '</span> ];
+0341 
+0342                 <span class="comment">% include this dimension if a factor uses it</span>
+0343                 <span class="keyword">for</span> f = 1:length(obj.factors)
+0344                     <span class="keyword">for</span> fd = 1:length(obj.factors(f).dims)
+0345                         <span class="keyword">if</span> obj.factors(f).dims(fd) == obj.dims(d)
+0346                             <span class="keyword">if</span> length(edges) ~= 2
+0347                                 edges = [ edges <span class="string">''','''</span> ];
+0348                             <span class="keyword">else</span>
+0349                                 edges = [ edges <span class="string">''''</span> ];
+0350                             <span class="keyword">end</span>
+0351                             edges = [ edges obj.factors(f).name ];
+0352                         <span class="keyword">end</span>
+0353                     <span class="keyword">end</span>
+0354                 <span class="keyword">end</span>
+0355 
+0356                 all_edges = [ all_edges edges <span class="string">''' ]'</span> ];
+0357             <span class="keyword">end</span>
+0358             all_edges = [ all_edges <span class="string">' ]'</span> ];
+0359         <span class="keyword">end</span>
+0360 
+0361         <a name="_sub5" href="#_subfunctions" class="code">function [size] = get_element_size(obj)</a>
+0362         <span class="comment">% returns number of elements for this model</span>
+0363             size=0;
+0364             <span class="keyword">for</span> f = 1:length(obj.factors)
+0365                 <span class="keyword">if</span> obj.factors(f).isObserved == 0
+0366                     size = size + <span class="keyword">...</span>
+0367                            obj.factors(f).get_element_size();
+0368                 <span class="keyword">end</span>
+0369             <span class="keyword">end</span>
+0370         <span class="keyword">end</span>
+0371 
+0372         <a name="_sub6" href="#_subfunctions" class="code">function [card] = get_index_card(obj, index_char)</a>
+0373         <span class="comment">% returns cardinality of a given name of a dimension</span>
+0374             <span class="keyword">for</span> d = 1:length(obj.dims)
+0375                 <span class="keyword">if</span> obj.dims(d).name == index_char
+0376                     card = obj.dims(d).cardinality;
+0377                     <span class="keyword">break</span>
+0378                 <span class="keyword">end</span>
+0379             <span class="keyword">end</span>
+0380         <span class="keyword">end</span>
+0381 
+0382         <a name="_sub7" href="#_subfunctions" class="code">function [factor] = get_first_non_observed_factor(obj)</a>
+0383         <span class="comment">% returns first non observed factor index, used to return</span>
+0384         <span class="comment">% index of the output factor</span>
+0385             <span class="keyword">for</span> f = 1:length(obj.factors)
+0386                 <span class="keyword">if</span> obj.factors(f).isObserved == 0
+0387                     factor = obj.factors(f);
+0388                     <span class="keyword">return</span>
+0389                 <span class="keyword">end</span>
+0390             <span class="keyword">end</span>
+0391         <span class="keyword">end</span>
+0392 
+0393         <a name="_sub8" href="#_subfunctions" class="code">function [ind] = get_first_non_observed_factor_index(obj)</a>
+0394         <span class="comment">% returns first non observed factor index, used to return</span>
+0395         <span class="comment">% index of the output factor</span>
+0396             <span class="keyword">for</span> f = 1:length(obj.factors)
+0397                 <span class="keyword">if</span> obj.factors(f).isObserved == 0
+0398                     ind = f;
+0399                     <span class="keyword">return</span>
+0400                 <span class="keyword">end</span>
+0401             <span class="keyword">end</span>
+0402         <span class="keyword">end</span>
+0403 
+0404         <a name="_sub9" href="#_subfunctions" class="code">function [ind] = find_cell_char(obj, chars)</a>
+0405         <span class="comment">% returns index of a given char array in object's dimension array</span>
+0406             <span class="keyword">for</span> ind=1:length(obj.dims)
+0407                 <span class="keyword">if</span> obj.dims(ind).name == chars
+0408                     <span class="keyword">return</span>
+0409                 <span class="keyword">end</span>
+0410             <span class="keyword">end</span>
+0411             ind=0;
+0412         <span class="keyword">end</span>
+0413 
+0414        <a name="_sub10" href="#_subfunctions" class="code">function [r] = get_dimension_index(obj, dim)</a>
+0415         <span class="comment">% returns index of dimension dim in obj.dims if obj</span>
+0416         <span class="comment">% contains TFDimension (or char) dim returns 0 otherwise</span>
+0417 
+0418             r=0;
+0419             <span class="keyword">for</span> d = 1:length(obj.dims)
+0420                 <span class="keyword">if</span> obj.dims(d) == dim
+0421                     r=d;
+0422                     <span class="keyword">break</span>;
+0423                 <span class="keyword">end</span>
+0424             <span class="keyword">end</span>           
+0425        <span class="keyword">end</span>
+0426 
+0427         <a name="_sub11" href="#_subfunctions" class="code">function [ordered_index_chars] = order_dims(obj, </a><span class="keyword">...</span>
+0428                                                     dims_array)
+0429             <span class="comment">% order given cell of dimension names according to</span>
+0430             <span class="comment">% factor.dims order</span>
+0431 
+0432             tmp=cell(length(dims_array), 3);
+0433 
+0434             tmp(:,1) = dims_array;
+0435             <span class="keyword">for</span> i = 1:length(dims_array)
+0436                 tmp{i,2} = obj.get_index_card(char(dims_array(i)));
+0437                 tmp{i,3} = obj.find_cell_char(char(dims_array(i))); <span class="comment">% order of the index</span>
+0438                                                                     <span class="comment">% in the model</span>
+0439             <span class="keyword">end</span>
+0440 
+0441             tmp=sortrows(tmp,3); <span class="comment">% sort by the order of the model indices</span>
+0442             ordered_index_chars=tmp(:,1)';
+0443         <span class="keyword">end</span>
+0444 
+0445 
+0446         <a name="_sub12" href="#_subfunctions" class="code">function [newmodel] = contract_all(obj)</a>
+0447             contract_dims = obj.get_contraction_dims();
+0448 
+0449             newmodel = obj;
+0450             <span class="keyword">for</span> i = 1:length(contract_dims)
+0451                 newmodel = newmodel.contract(contract_dims(i));
+0452             <span class="keyword">end</span>
+0453         <span class="keyword">end</span>
+0454 
+0455 
+0456         <a name="_sub13" href="#_subfunctions" class="code">function [contract_dims] = get_contraction_dims(obj)</a>
+0457         <span class="comment">% returns cell of dimensions which must be contracted to</span>
+0458         <span class="comment">% calculate output factor(s)</span>
+0459 
+0460             output_chars = {};
+0461             <span class="keyword">for</span> f=1:length(obj.factors)
+0462                 <span class="keyword">if</span> obj.factors(f).isObserved
+0463 
+0464                     <span class="comment">% for each dimension of this factor</span>
+0465                     <span class="keyword">for</span> i=1:length(obj.factors(f).dims)
+0466                         output_chars = [output_chars <span class="keyword">...</span>
+0467                                         obj.factors(f).dims(i).name];
+0468                     <span class="keyword">end</span>
+0469 
+0470                 <span class="keyword">end</span>
+0471             <span class="keyword">end</span>
+0472 
+0473             <span class="comment">% contraction dimensions: alldims - output_dims</span>
+0474             contract_dims={};
+0475             <span class="keyword">for</span> d_a = 1:length(obj.dims)
+0476                 found=0;
+0477                 <span class="keyword">for</span> d_o = 1:length(output_chars)
+0478                     <span class="keyword">if</span> obj.dims(d_a) == char(output_chars(d_o))
+0479                         found=1;
+0480                         <span class="keyword">break</span>
+0481                     <span class="keyword">end</span>
+0482                 <span class="keyword">end</span>
+0483 
+0484                 <span class="keyword">if</span> found == 0
+0485                     contract_dims = [contract_dims obj.dims(d_a)];
+0486                     <span class="comment">%['add '  obj.dims(d_a).name]</span>
+0487                 <span class="keyword">end</span>
+0488             <span class="keyword">end</span>
+0489 
+0490             <span class="comment">%['return ' contract_dims.name]</span>
+0491             <span class="comment">%contract_dims = obj.order_dims(unique(contract_dims));</span>
+0492         <span class="keyword">end</span>
+0493 
+0494         <a name="_sub14" href="#_subfunctions" class="code">function [contract_dims] = get_current_contraction_dims(obj)</a>
+0495         <span class="comment">% returns cell of dimensions which must be contracted to</span>
+0496         <span class="comment">% calculate output factor(s) by using current factors to</span>
+0497         <span class="comment">% calculate all dimension not model.dims which is always</span>
+0498         <span class="comment">% fixed to maximum possible dimension list.</span>
+0499 
+0500             output_chars = {};
+0501             <span class="keyword">for</span> f=1:length(obj.factors)
+0502                 <span class="keyword">if</span> obj.factors(f).isObserved
+0503 
+0504                     <span class="comment">% for each dimension of this factor</span>
+0505                     <span class="keyword">for</span> i=1:length(obj.factors(f).dims)
+0506                         output_chars = [output_chars <span class="keyword">...</span>
+0507                                         obj.factors(f).dims(i).name];
+0508                     <span class="keyword">end</span>
+0509 
+0510                 <span class="keyword">end</span>
+0511             <span class="keyword">end</span>
+0512 
+0513             <span class="comment">% contraction dimensions: alldims - output_dims</span>
+0514             alldims={};
+0515             <span class="keyword">for</span> f = 1:length(obj.factors)
+0516                 <span class="keyword">for</span> d = 1:length(obj.factors(f).dims)
+0517                     found = 0;
+0518                     n=obj.factors(f).dims(d).name;
+0519                     <span class="keyword">for</span> i=1:length(alldims)
+0520                         <span class="keyword">if</span> char(alldims(i)) == n
+0521                             found = 1;
+0522                             <span class="keyword">break</span>
+0523                         <span class="keyword">end</span>
+0524                     <span class="keyword">end</span>
+0525 
+0526                     <span class="keyword">if</span> ~found
+0527                         alldims = [alldims n];
+0528                     <span class="keyword">end</span>
+0529                 <span class="keyword">end</span>
+0530             <span class="keyword">end</span>
+0531 
+0532             contract_dims={};
+0533             <span class="keyword">for</span> d_a = 1:length(alldims)
+0534                 found=0;
+0535                 <span class="keyword">for</span> d_o = 1:length(output_chars)
+0536                     <span class="keyword">if</span> char(alldims(d_a)) == char(output_chars(d_o))
+0537                         found=1;
+0538                         <span class="keyword">break</span>
+0539                     <span class="keyword">end</span>
+0540                 <span class="keyword">end</span>
+0541 
+0542                 <span class="keyword">if</span> found == 0
+0543                     contract_dims = [contract_dims alldims(d_a)];
+0544                     <span class="comment">%['add '  alldims(d_a).name]</span>
+0545                 <span class="keyword">end</span>
+0546             <span class="keyword">end</span>
+0547 
+0548             <span class="comment">%['return ' contract_dims.name]</span>
+0549             <span class="comment">%contract_dims = obj.order_dims(unique(contract_dims));</span>
+0550         <span class="keyword">end</span>
+0551 
+0552 
+0553         <a name="_sub15" href="#_subfunctions" class="code">function [factor_inds] = latent_factor_indices(obj)</a>
+0554             factor_inds=[];
+0555             <span class="keyword">for</span> f=1:length(obj.factors)
+0556                 <span class="keyword">if</span> obj.factors(f).isLatent
+0557                     factor_inds = [ factor_inds f ];
+0558                 <span class="keyword">end</span>
+0559             <span class="keyword">end</span>
+0560         <span class="keyword">end</span>
+0561 
+0562 
+0563         <a name="_sub16" href="#_subfunctions" class="code">function [factors] = latent_factors(obj)</a>
+0564             factors=[];
+0565             <span class="keyword">for</span> f=1:length(obj.factors)
+0566                 <span class="keyword">if</span> obj.factors(f).isLatent
+0567                     factors = [ factors obj.factors(f) ];
+0568                 <span class="keyword">end</span>
+0569             <span class="keyword">end</span>
+0570         <span class="keyword">end</span>
+0571 
+0572         <a name="_sub17" href="#_subfunctions" class="code">function [factor_ind] = observed_factor_index(obj)</a>
+0573             factor_ind=0;
+0574             <span class="keyword">for</span> f=1:length(obj.factors)
+0575                 <span class="keyword">if</span> obj.factors(f).isObserved
+0576                     factor_ind = f;
+0577                     <span class="keyword">return</span>
+0578                 <span class="keyword">end</span>
+0579             <span class="keyword">end</span>
+0580         <span class="keyword">end</span>
+0581 
+0582         <a name="_sub18" href="#_subfunctions" class="code">function [factor] = observed_factor(obj)</a>
+0583         <span class="comment">% returns first observed factor (useful for PLTF operations)</span>
+0584             <span class="keyword">for</span> f=1:length(obj.factors)
+0585                 <span class="keyword">if</span> obj.factors(f).isObserved
+0586                     factor = obj.factors(f);
+0587                     <span class="keyword">return</span>
+0588                 <span class="keyword">end</span>
+0589             <span class="keyword">end</span>
+0590         <span class="keyword">end</span>
+0591 
+0592         <a name="_sub19" href="#_subfunctions" class="code">function [factors] = observed_factors(obj)</a>
+0593             factors=[];
+0594             <span class="keyword">for</span> f=1:length(obj.factors)
+0595                 <span class="keyword">if</span> obj.factors(f).isObserved
+0596                     factors = [ factors obj.factors(f) ];
+0597                 <span class="keyword">end</span>
+0598             <span class="keyword">end</span>
+0599         <span class="keyword">end</span>
+0600 
+0601         <a name="_sub20" href="#_subfunctions" class="code">function [factors] = input_factors(obj)</a>
+0602             factors=[];
+0603             <span class="keyword">for</span> f=1:length(obj.factors)
+0604                 <span class="keyword">if</span> obj.factors(f).isInput
+0605                     factors = [ factors obj.factors(f) ];
+0606                 <span class="keyword">end</span>
+0607             <span class="keyword">end</span>
+0608         <span class="keyword">end</span>
+0609 
+0610         <a name="_sub21" href="#_subfunctions" class="code">function [factors] = temp_factors(obj)</a>
+0611             factors=[];
+0612             <span class="keyword">for</span> f=1:length(obj.factors)
+0613                 <span class="keyword">if</span> obj.factors(f).isTemp
+0614                     factors = [ factors obj.factors(f) ];
+0615                 <span class="keyword">end</span>
+0616             <span class="keyword">end</span>
+0617         <span class="keyword">end</span>
+0618 
+0619     <span class="keyword">end</span>
+0620 
+0621 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Tue 10-Jul-2012 08:47:10 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>

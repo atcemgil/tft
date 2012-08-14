@@ -1,0 +1,269 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of TFFactor</title>
+  <meta name="keywords" content="TFFactor">
+  <meta name="description" content="Represents a PLTF factor">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html &copy; 2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../m2html.css">
+  <script type="text/javascript">
+    if (top.frames.length == 0) { top.location = "../index.html"; };
+  </script>
+</head>
+<body>
+<a name="_top"></a>
+<!-- menu.html tft -->
+<h1>TFFactor
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>Represents a PLTF factor</strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>This is a script file. </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre class="comment"> Represents a PLTF factor 
+   Factors are identified with their names of any length
+   character array and dimension they occupy data in. dims array
+   contains an array of TFDimension objects.
+
+   Depending on the input arguments 'latent', 'type' and
+   'isClamped' internal flag variables are set. See examples for
+   details
+
+   Examples:
+   A = TFFactor('name', 'A', 'type', 'latent', 'dims', [dim_i dim_p]);
+   C = TFFactor('name', 'C', 'type', 'latent', 'dims', [dim_k dim_r], 'isClamped', true);
+   X = TFFactor('name', 'X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);
+
+   See also <a href="TFDimension.html" class="code" title="">TFDimension</a>, <a href="TFModel.html" class="code" title="">TFModel</a></pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="TFDimension.html" class="code" title="">TFDimension</a>	Represents a single dimension</li><li><a href="TFFactor.html" class="code" title="">TFFactor</a>	Represents a PLTF factor</li></ul>
+This function is called by:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="TFFactor.html" class="code" title="">TFFactor</a>	Represents a PLTF factor</li><li><a href="TFModel.html" class="code" title="">TFModel</a>	Represents data required to describe a tensor factorization model</li></ul>
+<!-- crossreference -->
+
+<h2><a name="_subfunctions"></a>SUBFUNCTIONS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="#_sub1" class="code">function obj = TFFactor(varargin)</a></li><li><a href="#_sub2" class="code">function [size] = get_element_size(obj)</a></li><li><a href="#_sub3" class="code">function [obj, idx] = sort(obj, varargin)</a></li><li><a href="#_sub4" class="code">function r = eq(a,b)</a></li><li><a href="#_sub5" class="code">function r = ne(a,b)</a></li><li><a href="#_sub6" class="code">function [r] = got_dimension(obj, dim)</a></li><li><a href="#_sub7" class="code">function [name] = get_data_name(obj)</a></li><li><a href="#_sub8" class="code">function [] = rand_init(obj, all_dims, imax)</a></li><li><a href="#_sub9" class="code">function [contract_dims] =</a></li></ul>
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre>0001 <span class="comment">% Represents a PLTF factor</span>
+0002 <span class="comment">%   Factors are identified with their names of any length</span>
+0003 <span class="comment">%   character array and dimension they occupy data in. dims array</span>
+0004 <span class="comment">%   contains an array of TFDimension objects.</span>
+0005 <span class="comment">%</span>
+0006 <span class="comment">%   Depending on the input arguments 'latent', 'type' and</span>
+0007 <span class="comment">%   'isClamped' internal flag variables are set. See examples for</span>
+0008 <span class="comment">%   details</span>
+0009 <span class="comment">%</span>
+0010 <span class="comment">%   Examples:</span>
+0011 <span class="comment">%   A = TFFactor('name', 'A', 'type', 'latent', 'dims', [dim_i dim_p]);</span>
+0012 <span class="comment">%   C = TFFactor('name', 'C', 'type', 'latent', 'dims', [dim_k dim_r], 'isClamped', true);</span>
+0013 <span class="comment">%   X = TFFactor('name', 'X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);</span>
+0014 <span class="comment">%</span>
+0015 <span class="comment">%   See also TFDimension, TFModel</span>
+0016 
+0017 classdef <a href="TFFactor.html" class="code" title="">TFFactor</a>
+0018 
+0019     properties
+0020         name = <span class="string">''</span>;
+0021  
+0022         dims = <a href="TFDimension.html" class="code" title="">TFDimension</a>();  <span class="comment">% array of TFDimension</span>
+0023         <span class="comment">%data;  % contains data of this factor</span>
+0024 
+0025         isLatent=0;
+0026         isObserved=0;
+0027         isInput=0;
+0028         isTemp=0;
+0029     <span class="keyword">end</span>
+0030 
+0031     methods
+0032 
+0033         <a name="_sub0" href="#_subfunctions" class="code">function obj = TFFactor(varargin)</a>
+0034             p = inputParser;
+0035             addParamValue(p, <span class="string">'name'</span>, <span class="string">''</span>, @isstr);
+0036             types={<span class="string">'latent'</span>, <span class="string">'observed'</span>, <span class="string">'temp'</span>};
+0037             addParamValue(p, <span class="string">'type'</span>, <span class="string">'latent'</span>, @(x) <span class="keyword">...</span>
+0038                           any(validatestring(x,types)));
+0039             addParamValue(p, <span class="string">'isClamped'</span>, 0, @islogical);
+0040             addParamValue(p, <span class="string">'dims'</span>, [], @isvector);
+0041             <span class="comment">%addParamValue(p, 'data', [], @isvector);</span>
+0042 
+0043             parse(p,varargin{:});
+0044 
+0045             <span class="comment">% check if all dims elements are TFDimension objects</span>
+0046             <span class="keyword">for</span> i = 1:length(p.Results.dims)
+0047                 <span class="keyword">if</span> ~isa(p.Results.dims(i), <span class="string">'TFDimension'</span>)
+0048                     err = MException( <span class="keyword">...</span>
+0049                         [<span class="string">'TFFactor:DimensionNotTFDimension'</span>], <span class="keyword">...</span>
+0050                         [<span class="string">'Dimensions of TFFactor must be '</span> <span class="keyword">...</span>
+0051                          <span class="string">'TFDimension objects'</span>]);
+0052                     throw(err);
+0053                 <span class="keyword">end</span>
+0054             <span class="keyword">end</span>
+0055             obj.dims = p.Results.dims;
+0056 
+0057             obj.name = p.Results.name;
+0058 
+0059             <span class="keyword">if</span> strcmp(p.Results.type, <span class="string">'latent'</span>)
+0060                 obj.isLatent = 1;
+0061             <span class="keyword">elseif</span> strcmp(p.Results.type, <span class="string">'observed'</span>)
+0062                 obj.isObserved = 1;
+0063             <span class="keyword">elseif</span> strcmp(p.Results.type, <span class="string">'temp'</span>)
+0064                 obj.isTemp = 1;
+0065             <span class="keyword">end</span>
+0066 
+0067             obj.isTemp = p.Results.isClamped;
+0068 
+0069         <span class="keyword">end</span>
+0070 
+0071 
+0072         <a name="_sub1" href="#_subfunctions" class="code">function [size] = get_element_size(obj)</a>
+0073         <span class="comment">% returns number of elements for this factor</span>
+0074             size=1;
+0075             <span class="keyword">for</span> d = 1:length(obj.dims)
+0076                 size = size * obj.dims(d).cardinality;
+0077             <span class="keyword">end</span>
+0078         <span class="keyword">end</span>
+0079 
+0080 
+0081         <a name="_sub2" href="#_subfunctions" class="code">function [obj, idx] = sort(obj, varargin)</a>
+0082             [~,idx] = <a href="#_sub3" class="code" title="subfunction [obj, idx] = sort(obj, varargin)">sort</a>([obj.name],varargin{:}); 
+0083             obj = obj(idx);
+0084         <span class="keyword">end</span>
+0085 
+0086 
+0087         <a name="_sub3" href="#_subfunctions" class="code">function r = eq(a,b)</a>
+0088             r=false;
+0089 
+0090             <span class="comment">%if a.name == b.name &amp;&amp; ...</span>
+0091             <span class="comment">%a.isLatent == b.isLatent &amp;&amp; ...</span>
+0092             <span class="comment">%a.isObserved == b.isObserved &amp;&amp; ...</span>
+0093             <span class="comment">%a.isInput == b.isInput &amp;&amp; ...</span>
+0094             <span class="comment">%a.isTemp == b.isTemp</span>
+0095 
+0096 
+0097             <span class="comment">% from TFModel.eq:</span>
+0098             <span class="comment">% mark matched b factors</span>
+0099             <span class="comment">% if there are any unmarked -&gt; inequal</span>
+0100             <span class="comment">% problematic case:</span>
+0101             <span class="comment">% a.factors ( ip, jpi ) , b.factors (  ip, pi )</span>
+0102             <span class="comment">% b==a matches all b objects with a.factors(1)</span>
+0103             <span class="comment">% but a~=b !</span>
+0104 
+0105             b_marks = zeros(size(b.dims));
+0106 
+0107             <span class="keyword">if</span> length(a.dims) == length(b.dims)<span class="comment">% &amp;&amp; ...</span>
+0108                 <span class="keyword">for</span> d_a = 1:length(a.dims)
+0109                     found = 0;
+0110                     <span class="keyword">for</span> d_b = 1:length(b.dims)
+0111                         <span class="keyword">if</span> a.dims(d_a) == b.dims(d_b) &amp;&amp; <span class="keyword">...</span>
+0112                                 b_marks(d_b) == 0
+0113                             found = 1;
+0114                             b_marks(d_b) = 1;
+0115                             <span class="keyword">break</span>;
+0116                         <span class="keyword">end</span>
+0117                     <span class="keyword">end</span>
+0118 
+0119                     <span class="keyword">if</span> found == 0
+0120                         <span class="keyword">return</span>
+0121                     <span class="keyword">end</span>
+0122                 <span class="keyword">end</span>
+0123 
+0124                 r=true;
+0125             <span class="keyword">end</span>
+0126         <span class="keyword">end</span>
+0127 
+0128 
+0129         <a name="_sub4" href="#_subfunctions" class="code">function r = ne(a,b)</a>
+0130             r = ~(a==b);
+0131         <span class="keyword">end</span>
+0132 
+0133 
+0134         <a name="_sub5" href="#_subfunctions" class="code">function [r] = got_dimension(obj, dim)</a>
+0135         <span class="comment">% returns index of dimension dim in obj.dims if obj</span>
+0136         <span class="comment">% contains TFDimension (or char) dim returns 0 otherwise</span>
+0137 
+0138             r=0;
+0139             <span class="keyword">for</span> d = 1:length(obj.dims)
+0140                 <span class="keyword">if</span> obj.dims(d) == dim
+0141                     r=d;
+0142                     <span class="keyword">break</span>;
+0143                 <span class="keyword">end</span>
+0144             <span class="keyword">end</span>
+0145         <span class="keyword">end</span>
+0146 
+0147 
+0148         <a name="_sub6" href="#_subfunctions" class="code">function [name] = get_data_name(obj)</a>
+0149             name = [obj.name <span class="string">'_data'</span>];
+0150         <span class="keyword">end</span>
+0151 
+0152 
+0153         <a name="_sub7" href="#_subfunctions" class="code">function [] = rand_init(obj, all_dims, imax)</a>
+0154 
+0155             eval( [ <span class="string">'global '</span> obj.get_data_name() <span class="string">';'</span> ] );
+0156             sz = <span class="string">''</span>;
+0157             <span class="keyword">for</span> ad = 1:length(all_dims)
+0158                 <span class="keyword">if</span> ad ~= 1
+0159                     sz = [sz <span class="string">', '</span>];
+0160                 <span class="keyword">end</span>
+0161 
+0162                 found=0;
+0163                 <span class="keyword">for</span> od = 1:length(obj.dims)
+0164                     <span class="keyword">if</span> all_dims(ad) == obj.dims(od)
+0165                         found=1;
+0166                         <span class="keyword">break</span>
+0167                     <span class="keyword">end</span>
+0168                 <span class="keyword">end</span>
+0169 
+0170                 <span class="keyword">if</span> found
+0171                     sz = [sz num2str(all_dims(ad).cardinality) ];
+0172                 <span class="keyword">else</span>
+0173                     sz = [sz num2str(1) ];
+0174                 <span class="keyword">end</span>
+0175             <span class="keyword">end</span>
+0176 
+0177             <span class="keyword">if</span> nargin == 2
+0178                 eval( [ obj.get_data_name() <span class="string">' = rand('</span> sz <span class="string">');'</span>] );
+0179             <span class="keyword">else</span>
+0180                 eval( [ obj.get_data_name() <span class="keyword">...</span>
+0181                         <span class="string">' = randi('</span> num2str(imax) <span class="string">', '</span> sz <span class="string">');'</span> ] );
+0182             <span class="keyword">end</span>
+0183         <span class="keyword">end</span>
+0184 
+0185 
+0186         <a name="_sub8" href="#_subfunctions" class="code">function [contract_dims] = </a><span class="keyword">...</span>
+0187                 get_contraction_to(obj, sub_dims)
+0188             contract_dims = [];
+0189             <span class="keyword">for</span> od = 1:length(obj.dims)
+0190                 found=0;
+0191                 <span class="keyword">for</span> sd = 1:length(sub_dims)
+0192                     <span class="keyword">if</span> obj.dims(od) == sub_dims(sd)
+0193                         found=1;
+0194                         <span class="keyword">break</span>;
+0195                     <span class="keyword">end</span>
+0196                 <span class="keyword">end</span>
+0197 
+0198                 <span class="keyword">if</span> ~found
+0199                     contract_dims = [ contract_dims obj.dims(od) ];
+0200                 <span class="keyword">end</span>
+0201             <span class="keyword">end</span>
+0202         <span class="keyword">end</span>
+0203 
+0204 
+0205     <span class="keyword">end</span>
+0206 
+0207 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Tue 14-Aug-2012 15:00:33 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>

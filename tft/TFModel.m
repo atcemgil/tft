@@ -1,26 +1,39 @@
+% Represents data required to describe a tensor factorization model
+%
+%   A model is represented with its name and factors array of
+%   TFFactor objects. dims array of TFDimension objects define
+%   dimensions used by this model. Dimensions are transfered to C++
+%   in the order defined in dims array. See examples below for a
+%   full model description.
+%
+%   Examples:
+%   
+%   dim_i = TFDimension('name', 'i', 'cardinality', 5);
+%   dim_j = TFDimension('cardinality', 6, 'name', 'j');
+%   dim_k = TFDimension('cardinality', 7, 'name', 'k');
+%   dim_r = TFDimension('cardinality', 10, 'name', 'r');
+%   
+%   p_A=TFFactor('name', 'p_A', 'type', 'latent', 'dims', [dim_i dim_r]);
+%   p_B=TFFactor('name', 'p_B', 'type', 'latent', 'dims', [dim_j dim_r]);
+%   p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);
+%   
+%   parafac_model = TFModel('name', 'Parafac', 'factors', [p_A p_B p_C X], 'dims', [dim_i dim_j dim_k dim_r]);
+%   
+%   parafac_model.rand_init_latent_factors('all');
+%
+%   See also TFDimension, TFFactor
+
 classdef TFModel
-% Class representing data required to describe a tensor
-% factorization model
 
     properties
-        name='';    % name of the model
-        factors=[]; % array of TFFactor
+        name='';          % name of the model
+        factors=TFFactor; % array of TFFactor
 
-
-        dims=[];    % array of TFDimension used by factors defines
-                    % order of dimensions on memory
+        dims=TFDimension; % array of TFDimension used by factors defines
+                          % order of dimensions on memory
 
         cost=0;
 
-
-        %tree_index = 0; % index of current model in externally
-        %                % stored TFModel list
-        %
-        %parent_tree_indices=[]; % array of integers representing
-        %                        % indices of parents of this
-        %                        % model. list of models are assumed
-        %                        % to be stored externally
-        %children_tree_indices=[];
     end
 
     methods
@@ -99,11 +112,11 @@ classdef TFModel
                     newmodel = obj;
 
                     if iter==1 && alpha==1
-                        g = newmodel.schedule_dp();
-                        system([ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
-                                            ' dot -o /tmp/img.eps; ' ...
-                                            ' display  /tmp/img.eps ' ...
-                                            '& ' ] ] );
+                        %g = newmodel.schedule_dp();
+                        %system([ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
+                        %                    ' dot -o /tmp/img.eps; ' ...
+                        %                    ' display  /tmp/img.eps ' ...
+                        %                    ' ' ] ] );
                     end
 
                     % perform contraction
@@ -182,11 +195,11 @@ classdef TFModel
                 d_model.factors = [d_model.factors A];
             end
 
-            % perform contraction
-            g = d_model.schedule_dp();
-            system( [ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
-                                ' dot -o /tmp/img.eps ;  display  /tmp/img.eps; ' ] ] );
 
+            %g = d_model.schedule_dp();
+            %system( [ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
+            %                    ' dot -o /tmp/img.eps ;  display  /tmp/img.eps; ' ] ] );
+            % perform contraction
             d_model=d_model.contract_all();
 
             eval( [ 'global ' output_name ';'] );

@@ -1,0 +1,96 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of run_schedule_2</title>
+  <meta name="keywords" content="run_schedule_2">
+  <meta name="description" content="">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html &copy; 2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../m2html.css">
+  <script type="text/javascript">
+    if (top.frames.length == 0) { top.location = "../index.html"; };
+  </script>
+</head>
+<body>
+<a name="_top"></a>
+<!-- menu.html schedule -->
+<h1>run_schedule_2
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong></strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>This is a script file. </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre class="comment"></pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../matlabicon.gif)">
+</ul>
+This function is called by:
+<ul style="list-style-image:url(../matlabicon.gif)">
+</ul>
+<!-- crossreference -->
+
+
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre>0001 
+0002 rng(1)
+0003 
+0004 i=2;
+0005 j=3;
+0006 k=4;
+0007 p=5;
+0008 q=6;
+0009 r=7;
+0010 
+0011 rand_max=10;
+0012 
+0013 A=randi(rand_max,i,p);
+0014 B=randi(rand_max,j,q);
+0015 C=randi(rand_max,k,r);
+0016 G=randi(rand_max,p,q,r);
+0017 F=randi(rand_max,p,q);
+0018 
+0019 
+0020 model_tucker3=struct(<span class="string">'latent_factors'</span>, {<span class="string">'ABCG'</span>}, <span class="keyword">...</span>
+0021                      <span class="string">'input_factors'</span>, {<span class="string">'B'</span>}, <span class="keyword">...</span>
+0022                      <span class="string">'observed_factor'</span>, {<span class="string">'X'</span>} )
+0023 
+0024 model_sample=struct(<span class="string">'latent_factors'</span>, {<span class="string">'AFH'</span>}, <span class="keyword">...</span>
+0025                     <span class="string">'input_factors'</span>, {<span class="string">'F'</span>}, <span class="keyword">...</span>
+0026                     <span class="string">'observed_factor'</span>, {<span class="string">'C'</span>} )
+0027 
+0028 <span class="comment">%model_tucker3=struct('latent_factors', {'G'}, ...</span>
+0029 <span class="comment">%                     'input_factors', {'B'}, ...</span>
+0030 <span class="comment">%                     'observed_factor', {'X'} )</span>
+0031 <span class="comment">%</span>
+0032 <span class="comment">%model_sample=struct('latent_factors', {'AF'}, ...</span>
+0033 <span class="comment">%                  'input_factors', {'F'}, ...</span>
+0034 <span class="comment">%                  'observed_factor', {'C'} )</span>
+0035 <span class="comment">%</span>
+0036 
+0037 
+0038 indices=<span class="string">'ijkpqr'</span>;
+0039 index_cards=[i j k p q r];
+0040 
+0041 factor_indices={<span class="string">'A'</span>, <span class="string">'ip'</span>, <span class="string">'B'</span>, <span class="string">'jq'</span>, <span class="string">'C'</span> <span class="string">'kr'</span>, <span class="string">'G'</span>, <span class="string">'pqr'</span>, <span class="string">'F'</span>, <span class="keyword">...</span>
+0042                 <span class="string">'pq'</span>, <span class="string">'X'</span>, <span class="string">'ijk'</span>, <span class="string">'H'</span>, <span class="string">'kr'</span>}
+0043 
+0044 model={  <span class="keyword">...</span>
+0045     {model_tucker3, model_sample}, <span class="keyword">...</span>
+0046     indices, <span class="keyword">...</span>
+0047     index_cards, <span class="keyword">...</span>
+0048     factor_indices }
+0049 
+0050 schedule_2(model);</pre></div>
+<hr><address>Generated on Mon 09-Jul-2012 22:53:56 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>

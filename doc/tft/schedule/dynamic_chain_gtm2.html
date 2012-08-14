@@ -1,0 +1,173 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of dynamic_chain_gtm2</title>
+  <meta name="keywords" content="dynamic_chain_gtm2">
+  <meta name="description" content="">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html &copy; 2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../../m2html.css">
+  <script type="text/javascript">
+    if (top.frames.length == 0) { top.location = "../../index.html"; };
+  </script>
+</head>
+<body>
+<a name="_top"></a>
+<!-- ../menu.html tft --><!-- menu.html schedule -->
+<h1>dynamic_chain_gtm2
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="box"><strong></strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="box"><strong>This is a script file. </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="fragment"><pre class="comment"></pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../../matlabicon.gif)">
+<li><a href="min_backward_message2.html" class="code" title="function [models] = min_backward_message2(models, lastmodel)">min_backward_message2</a>	sends backward (child to parents) message calculating cumulative</li></ul>
+This function is called by:
+<ul style="list-style-image:url(../../matlabicon.gif)">
+</ul>
+<!-- crossreference -->
+
+
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="fragment"><pre>0001 addpath(<span class="string">'..'</span>)
+0002 tf_model2
+0003 
+0004 all_sequences= <span class="keyword">...</span>
+0005     perms(TFDimensionList2cell(tucker_model.get_contraction_dims));
+0006 
+0007 initmodel = tucker_model;
+0008 models = [initmodel];
+0009 
+0010 <span class="keyword">for</span> s=1:size(all_sequences,1)
+0011     parent=1; <span class="comment">% reset parent</span>
+0012 
+0013     <span class="keyword">for</span> d=1:size(all_sequences,2)
+0014         newmodel = models(parent).contract(all_sequences(s,d));
+0015 
+0016         <span class="comment">% memoization</span>
+0017         found=0;
+0018         <span class="keyword">for</span> i=1:length(models)
+0019             <span class="keyword">if</span> models(i) == newmodel
+0020                 found=i;
+0021                 <span class="keyword">break</span>;
+0022             <span class="keyword">end</span>
+0023         <span class="keyword">end</span>
+0024 
+0025         <span class="keyword">if</span> found == 0
+0026             newmodel.parent_tree_indices = [parent];
+0027             newmodel.cost = newmodel.get_element_size;
+0028             models = [models newmodel];
+0029             models(parent).children_tree_indices = <span class="keyword">...</span>
+0030                 [ models(parent).children_tree_indices length(models) ];
+0031 
+0032             parent = length(models);
+0033 
+0034             <span class="comment">% mark last model for backward message</span>
+0035             <span class="keyword">if</span> length(newmodel.get_current_contraction_dims) == 0
+0036                 lastmodel = length(models);
+0037             <span class="keyword">end</span>
+0038 
+0039         <span class="keyword">else</span>
+0040             <span class="keyword">if</span> sum( models(found).parent_tree_indices == parent ) == 0
+0041                 models(found).parent_tree_indices = <span class="keyword">...</span>
+0042                     [ models(found).parent_tree_indices parent ];
+0043 
+0044                 models(parent).children_tree_indices = <span class="keyword">...</span>
+0045                     [ models(parent).children_tree_indices found ];
+0046             <span class="keyword">end</span>
+0047 
+0048             parent = found;
+0049         <span class="keyword">end</span>
+0050     <span class="keyword">end</span>
+0051 <span class="keyword">end</span>
+0052 
+0053 
+0054 
+0055 
+0056 
+0057 
+0058 
+0059 
+0060 <span class="comment">% calculate cumulative costs</span>
+0061 models=<a href="min_backward_message2.html" class="code" title="function [models] = min_backward_message2(models, lastmodel)">min_backward_message2</a>(models, [lastmodel]);
+0062 
+0063 s=1;
+0064 global_min_path=[];
+0065 <span class="keyword">while</span> s~=lastmodel
+0066     costs=[];
+0067     inds=[];
+0068     <span class="keyword">for</span> i = 1:length(models(s).children_tree_indices)
+0069         costs = [costs models(models(s).children_tree_indices(i)).cost];
+0070         inds = [inds models(s).children_tree_indices(i)];
+0071     <span class="keyword">end</span>
+0072 
+0073     global_min_path = [global_min_path inds(find(costs == <span class="keyword">...</span>
+0074                                                  min(costs)))];
+0075     s=s+1;
+0076 <span class="keyword">end</span>
+0077 
+0078 
+0079 
+0080 p=<span class="string">'[], '</span>;
+0081 
+0082 <span class="keyword">for</span> s=2:length(models)
+0083     p = [ p <span class="string">'[ '</span> ];
+0084     <span class="keyword">for</span> i =1:length(models(s).parent_tree_indices)
+0085         <span class="keyword">if</span> i ~= 1
+0086             p = [ p <span class="string">','</span> ];
+0087         <span class="keyword">end</span>
+0088         p = [ p num2str(models(s).parent_tree_indices(i)) ];
+0089     <span class="keyword">end</span>
+0090     p = [ p <span class="string">' ] '</span> ];
+0091     <span class="keyword">if</span> s ~= length(models)
+0092         p = [ p <span class="string">' , '</span> ];
+0093     <span class="keyword">end</span>
+0094 <span class="keyword">end</span>
+0095 
+0096 
+0097 l=<span class="string">''</span>;
+0098 c=<span class="string">''</span>;
+0099 <span class="keyword">for</span> s=1:length(models)
+0100     <span class="keyword">if</span> s ~= 1
+0101         l = [ l <span class="string">','</span> ];
+0102         c = [ c <span class="string">','</span> ];
+0103     <span class="keyword">end</span>
+0104 
+0105 
+0106     <span class="keyword">if</span> length(models(s).get_current_contraction_dims) == 0
+0107         l = [ l <span class="string">' '''' '</span> ];
+0108     <span class="keyword">else</span>
+0109         l = [ l <span class="string">' '''</span> <span class="keyword">...</span>
+0110               char(models(s).get_current_contraction_dims())' <span class="string">''''</span> <span class="keyword">...</span>
+0111             ];
+0112     <span class="keyword">end</span>
+0113 
+0114     c=[c num2str(models(s).cost) ];
+0115 <span class="keyword">end</span>
+0116 
+0117 
+0118 g=<span class="string">''</span>;
+0119 <span class="keyword">for</span> i=1:length(global_min_path)
+0120     <span class="keyword">if</span> i ~= 1
+0121         g = [ g <span class="string">','</span>];
+0122     <span class="keyword">end</span>
+0123     g = [g num2str(global_min_path(i))];
+0124 <span class="keyword">end</span>
+0125 
+0126 
+0127 system([<span class="string">'python ../visualize/treeplot.py &quot;['</span> p <span class="string">']&quot; &quot;['</span> l <span class="string">']&quot; &quot;['</span> c <span class="string">']&quot; &quot;['</span> g <span class="string">']&quot;'</span> ]);</pre></div>
+<hr><address>Generated on Sun 12-Aug-2012 12:42:25 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>
