@@ -11,13 +11,17 @@
 classdef TFGraph
 
     properties
-        node_list = TFModel(); % list TFModel objects
+        node_list = TFModel; % list TFModel objects
         edges;     % half full binary matrix of node_list relations
 
         optimal_edges % half full minimal cost node_list edges
     end
 
     methods
+        function obj = TFGraph()
+            obj.node_list = [];
+        end
+
         function [r] = exists(obj, tfmodel)
         % returns index of given node
         % returns 0 if node does not exist

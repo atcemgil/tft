@@ -102,6 +102,8 @@ Automatically generated PLTF update rules can be executed using TFModel.pltf(ite
   <img src="img/tucker3_pltf_300.jpg"/>
 </div>
 
+To utilize contraction scheduling on PLTF update rule calculations second parameter must be specified like so: tucker_model.pltf(iteration_number, 'optimal')
+
 <h3>Contraction Scheduling</h3>
 
 PLTF update equations involve a number of Generalized Tensor Multiplication (GTM) operations. Similar to the case in chain matrix multiplication, due to the associativity property of the operation order of chain GTM operations result in different amount of memory usage.

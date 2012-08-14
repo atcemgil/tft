@@ -74,11 +74,17 @@ classdef TFModel
 
         end
 
-        function [] = pltf(obj, iternum)
+        function [] = pltf(obj, iternum, contract_type)
         % performs PLTF update operations on the model
         % returns estimated TFFactor (\hat(X))
         % iternum: number of iterations
+        % contract_type: if optimal contractions are performed in
+        % least memory using sequence
         % defines order of contraction operations
+
+            if nargin == 2
+                contract_type = '';
+            end
 
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
@@ -120,7 +126,7 @@ classdef TFModel
                     end
 
                     % perform contraction
-                    newmodel = newmodel.contract_all();
+                    newmodel = newmodel.contract_all(contract_type);
 
                     % store result in hat_X_data
                     result_name = ...
@@ -139,10 +145,10 @@ classdef TFModel
 
 
                     % generate D1
-                    obj.delta(alpha, 'D1_data', hat_X);
+                    obj.delta(alpha, 'D1_data', contract_type, hat_X);
 
                     % generate D2
-                    obj.delta(alpha, 'D2_data', mask);
+                    obj.delta(alpha, 'D2_data', contract_type, mask);
 
                     % update Z_alpha
                     global D1_data D2_data;
@@ -169,14 +175,18 @@ classdef TFModel
             ylabel('KL divergence');
         end
 
-        function [] = delta(obj, alpha, output_name, A)
+        function [] = delta(obj, alpha, output_name, contract_type, ...
+                            A)
         % PLTF delta function implementation
         % alpha: index of latent factor in TFModel.factors array
         % which will be updated
         % name: unique name used as the name of calculated delta
         % factor data
+        % contract_type: if optimal contractions are performed in
+        % least memory using sequence
         % A: operand element of delta function assumed all ones if
         % not given
+
             
             % create new model for delta operation
             d_model = obj;
@@ -189,7 +199,7 @@ classdef TFModel
             d_model.factors(alpha).isObserved= 1;
 
             % if given, add A as a new latent factor
-            if nargin == 4
+            if nargin == 5
                 A.isLatent = 1;
                 A.isObserved = 0;
                 d_model.factors = [d_model.factors A];
@@ -200,7 +210,7 @@ classdef TFModel
             %system( [ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
             %                    ' dot -o /tmp/img.eps ;  display  /tmp/img.eps; ' ] ] );
             % perform contraction
-            d_model=d_model.contract_all();
+            d_model=d_model.contract_all(contract_type);
 
             eval( [ 'global ' output_name ';'] );
             eval( [ 'global ' ...
@@ -274,6 +284,37 @@ classdef TFModel
             end
         end
 
+        function [ocs_dims] = get_optimal_contraction_sequence_dims(obj)
+        % Runs schedule_dp function to generate graph with least
+        % memory using contraction sequence information in it. Then
+        % searches TFGraph.optimal_edges for the optimal path and
+        % returns a cell of contraction dimension names.
+
+            graph = obj.schedule_dp();
+            t = graph.optimal_edges;
+            t(t==0) = Inf;
+            ocs_models = [];
+            i = length(t);
+            while i ~= 1
+                ocs_models = [ ocs_models graph.node_list(i) ];
+                i = find( t(:,i) == min(t(:, i)) );
+            end
+            ocs_models = [ ocs_models graph.node_list(i) ];
+
+            ocs_dims = {};
+            for i = 1:(length(ocs_models)-1)
+                ocs_dims = [ ocs_dims ...
+                             { setdiff( ...
+                                 ocs_models(i)...
+                                 .get_current_contraction_dims, ...
+                                 ocs_models(i+ ...
+                                            1)...
+                                 .get_current_contraction_dims) }; ...
+                           ];
+            end
+
+        end
+            
 
         function [graph] = schedule_dp(obj)
         % returns a tree of TFModel generated as a result of the
@@ -285,7 +326,8 @@ classdef TFModel
             
             % generate final state of contraction operation to be
             % used as the initial state of dp search
-            end_node = obj.contract_all();
+            end_node = obj.contract_all(); % must not be optimal,
+                                           % infinite loop!
 
             graph = TFGraph;
             process_nodes = [end_node];
@@ -470,9 +512,9 @@ classdef TFModel
 
             if isa(dim, 'TFDimension')
                 dim = dim.name;
-            elseif isa(dim, 'char') || isa(dim, 'cell')
-                dim = char(dim);
-            else
+            elseif isa(dim, 'cell')
+                dim = char(dim{1});
+            elseif ~isa(dim, 'char')
                 display(['ERROR: unsupported dim type ' class(dim) ...
                          'was expecting TFDimension, cell or char ' ...
                          'array']);
@@ -742,8 +784,30 @@ classdef TFModel
         end
 
 
-        function [newmodel] = contract_all(obj)
-            contract_dims = obj.get_contraction_dims();
+        function [newmodel] = contract_all(obj, contract_type)
+        % performs all necessary contraction operations for the
+        % model. if contract_type argument is equal to 'optimal'
+        % then schedule_dp() is used to find the optimal (least
+        % memory using) sequence and the optimal sequence is used
+        % to contract all necessary dimensions. Otherwise
+        % get_contraction_dims() is used to order contraction
+        % operation which does not order dimensions
+
+            if nargin == 2 && strcmp(contract_type, 'optimal')
+                contract_dims = ...
+                    obj.get_optimal_contraction_sequence_dims();
+
+                %for i=1:length(contract_dims)
+                %    display(['optimal contracting ' ...
+                %             char(contract_dims{i})]);
+                %end
+            else
+                contract_dims = obj.get_contraction_dims();
+
+                %for i=1:length(contract_dims)
+                %    display(['contracting ' contract_dims(i).name]);
+                %end
+            end
 
             newmodel = obj;
             for i = 1:length(contract_dims)
@@ -791,7 +855,7 @@ classdef TFModel
         end
 
         function [contract_dims] = get_current_contraction_dims(obj)
-        % returns cell of dimensions which must be contracted to
+        % returns cell of TFDimensions which must be contracted to
         % calculate output factor(s) by using current factors to
         % calculate all dimension not model.dims. (model.dims is always
         % fixed to maximum possible dimension list.)

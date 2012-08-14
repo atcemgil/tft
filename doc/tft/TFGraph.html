@@ -48,7 +48,7 @@ This function is called by:
 
 <h2><a name="_subfunctions"></a>SUBFUNCTIONS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
 <ul style="list-style-image:url(../matlabicon.gif)">
-<li><a href="#_sub1" class="code">function [r] = exists(obj, tfmodel)</a></li><li><a href="#_sub2" class="code">function [obj] = clear_edges(obj)</a></li><li><a href="#_sub3" class="code">function [obj] = increment_edges(obj)</a></li><li><a href="#_sub4" class="code">function [m] = get_min_arriving_cost(obj, node_index)</a></li><li><a href="#_sub5" class="code">function [obj] = append_node(obj, parent_node, new_node)</a></li><li><a href="#_sub6" class="code">function [obj] = update_node(obj, parent_node, child_node,</a></li><li><a href="#_sub7" class="code">function [str] = get_factor_dim_string(obj,</a></li><li><a href="#_sub8" class="code">function [str] = get_current_contraction_dims_string(obj,</a></li><li><a href="#_sub9" class="code">function [str] = print_dot(obj)</a></li></ul>
+<li><a href="#_sub1" class="code">function obj = TFGraph()</a></li><li><a href="#_sub2" class="code">function [r] = exists(obj, tfmodel)</a></li><li><a href="#_sub3" class="code">function [obj] = clear_edges(obj)</a></li><li><a href="#_sub4" class="code">function [obj] = increment_edges(obj)</a></li><li><a href="#_sub5" class="code">function [m] = get_min_arriving_cost(obj, node_index)</a></li><li><a href="#_sub6" class="code">function [obj] = append_node(obj, parent_node, new_node)</a></li><li><a href="#_sub7" class="code">function [obj] = update_node(obj, parent_node, child_node,</a></li><li><a href="#_sub8" class="code">function [str] = get_factor_dim_string(obj,</a></li><li><a href="#_sub9" class="code">function [str] = get_current_contraction_dims_string(obj,</a></li><li><a href="#_sub10" class="code">function [str] = print_dot(obj)</a></li></ul>
 
 <h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
 <div class="fragment"><pre>0001 <span class="comment">% Represents a graph of TFModel objects.</span>
@@ -64,165 +64,169 @@ This function is called by:
 0011 classdef <a href="TFGraph.html" class="code" title="">TFGraph</a>
 0012 
 0013     properties
-0014         node_list = <a href="TFModel.html" class="code" title="">TFModel</a>(); <span class="comment">% list TFModel objects</span>
+0014         node_list = <a href="TFModel.html" class="code" title="">TFModel</a>; <span class="comment">% list TFModel objects</span>
 0015         edges;     <span class="comment">% half full binary matrix of node_list relations</span>
 0016 
 0017         optimal_edges <span class="comment">% half full minimal cost node_list edges</span>
 0018     <span class="keyword">end</span>
 0019 
 0020     methods
-0021         <a name="_sub0" href="#_subfunctions" class="code">function [r] = exists(obj, tfmodel)</a>
-0022         <span class="comment">% returns index of given node</span>
-0023         <span class="comment">% returns 0 if node does not exist</span>
-0024             r = 0;
-0025             <span class="keyword">for</span> nli = 1:length(obj.node_list)
-0026                 <span class="keyword">if</span> obj.node_list(nli) == tfmodel
-0027                     r = nli;
-0028                     <span class="keyword">return</span>
-0029                 <span class="keyword">end</span>
-0030             <span class="keyword">end</span>
-0031         <span class="keyword">end</span>
-0032 
-0033 
-0034         <a name="_sub1" href="#_subfunctions" class="code">function [obj] = clear_edges(obj)</a>
-0035             obj.edges = zeros(length(obj.node_list));
-0036             obj.optimal_edges = zeros(length(obj.node_list));
-0037         <span class="keyword">end</span>
-0038 
-0039         <a name="_sub2" href="#_subfunctions" class="code">function [obj] = increment_edges(obj)</a>
-0040         <span class="comment">% extend relationship matrices</span>
-0041             obj.edges = [ obj.edges ; <span class="keyword">...</span>
-0042                           zeros(1,size(obj.edges, 2))];
-0043             obj.edges = [ obj.edges <span class="keyword">...</span>
-0044                           zeros(length(obj.node_list),1)];
-0045 
-0046             obj.optimal_edges = [ obj.optimal_edges ; <span class="keyword">...</span>
-0047                                 zeros(1, <span class="keyword">...</span>
-0048                                       size(obj.optimal_edges,2 ))];
-0049             obj.optimal_edges = [ obj.optimal_edges <span class="keyword">...</span>
-0050                                 zeros(length(obj.node_list),1)];
-0051         <span class="keyword">end</span>
-0052 
-0053 
-0054         <a name="_sub3" href="#_subfunctions" class="code">function [m] = get_min_arriving_cost(obj, node_index)</a>
-0055             A = obj.optimal_edges(:, node_index);
-0056             A(~A) = inf;
-0057             m = min(A);
-0058             <span class="keyword">if</span> isinf(m)
-0059                 m = 0;
-0060             <span class="keyword">end</span>
-0061         <span class="keyword">end</span>
-0062 
-0063 
-0064         <a name="_sub4" href="#_subfunctions" class="code">function [obj] = append_node(obj, parent_node, new_node)</a>
-0065         <span class="comment">% adds a new node to the graph object</span>
-0066             obj.node_list = [obj.node_list new_node];
+0021         <a name="_sub0" href="#_subfunctions" class="code">function obj = TFGraph()</a>
+0022             obj.node_list = [];
+0023         <span class="keyword">end</span>
+0024 
+0025         <a name="_sub1" href="#_subfunctions" class="code">function [r] = exists(obj, tfmodel)</a>
+0026         <span class="comment">% returns index of given node</span>
+0027         <span class="comment">% returns 0 if node does not exist</span>
+0028             r = 0;
+0029             <span class="keyword">for</span> nli = 1:length(obj.node_list)
+0030                 <span class="keyword">if</span> obj.node_list(nli) == tfmodel
+0031                     r = nli;
+0032                     <span class="keyword">return</span>
+0033                 <span class="keyword">end</span>
+0034             <span class="keyword">end</span>
+0035         <span class="keyword">end</span>
+0036 
+0037 
+0038         <a name="_sub2" href="#_subfunctions" class="code">function [obj] = clear_edges(obj)</a>
+0039             obj.edges = zeros(length(obj.node_list));
+0040             obj.optimal_edges = zeros(length(obj.node_list));
+0041         <span class="keyword">end</span>
+0042 
+0043         <a name="_sub3" href="#_subfunctions" class="code">function [obj] = increment_edges(obj)</a>
+0044         <span class="comment">% extend relationship matrices</span>
+0045             obj.edges = [ obj.edges ; <span class="keyword">...</span>
+0046                           zeros(1,size(obj.edges, 2))];
+0047             obj.edges = [ obj.edges <span class="keyword">...</span>
+0048                           zeros(length(obj.node_list),1)];
+0049 
+0050             obj.optimal_edges = [ obj.optimal_edges ; <span class="keyword">...</span>
+0051                                 zeros(1, <span class="keyword">...</span>
+0052                                       size(obj.optimal_edges,2 ))];
+0053             obj.optimal_edges = [ obj.optimal_edges <span class="keyword">...</span>
+0054                                 zeros(length(obj.node_list),1)];
+0055         <span class="keyword">end</span>
+0056 
+0057 
+0058         <a name="_sub4" href="#_subfunctions" class="code">function [m] = get_min_arriving_cost(obj, node_index)</a>
+0059             A = obj.optimal_edges(:, node_index);
+0060             A(~A) = inf;
+0061             m = min(A);
+0062             <span class="keyword">if</span> isinf(m)
+0063                 m = 0;
+0064             <span class="keyword">end</span>
+0065         <span class="keyword">end</span>
+0066 
 0067 
-0068             obj = obj.increment_edges();
-0069 
-0070             <span class="comment">% update relation matrices</span>
-0071             parent_index = obj.exists(parent_node);
-0072             <span class="keyword">if</span> ~parent_index
-0073                 display(<span class="string">'ERROR: parent is not in the node_list'</span>)
-0074             <span class="keyword">end</span>
-0075             obj.edges(parent_index, end) = 1;
-0076 
-0077             obj.optimal_edges(parent_index, end) = <span class="keyword">...</span>
-0078                 obj.get_min_arriving_cost(parent_index) + <span class="keyword">...</span>
-0079                 new_node.cost;
-0080         <span class="keyword">end</span>
-0081 
-0082 
-0083         <a name="_sub5" href="#_subfunctions" class="code">function [obj] = update_node(obj, parent_node, child_node, </a><span class="keyword">...</span>
-0084                                      nnidx)
-0085         <span class="comment">% updates relation of parent_node and child_node</span>
+0068         <a name="_sub5" href="#_subfunctions" class="code">function [obj] = append_node(obj, parent_node, new_node)</a>
+0069         <span class="comment">% adds a new node to the graph object</span>
+0070             obj.node_list = [obj.node_list new_node];
+0071 
+0072             obj = obj.increment_edges();
+0073 
+0074             <span class="comment">% update relation matrices</span>
+0075             parent_index = obj.exists(parent_node);
+0076             <span class="keyword">if</span> ~parent_index
+0077                 display(<span class="string">'ERROR: parent is not in the node_list'</span>)
+0078             <span class="keyword">end</span>
+0079             obj.edges(parent_index, end) = 1;
+0080 
+0081             obj.optimal_edges(parent_index, end) = <span class="keyword">...</span>
+0082                 obj.get_min_arriving_cost(parent_index) + <span class="keyword">...</span>
+0083                 new_node.cost;
+0084         <span class="keyword">end</span>
+0085 
 0086 
-0087             pidx = obj.exists(parent_node);
-0088 
-0089             <span class="comment">% create link between parent and child</span>
-0090             obj.edges(pidx, nnidx) = 1;
-0091 
-0092             obj.optimal_edges(pidx, nnidx) = <span class="keyword">...</span>
-0093                 obj.get_min_arriving_cost(pidx) + <span class="keyword">...</span>
-0094                 child_node.cost;
-0095         <span class="keyword">end</span>
-0096 
-0097 
-0098         <a name="_sub6" href="#_subfunctions" class="code">function [str] = get_factor_dim_string(obj, </a><span class="keyword">...</span>
-0099                                                node_list_index)
-0100             str = <span class="string">''</span>;
-0101             first=1;
-0102             <span class="keyword">for</span> find = 1: <span class="keyword">...</span>
-0103                        length(obj.node_list(node_list_index) <span class="keyword">...</span>
-0104                               .factors)
-0105                 <span class="keyword">if</span> obj.node_list(node_list_index).factors(find).isLatent
-0106                     <span class="keyword">if</span> ~first
-0107                         str = [ str <span class="string">', '</span> ];
-0108                     <span class="keyword">end</span>
-0109                     first=0;
-0110 
-0111                     <span class="keyword">for</span> dind = length(<span class="keyword">...</span>
-0112                         obj.node_list(node_list_index).factors(find) <span class="keyword">...</span>
-0113                         .dims):-1:1
-0114                         str = [ str <span class="keyword">...</span>
-0115                                 char(obj.node_list(node_list_index) <span class="keyword">...</span>
-0116                                      .factors(find).dims(dind).name) ];
-0117                     <span class="keyword">end</span>
-0118                 <span class="keyword">end</span>
-0119             <span class="keyword">end</span>
-0120         <span class="keyword">end</span>
-0121 
-0122 
-0123         <a name="_sub7" href="#_subfunctions" class="code">function [str] = get_current_contraction_dims_string(obj, </a><span class="keyword">...</span>
-0124                                                              node_list_index)
-0125             str = <span class="string">''</span>;
-0126             cont_dims = <span class="keyword">...</span>
-0127                 obj.node_list(node_list_index) <span class="keyword">...</span>
-0128                 .get_current_contraction_dims;
-0129 
-0130             <span class="keyword">for</span> cdi = 1:length(cont_dims)
-0131                 str = [ str <span class="keyword">...</span>
-0132                         char(cont_dims(cdi)) ];
-0133             <span class="keyword">end</span>
-0134         <span class="keyword">end</span>
-0135 
-0136 
-0137         <a name="_sub8" href="#_subfunctions" class="code">function [str] = print_dot(obj)</a>
-0138             str= [ <span class="string">'digraph structs{'</span> char(10) <span class="keyword">...</span>
-0139                    <span class="string">'rankdir=LR;'</span> char(10) <span class="keyword">...</span>
-0140                    <span class="string">'node [shape=Mrecord];'</span> char(10) <span class="keyword">...</span>
-0141                    <span class="string">'splines=false '</span> char(10)];
-0142 
-0143             <span class="keyword">for</span> nid = 1:length(obj.node_list)
-0144                 str = [ str <span class="string">'struct'</span> num2str(nid) <span class="string">' [label=&quot;&lt;f0&gt; '</span> <span class="keyword">...</span>
-0145                         obj.get_current_contraction_dims_string(nid) <span class="keyword">...</span>
-0146                         <span class="string">' | &lt;f1&gt; '</span> obj.get_factor_dim_string(nid) <span class="string">'&quot;];'</span> <span class="keyword">...</span>
-0147                         char(10) 
-0148                       ];
-0149             <span class="keyword">end</span>
-0150 
-0151             <span class="keyword">for</span> i = 1:length(obj.edges)
-0152                 <span class="keyword">for</span> j = 1:i
-0153                     <span class="keyword">if</span> obj.edges(j,i)
-0154                         str = [ str <span class="keyword">...</span>
-0155                                 <span class="string">'struct'</span> num2str(j) <span class="string">':f0 -&gt;'</span> <span class="keyword">...</span>
-0156                                 <span class="string">'struct'</span> num2str(i) <span class="string">':f0 '</span> <span class="keyword">...</span>
-0157                                 <span class="string">'[ label=&quot;'</span> <span class="keyword">...</span>
-0158                                 setdiff(obj <span class="keyword">...</span>
-0159                                         .get_current_contraction_dims_string(i), <span class="keyword">...</span>
-0160                                         obj.get_current_contraction_dims_string(j)) <span class="keyword">...</span>
-0161                                 <span class="string">'('</span> num2str(obj.optimal_edges(j,i))  <span class="string">')&quot; ];'</span> char(10) ];
-0162                     <span class="keyword">end</span>
-0163                 <span class="keyword">end</span>
-0164             <span class="keyword">end</span>
-0165 
-0166             str = [ str char(10) <span class="string">'}'</span> ];
-0167 
-0168         <span class="keyword">end</span>
+0087         <a name="_sub6" href="#_subfunctions" class="code">function [obj] = update_node(obj, parent_node, child_node, </a><span class="keyword">...</span>
+0088                                      nnidx)
+0089         <span class="comment">% updates relation of parent_node and child_node</span>
+0090 
+0091             pidx = obj.exists(parent_node);
+0092 
+0093             <span class="comment">% create link between parent and child</span>
+0094             obj.edges(pidx, nnidx) = 1;
+0095 
+0096             obj.optimal_edges(pidx, nnidx) = <span class="keyword">...</span>
+0097                 obj.get_min_arriving_cost(pidx) + <span class="keyword">...</span>
+0098                 child_node.cost;
+0099         <span class="keyword">end</span>
+0100 
+0101 
+0102         <a name="_sub7" href="#_subfunctions" class="code">function [str] = get_factor_dim_string(obj, </a><span class="keyword">...</span>
+0103                                                node_list_index)
+0104             str = <span class="string">''</span>;
+0105             first=1;
+0106             <span class="keyword">for</span> find = 1: <span class="keyword">...</span>
+0107                        length(obj.node_list(node_list_index) <span class="keyword">...</span>
+0108                               .factors)
+0109                 <span class="keyword">if</span> obj.node_list(node_list_index).factors(find).isLatent
+0110                     <span class="keyword">if</span> ~first
+0111                         str = [ str <span class="string">', '</span> ];
+0112                     <span class="keyword">end</span>
+0113                     first=0;
+0114 
+0115                     <span class="keyword">for</span> dind = length(<span class="keyword">...</span>
+0116                         obj.node_list(node_list_index).factors(find) <span class="keyword">...</span>
+0117                         .dims):-1:1
+0118                         str = [ str <span class="keyword">...</span>
+0119                                 char(obj.node_list(node_list_index) <span class="keyword">...</span>
+0120                                      .factors(find).dims(dind).name) ];
+0121                     <span class="keyword">end</span>
+0122                 <span class="keyword">end</span>
+0123             <span class="keyword">end</span>
+0124         <span class="keyword">end</span>
+0125 
+0126 
+0127         <a name="_sub8" href="#_subfunctions" class="code">function [str] = get_current_contraction_dims_string(obj, </a><span class="keyword">...</span>
+0128                                                              node_list_index)
+0129             str = <span class="string">''</span>;
+0130             cont_dims = <span class="keyword">...</span>
+0131                 obj.node_list(node_list_index) <span class="keyword">...</span>
+0132                 .get_current_contraction_dims;
+0133 
+0134             <span class="keyword">for</span> cdi = 1:length(cont_dims)
+0135                 str = [ str <span class="keyword">...</span>
+0136                         char(cont_dims(cdi)) ];
+0137             <span class="keyword">end</span>
+0138         <span class="keyword">end</span>
+0139 
+0140 
+0141         <a name="_sub9" href="#_subfunctions" class="code">function [str] = print_dot(obj)</a>
+0142             str= [ <span class="string">'digraph structs{'</span> char(10) <span class="keyword">...</span>
+0143                    <span class="string">'rankdir=LR;'</span> char(10) <span class="keyword">...</span>
+0144                    <span class="string">'node [shape=Mrecord];'</span> char(10) <span class="keyword">...</span>
+0145                    <span class="string">'splines=false '</span> char(10)];
+0146 
+0147             <span class="keyword">for</span> nid = 1:length(obj.node_list)
+0148                 str = [ str <span class="string">'struct'</span> num2str(nid) <span class="string">' [label=&quot;&lt;f0&gt; '</span> <span class="keyword">...</span>
+0149                         obj.get_current_contraction_dims_string(nid) <span class="keyword">...</span>
+0150                         <span class="string">' | &lt;f1&gt; '</span> obj.get_factor_dim_string(nid) <span class="string">'&quot;];'</span> <span class="keyword">...</span>
+0151                         char(10) 
+0152                       ];
+0153             <span class="keyword">end</span>
+0154 
+0155             <span class="keyword">for</span> i = 1:length(obj.edges)
+0156                 <span class="keyword">for</span> j = 1:i
+0157                     <span class="keyword">if</span> obj.edges(j,i)
+0158                         str = [ str <span class="keyword">...</span>
+0159                                 <span class="string">'struct'</span> num2str(j) <span class="string">':f0 -&gt;'</span> <span class="keyword">...</span>
+0160                                 <span class="string">'struct'</span> num2str(i) <span class="string">':f0 '</span> <span class="keyword">...</span>
+0161                                 <span class="string">'[ label=&quot;'</span> <span class="keyword">...</span>
+0162                                 setdiff(obj <span class="keyword">...</span>
+0163                                         .get_current_contraction_dims_string(i), <span class="keyword">...</span>
+0164                                         obj.get_current_contraction_dims_string(j)) <span class="keyword">...</span>
+0165                                 <span class="string">'('</span> num2str(obj.optimal_edges(j,i))  <span class="string">')&quot; ];'</span> char(10) ];
+0166                     <span class="keyword">end</span>
+0167                 <span class="keyword">end</span>
+0168             <span class="keyword">end</span>
 0169 
-0170 
-0171     <span class="keyword">end</span>
-0172 <span class="keyword">end</span></pre></div>
-<hr><address>Generated on Tue 14-Aug-2012 15:00:33 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+0170             str = [ str char(10) <span class="string">'}'</span> ];
+0171 
+0172         <span class="keyword">end</span>
+0173 
+0174 
+0175     <span class="keyword">end</span>
+0176 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Tue 14-Aug-2012 17:57:05 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
 </body>
 </html>
