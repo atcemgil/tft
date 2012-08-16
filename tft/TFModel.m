@@ -25,6 +25,7 @@
 
 classdef TFModel
 
+
     properties
         name='';          % name of the model
         factors=TFFactor; % array of TFFactor
@@ -35,6 +36,7 @@ classdef TFModel
         cost=0;
 
     end
+
 
     methods
 
@@ -74,62 +76,111 @@ classdef TFModel
 
         end
 
-        function [] = pltf(obj, iternum, contract_type)
+
+
+
+        function [] = pltf(obj, iternum, contract_type, operation_type)
         % performs PLTF update operations on the model
         % returns estimated TFFactor (\hat(X))
+        %
         % iternum: number of iterations
-        % contract_type: if optimal contractions are performed in
-        % least memory using sequence
-        % defines order of contraction operations
+        %
+        % contract_type: if equals to 'optimal', contractions are
+        % performed in least memory using sequence defines order of
+        % contraction operations, if equals to 'full', full tensor
+        % is used for contraction operations instead of generating
+        % temporary factors.
+        %
+        % operation_type: if equals to 'compute' normal contraction
+        % operations are performed. if equals to 'mem_analysis'
+        % operation are not performed but memory requirement is
+        % calculated and reported.
 
             if nargin == 2
                 contract_type = '';
             end
+            if nargin < 4
+                operation_type = 'compute';
+            end
+
 
             % init optimal model cache
             global ocs_cache;
             ocs_cache = [];
 
+            % initalize data_mem with memory requirements of the
+            % model elements
+            data_mem = obj.get_element_size();
+
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
+            % hat_X requires extra memory
+            data_mem = data_mem + hat_X.get_element_size();
 
-            eval( [ 'global ' obj.observed_factor.get_data_name() ...
-                    ';' ] );
-            global hat_X_data;
-            hat_X.rand_init(obj.dims, 100);
+            if strcmp( operation_type, 'compute' )
+                eval( [ 'global ' obj.observed_factor.get_data_name() ...
+                        ';' ] );
+                global hat_X_data;
+                hat_X.rand_init(obj.dims, 100);
+            end
 
             mask = obj.observed_factor;
             mask.name = 'mask';
-            global mask_data;
-            mask_data = ones(size(hat_X_data));
+            % mask requires extra memory
+            data_mem = data_mem + mask.get_element_size();
 
+            if strcmp( operation_type, 'compute' )
+                global mask_data;
+                mask_data = ones(size(hat_X_data));
+                KL=zeros(1,iternum);
+                for iter = 1:iternum
+                    display(['iteration' char(9) num2str(iter)]);
+                    [ kl extra_mem ] = obj.pltf_iteration(contract_type, ...
+                                                          hat_X, ...
+                                                          mask, ...
+                                                          operation_type);
+                    KL(iter) = kl;
+                end
 
-            KL=zeros(1,iternum);
-            for iter = 1:iternum
-                iter
-                kl = obj.pltf_iteration(contract_type, hat_X, ...
-                                        mask, 'operate');
-                KL(iter) = kl;
+                display(['KL divergence over iterations: ']);
+                display(KL);
+                plot(KL);
+                title('KL divergence over iterations');
+                xlabel('iteration number');
+                ylabel('KL divergence');
+
+            elseif strcmp( operation_type, 'mem_analysis' )
+                [ kl extra_mem ] = obj.pltf_iteration(contract_type, hat_X, ...
+                                                      mask, ...
+                                                      operation_type);
+                
             end
 
-            display(['KL divergence over iterations: ']);
-            display(KL);
-            plot(KL);
-            title('KL divergence over iterations');
-            xlabel('iteration number');
-            ylabel('KL divergence');
+            data_mem = data_mem + extra_mem;
+            display([char(10) ...
+                     'data elements required: ' num2str(data_mem) ...
+                     char(10) ...
+                     ['memory size with (8 byte) double precision: ' ...
+                      num2str(8 * data_mem / 1000 / 1000) ' MB' ] ] );
         end
 
 
-        function [kl] = pltf_iteration(obj, contract_type, ...
-                                       hat_X, mask, ...
-                                       operation_type)
 
+
+        function [ kl extra_mem ] = pltf_iteration(obj, ...
+                                                  contract_type, ...
+                                                  hat_X, mask, ...
+                                                  operation_type)
             % helper function for the pltf inner loop
             % operation_type: 'compute' if actual computation is
-            % requested, 'calc_mem' if only memory usage
+            % requested, 'mem_analysis' if only memory usage
             % computation is requested
+            % 
+            % returns KL divergence value calculated at the end of
+            % the operations. extra_mem is incremented with
+            % temporary data usage requirements
 
+            extra_mem = 0;
             for alpha=1:length(obj.latent_factor_indices)
                 % access global data
                 eval( [ 'global ' obj.observed_factor.get_data_name() ...
@@ -146,7 +197,7 @@ classdef TFModel
                 newmodel = obj;
 
                 %if iter==1 && alpha==1
-                    %g = newmodel.schedule_dp();
+                    %g = newmodel.schedule_dp(operation_type);
                     %system([ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
                     %                    ' dot -o /tmp/img.eps; ' ...
                     %                    ' display  /tmp/img.eps ' ...
@@ -154,7 +205,12 @@ classdef TFModel
                 %end
 
                 % perform contraction
-                newmodel = newmodel.contract_all(contract_type);
+                [ newmodel e_m ] = ...
+                    newmodel.contract_all(contract_type, ...
+                                          operation_type);
+
+                extra_mem = extra_mem + e_m;
+
 
                 % store result in hat_X_data
                 result_name = ...
@@ -166,48 +222,69 @@ classdef TFModel
 
 
                 % store X / hat_X in hat_X data
-                eval( [ 'hat_X_data  =  ' ...
-                        X_name ...
-                        ' ./ ' ...
-                        ' hat_X_data ;' ] );
+                if strcmp( operation_type, 'compute' )
+                    eval( [ 'hat_X_data  =  ' ...
+                            X_name ...
+                            ' ./ ' ...
+                            ' hat_X_data ;' ] );
+                end
 
 
                 % generate D1
-                obj.delta(alpha, 'D1_data', contract_type, hat_X);
+                [ e_m ] = obj.delta(alpha, 'D1_data', ...
+                                    contract_type, ...
+                                    operation_type, ...
+                                    hat_X);
+                extra_mem = extra_mem + e_m;                
 
                 % generate D2
-                obj.delta(alpha, 'D2_data', contract_type, mask);
+                [ e_m ] = obj.delta(alpha, 'D2_data', ...
+                                    contract_type, ...
+                                    operation_type, ...
+                                    mask);
+                extra_mem = extra_mem + e_m;
 
                 % update Z_alpha
-                global D1_data D2_data;
-                eval( [ Z_alpha_name '=' Z_alpha_name ' .* ' ...
-                        'D1_data'                     ' ./ ' ...
-                        'D2_data ;' ] );
+                if strcmp( operation_type, 'compute' )
+                    global D1_data D2_data;
+                    eval( [ Z_alpha_name '=' Z_alpha_name ' .* ' ...
+                            'D1_data'                     ' ./ ' ...
+                            'D2_data ;' ] );
+                end
             end
 
-            % calculate KL divergence
-            eval ( [ 'kl = sum(sum(sum( (hat_X_data .* ' X_name ') .* ' ...
-                     ' (log( (hat_X_data .* ' X_name ') ) - ' ...
-                     'log(' X_name ...
-                     ') ) - (hat_X_data .* ' X_name ')' ...
-                     '+ ' X_name ...
-                     ')));' ]);
+            if strcmp( operation_type, 'compute' )
+                % calculate KL divergence
+                eval ( [ 'kl = sum(sum(sum( (hat_X_data .* ' X_name ') .* ' ...
+                         ' (log( (hat_X_data .* ' X_name ') ) - ' ...
+                         'log(' X_name ...
+                         ') ) - (hat_X_data .* ' X_name ')' ...
+                         '+ ' X_name ...
+                         ')));' ]);
+            else
+                kl = 0;
+            end
         end
 
 
-        function [] = delta(obj, alpha, output_name, contract_type, ...
-                            A)
+
+
+        function [extra_mem] = delta(obj, alpha, output_name, ...
+                                     contract_type, operation_type, ...
+                                     A)
         % PLTF delta function implementation
         % alpha: index of latent factor in TFModel.factors array
         % which will be updated
         % name: unique name used as the name of calculated delta
         % factor data
-        % contract_type: if optimal contractions are performed in
-        % least memory using sequence
+        % contract_type: see description in pltf function
         % A: operand element of delta function assumed all ones if
         % not given
-
+        %
+        % returns extra_mem required by temporary tensor usage
             
+            extra_mem = 0;
+
             % create new model for delta operation
             d_model = obj;
 
@@ -219,154 +296,39 @@ classdef TFModel
             d_model.factors(alpha).isObserved= 1;
 
             % if given, add A as a new latent factor
-            if nargin == 5
+            if nargin == 6
                 A.isLatent = 1;
                 A.isObserved = 0;
                 d_model.factors = [d_model.factors A];
             end
 
 
-            %g = d_model.schedule_dp();
+            %g = d_model.schedule_dp(operation_type);
             %system( [ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
             %                    ' dot -o /tmp/img.eps ;  display  /tmp/img.eps; ' ] ] );
+
             % perform contraction
-            d_model=d_model.contract_all(contract_type);
+            [ d_model e_m ] = d_model.contract_all(contract_type, ...
+                                                   operation_type);
+            extra_mem = extra_mem + e_m;
 
-            eval( [ 'global ' output_name ';'] );
-            eval( [ 'global ' ...
-                    d_model.get_first_non_observed_factor().get_data_name() ';'...
-                  ] );
+            if strcmp( operation_type, 'compute' )
 
-            eval( [ output_name '=' ...
-                    d_model.get_first_non_observed_factor().get_data_name() ...
-                    ';' ]);
-        end
+                eval( [ 'global ' output_name ';'] );
+                eval( [ 'global ' ...
+                        d_model.get_first_non_observed_factor().get_data_name() ';'...
+                      ] );
 
-
-        function [r] = eq(a,b)
-            r = false;
-
-            % mark matched b factors
-            % if there are any unmarked -> inequal
-            % problematic case: 
-            % a.factors ( ip, jpi ) , b.factors (  ip, pi )
-            % b==a matches all b objects with a.factors(1)
-            % but a~=b !
-
-            b_marks = zeros(size(b.factors));
-
-            if length(a.factors) == length(b.factors)
-                for f_a = 1:length(a.factors)
-                    found = 0;
-                    for f_b = 1:length(b.factors)
-                        if a.factors(f_a) == b.factors(f_b) && ...
-                                b_marks(f_b) == 0
-                            found = 1;
-                            b_marks(f_b) = 1;
-                            break
-                        end
-                    end
-
-                    if found == 0
-                        return
-                    end
-                end
-
-                r = true;
+                eval( [ output_name '=' ...
+                        d_model.get_first_non_observed_factor().get_data_name() ...
+                        ';' ]);
             end
         end
 
-        function [uncontraction_dims] = get_uncontraction_dims(obj)
-        % returns list of TFDimension objects representing
-        % dimensions which are required to be added to the current
-        % TFModel object in order to reach initial model where
-        % uncontraction_dims = {}
-        % Calculation is performed as follows: 
-        % uncontraction_dims = contraction_dims - current_contraction_dims
-
-            contraction_dims = obj.get_contraction_dims();
-            current_contraction_dims = ...
-                obj.get_current_contraction_dims();
-            uncontraction_dims = [];
-
-            for cdi = 1:length(contraction_dims)
-                found=0;
-                for ccdi = 1:length(current_contraction_dims)
-                    if contraction_dims(cdi) == ...
-                            char(current_contraction_dims(ccdi))
-                        found=1;
-                        break;
-                    end
-                end
-                if ~found
-                    uncontraction_dims = [ uncontraction_dims ...
-                                        contraction_dims(cdi) ];
-                end
-            end
-        end
-
-        function [ocs_dims] = get_optimal_contraction_sequence_dims(obj)
-        % Runs schedule_dp function to generate graph with least
-        % memory using contraction sequence information in it. Then
-        % searches TFGraph.optimal_edges for the optimal path and
-        % returns a cell list of contraction dimension names.
-
-            global ocs_cache;
-
-            found = false;
-            for o = 1:length(ocs_cache)
-                if ocs_cache(o).model == obj
-                    found=true;
-                    break
-                end
-            end
-
-            if found
-                %display('cache hit')
-
-                %display([ 'ocs dims' ])
-                ocs_dims = ocs_cache(o).ocs_dims;
-                %for a =1:length(ocs_dims)
-                %    ocs_dims{a}
-                %end
-                return
-            %else
-            %    display('cache miss')
-            end
 
 
-            graph = obj.schedule_dp();
-            t = graph.optimal_edges;
-            t(t==0) = Inf;
-            ocs_models = [];
-            i = length(t);
-            while i ~= 1
-                ocs_models = [ ocs_models graph.node_list(i) ];
-                i = find( t(:,i) == min(t(:, i)) );
-            end
-            ocs_models = [ ocs_models graph.node_list(i) ];
 
-            ocs_dims = [];
-            for i = 1:(length(ocs_models)-1)
-                ocs_dims = [ ocs_dims ...
-                             { setdiff( ...
-                                 ocs_models(i)...
-                                 .get_current_contraction_dims, ...
-                                 ocs_models(i+ ...
-                                            1)...
-                                 .get_current_contraction_dims) }; ...
-                           ];
-            end
-
-            %display([ 'cache store' ])
-            %for a =1:length(ocs_dims)
-            %    ocs_dims{a}
-            %end
-            ocs_cache = [ ocs_cache TFOCSCache(obj, ocs_dims) ];
-        end
-            
-
-        function [graph] = schedule_dp(obj)
+        function [graph] = schedule_dp(obj, operation_type)
         % returns a tree of TFModel generated as a result of the
         % search for least memory consuming contraction sequence
         % with a dynamic programming approach
@@ -376,8 +338,8 @@ classdef TFModel
             
             % generate final state of contraction operation to be
             % used as the initial state of dp search
-            end_node = obj.contract_all(); % must not be optimal,
-                                           % infinite loop!
+            end_node = obj.contract_all('standard', ...  % must not be optimal or infinite loop!
+                                        operation_type);
 
             graph = TFGraph;
             process_nodes = [end_node];
@@ -414,6 +376,8 @@ classdef TFModel
             end
 
         end
+
+
 
 
         function [newmodel] = uncontract(obj, orig_model, dim)
@@ -554,11 +518,167 @@ classdef TFModel
 
         end
 
-        function [newmodel] = contract(obj, dim)
+
+
+
+        function [newmodel extra_mem] = contract_all(obj, contract_type, operation_type)
+        % Performs all necessary contraction operations for the
+        % model. If contract_type argument is equal to 'optimal'
+        % then schedule_dp() is used to find the optimal (least
+        % memory using) sequence and the optimal sequence is used
+        % to contract all necessary dimensions. Otherwise
+        % get_contraction_dims() is used to order contraction
+        % operation which does not order dimensions. If
+        % contract_type equals to 'full', no intermediate
+        % contractions are performed, full tensor is calculated and
+        % then contracted into the output tensor
+        % 
+        % operation_type argument may be 'compute' or
+        % 'mem_analysis'. Normal operations are performed in
+        % 'compute' (default), memory usage is reported in
+        % 'mem_analysis' case.
+        %
+        % returns the model generated after contracting all
+        % necessary dimension and the total extra memory required
+        % by all temporary elements
+
+            if nargin < 3
+                operation_type = 'compute';
+            end
+
+            if nargin < 2
+                contract_type = 'standard';
+            end
+
+            if strcmp( contract_type, 'optimal' )
+                contract_dims = ...
+                    obj.get_optimal_contraction_sequence_dims(operation_type);
+
+                %for i=1:length(contract_dims)
+                %    display(['optimal contracting ' ...
+                %             char(contract_dims{i})]);
+                %end
+            elseif  ~strcmp( contract_type, 'full' )
+                contract_dims = obj.get_contraction_dims();
+
+                %for i=1:length(contract_dims)
+                %    display(['contracting ' contract_dims(i).name]);
+                %end
+            end
+
+
+            extra_mem = 0;
+            newmodel = obj;
+
+            if strcmp( contract_type, 'full')
+                [ newmodel e_m ] = obj.contract_full(operation_type);
+                extra_mem = extra_mem + e_m;
+            else
+                for i = 1:length(contract_dims)
+                    [ newmodel e_m ]= ...
+                        newmodel.contract(contract_dims(i), ...
+                                          operation_type);
+                    extra_mem = extra_mem + e_m;
+                end
+            end
+        end
+
+
+
+
+        function [newmodel extra_mem] = contract_full(obj, operation_type)
+        % generates a new full (temporary) tensor, multiplies all
+        % latent tensors in to the full tensor and then 
+        % contracts full tensor over necessary indices and returns
+        % newmodel with full_tensor in it
+
+            % generate full tensor
+            F = TFFactor;
+            F.name = 'full_tensor'
+            F.isTemp = 1;
+            F.dims = obj.dims;    % full indices
+
+            if strcmp( operation_type, 'compute' )
+                % generate global full_tensor_data
+                global full_tensor_data
+
+                sz = '';
+                for adi = 1:length(obj.dims)
+                    if adi ~= 1
+                        sz = [sz ', '];
+                    end
+                    sz = [sz num2str(obj.dims(adi).cardinality) ];
+                end
+                eval( [ ' full_tensor_data = zeros(' sz ');'] );
+            end
+
+            extra_mem = F.get_element_size();
+
+            if strcmp( operation_type, 'compute' )
+                % access global data of all latent factors
+                lfi = obj.latent_factor_indices;
+                for lfii = 1:length(lfi)
+                    eval(['global ' ...
+                          obj.factors(lfi(lfii)).get_data_name() ...
+                         ]);
+                end
+
+                % multiply all latent tensors, store result in data_F
+                count = 0;
+                first_ind = 0;
+                for lfii = 1:length(lfi)
+                    if ~count
+                        first_ind = lfi(lfii);
+                        count = count + 1
+                        continue
+                    end
+
+                    if count == 1
+                        % in second latent factor store result in
+                        % data_F
+                        eval([ 'full_tensor_data = bsxfun(@times, ' ...
+                               obj.factors(first_ind).get_data_name() ','
+                               obj.factors(lfi(lfii)).get_data_name() ')' ]);
+                    else
+                        % following tensors should be multiplied with
+                        % data_F
+                        eval([ 'full_tensor_data = bsxfun(@times, full_tensor_data' ...
+                               obj.factors(lfi(lfii)).get_data_name() ')' ]);
+                    end
+                    count = count + 1;
+                end
+
+                % contract necessary dimensions from full_tensor_data
+                contract_dims = obj.get_contraction_dims();
+                for cdi = 1:length(contract_dims)
+                    full_tensor_data = sum( full_tensor_data,        ...
+                                            obj.get_dimension_index( ...
+                                                contract_dims(cdi)) );
+                end
+            end
+
+            % create and return a newmodel compatible with other
+            % contract functions
+            newmodel = obj;
+            newmodel.factors = [ obj.observed_factor F ];
+        end
+
+
+
+
+        function [newmodel extra_mem] = contract(obj, dim, operation_type)
         % returns a new TFModel generated by contracting obj with
-        % dim which may add new temporary factors. 
+        % dim which may add new temporary factors and mem_delta
+        % integer value. extra_mem will be positive if a temporary
+        % factor is generated and its value will indicate memory
+        % usage of new factor. mem_delta will be zero if no
+        % temporary factors are generated.
         % dim: TFDimension or char array or cell with the name of
         % the dimension
+        % operation_type: if equals to 'compute' contraction is
+        % calculated. if equals to 'mem_analysis' data elements are
+        % not created.
+            extra_mem = 0;
 
             if isa(dim, 'TFDimension')
                 dim = dim.name;
@@ -630,52 +750,54 @@ classdef TFModel
 
 
 
+            if strcmp( operation_type, 'compute' )
+                eval( [ 'global ' tmp.get_data_name()  ';'] );
 
-            eval( [ 'global ' tmp.get_data_name()  ';'] );
-
-            if length(contracted_factor_inds) == 1
-                % no multiplication
-                eval( [ 'global ' ...
-                        obj.factors(contracted_factor_inds(1)) ...
-                        .get_data_name() ';'] );
-                eval( [ tmp.get_data_name() ' = ' ...
-                        obj.factors(contracted_factor_inds(1)) ...
-                        .get_data_name() ';'] );
-            else
-
-                % multiply first two into tmp data
-                eval( [ 'global' ...
-                        ' ' obj.factors(contracted_factor_inds(1)).get_data_name() ...
-                        ' ' obj.factors(contracted_factor_inds(2)).get_data_name() ';'] );
-
-                eval( [ tmp.get_data_name() ' = bsxfun (@times, ' ...
-                        obj.factors(contracted_factor_inds(1)).get_data_name() ', '...
-                        obj.factors(contracted_factor_inds(2)).get_data_name() ');' ...
-                      ] );
-
-                % multiply tmp data with other factors
-                for cfii = 3:length(contracted_factor_inds)
-                    eval( [ 'global '...
-                            obj.factors(contracted_factor_inds(cfii)) ...
+                if length(contracted_factor_inds) == 1
+                    % no multiplication
+                    eval( [ 'global ' ...
+                            obj.factors(contracted_factor_inds(1)) ...
                             .get_data_name() ';'] );
+                    eval( [ tmp.get_data_name() ' = ' ...
+                            obj.factors(contracted_factor_inds(1)) ...
+                            .get_data_name() ';'] );
+                else
+
+                    % multiply first two into tmp data
+                    eval( [ 'global' ...
+                            ' ' obj.factors(contracted_factor_inds(1)).get_data_name() ...
+                            ' ' obj.factors(contracted_factor_inds(2)).get_data_name() ';'] );
+
                     eval( [ tmp.get_data_name() ' = bsxfun (@times, ' ...
-                            tmp.get_data_name() ','...
-                            obj.factors(contracted_factor_inds(cfii)) ...
-                            .get_data_name() ');' ] );
+                            obj.factors(contracted_factor_inds(1)).get_data_name() ', '...
+                            obj.factors(contracted_factor_inds(2)).get_data_name() ');' ...
+                          ] );
+
+                    % multiply tmp data with other factors
+                    for cfii = 3:length(contracted_factor_inds)
+                        eval( [ 'global '...
+                                obj.factors(contracted_factor_inds(cfii)) ...
+                                .get_data_name() ';'] );
+                        eval( [ tmp.get_data_name() ' = bsxfun (@times, ' ...
+                                tmp.get_data_name() ','...
+                                obj.factors(contracted_factor_inds(cfii)) ...
+                                .get_data_name() ');' ] );
+                    end
                 end
+
+
+                % sum contraction dimensions on tmp data
+                
+                con_dim_index = obj.get_dimension_index(dim);
+
+                eval( [ tmp.get_data_name() ' = sum( ' ...
+                        tmp.get_data_name() ', ' ...
+                        num2str(con_dim_index) ');'] );
+
             end
-
-
-            % sum contraction dimensions on tmp data
-            
-            con_dim_index = obj.get_dimension_index(dim);
-
-            eval( [ tmp.get_data_name() ' = sum( ' ...
-                    tmp.get_data_name() ', ' ...
-                    num2str(con_dim_index) ');'] );
-            
+               
             newmodel.factors = [newmodel.factors tmp];
-
+            extra_mem = tmp.get_element_size();
 
             % remove contracted factors
             % other dimensions live within the tmp factor
@@ -688,6 +810,72 @@ classdef TFModel
         end
 
 
+
+
+        function [ocs_dims] = get_optimal_contraction_sequence_dims(obj, ...
+                                                              operation_type)
+        % Runs schedule_dp function to generate graph with least
+        % memory using contraction sequence information in it. Then
+        % searches TFGraph.optimal_edges for the optimal path and
+        % returns a cell list of contraction dimension names.
+
+            global ocs_cache;
+
+            found = false;
+            for o = 1:length(ocs_cache)
+                if ocs_cache(o).model == obj
+                    found=true;
+                    break
+                end
+            end
+
+            if found
+                %display('cache hit')
+
+                %display([ 'ocs dims' ])
+                ocs_dims = ocs_cache(o).ocs_dims;
+                %for a =1:length(ocs_dims)
+                %    ocs_dims{a}
+                %end
+                return
+            %else
+            %    display('cache miss')
+            end
+
+
+            graph = obj.schedule_dp(operation_type);
+            t = graph.optimal_edges;
+            t(t==0) = Inf;
+            ocs_models = [];
+            i = length(t);
+            while i ~= 1
+                ocs_models = [ ocs_models graph.node_list(i) ];
+                i = find( t(:,i) == min(t(:, i)) );
+            end
+            ocs_models = [ ocs_models graph.node_list(i) ];
+
+            ocs_dims = [];
+            for i = 1:(length(ocs_models)-1)
+                ocs_dims = [ ocs_dims ...
+                             { setdiff( ...
+                                 ocs_models(i)...
+                                 .get_current_contraction_dims, ...
+                                 ocs_models(i+ ...
+                                            1)...
+                                 .get_current_contraction_dims) }; ...
+                           ];
+            end
+
+            %display([ 'cache store' ])
+            %for a =1:length(ocs_dims)
+            %    ocs_dims{a}
+            %end
+            ocs_cache = [ ocs_cache TFOCSCache(obj, ocs_dims) ];
+        end
+
+
+
+
         function [obj] = update_cost_from_latent(obj)
             obj.cost = 0;
             lfi=obj.latent_factor_indices();
@@ -696,6 +884,8 @@ classdef TFModel
                     obj.factors(lfi(fi)).get_element_size();
             end
         end
+
+
 
 
         function [dn fn all_edges] = print_ubigraph(obj)
@@ -749,6 +939,9 @@ classdef TFModel
             all_edges = [ all_edges ' ]' ];
         end
 
+
+
+
         function [size] = get_element_size(obj)
         % returns number of elements for this model
             size=0;
@@ -760,6 +953,9 @@ classdef TFModel
             end
         end
 
+
+
+
         function [card] = get_index_card(obj, index_char)
         % returns cardinality of a given name of a dimension
             for d = 1:length(obj.dims)
@@ -770,9 +966,15 @@ classdef TFModel
             end
         end
 
+
+
+
         function [factor] = get_first_non_observed_factor(obj)
         % returns first non observed factor index, used to return
-        % index of the output factor
+        % index of the output factor when all latent factors are
+        % contracted out. in this case only output (observed) and a
+        % single temporary non-observed factors should be present
+        % in the model (ie fully contracted model).
             for f = 1:length(obj.factors)
                 if obj.factors(f).isObserved == 0
                     factor = obj.factors(f);
@@ -780,6 +982,9 @@ classdef TFModel
                 end
             end
         end
+
+
+
 
         function [ind] = get_first_non_observed_factor_index(obj)
         % returns first non observed factor index, used to return
@@ -792,6 +997,9 @@ classdef TFModel
             end
         end
 
+
+
+
         function [ind] = find_cell_char(obj, chars)
         % returns index of a given char array in object's dimension array
             for ind=1:length(obj.dims)
@@ -801,6 +1009,9 @@ classdef TFModel
             end
             ind=0;
         end
+
+
+
 
        function [r] = get_dimension_index(obj, dim)
         % returns index of dimension dim in obj.dims if obj
@@ -815,7 +1026,10 @@ classdef TFModel
             end           
        end
 
-        function [ordered_index_chars] = order_dims(obj, ...
+
+
+
+       function [ordered_index_chars] = order_dims(obj, ...
                                                     dims_array)
             % order given cell of dimension names according to
             % factor.dims order
@@ -834,36 +1048,6 @@ classdef TFModel
         end
 
 
-        function [newmodel] = contract_all(obj, contract_type)
-        % performs all necessary contraction operations for the
-        % model. if contract_type argument is equal to 'optimal'
-        % then schedule_dp() is used to find the optimal (least
-        % memory using) sequence and the optimal sequence is used
-        % to contract all necessary dimensions. Otherwise
-        % get_contraction_dims() is used to order contraction
-        % operation which does not order dimensions
-
-            if nargin == 2 && strcmp(contract_type, 'optimal')
-                contract_dims = ...
-                    obj.get_optimal_contraction_sequence_dims();
-
-                %for i=1:length(contract_dims)
-                %    display(['optimal contracting ' ...
-                %             char(contract_dims{i})]);
-                %end
-            else
-                contract_dims = obj.get_contraction_dims();
-
-                %for i=1:length(contract_dims)
-                %    display(['contracting ' contract_dims(i).name]);
-                %end
-            end
-
-            newmodel = obj;
-            for i = 1:length(contract_dims)
-                newmodel = newmodel.contract(contract_dims(i));
-            end
-        end
 
 
         function [contract_dims] = get_contraction_dims(obj)
@@ -903,6 +1087,9 @@ classdef TFModel
             %['return ' contract_dims.name]
             %contract_dims = obj.order_dims(unique(contract_dims));
         end
+
+
+
 
         function [contract_dims] = get_current_contraction_dims(obj)
         % returns cell of TFDimensions which must be contracted to
@@ -963,6 +1150,8 @@ classdef TFModel
         end
 
 
+
+
         function [factor_inds] = latent_factor_indices(obj)
             factor_inds=[];
             for f=1:length(obj.factors)
@@ -971,6 +1160,8 @@ classdef TFModel
                 end
             end
         end
+
+
 
 
         function [factors] = latent_factors(obj)
@@ -982,6 +1173,9 @@ classdef TFModel
             end
         end
 
+
+
+
         function [factor_ind] = observed_factor_index(obj)
             factor_ind=0;
             for f=1:length(obj.factors)
@@ -991,6 +1185,9 @@ classdef TFModel
                 end
             end
         end
+
+
+
 
         function [factor] = observed_factor(obj)
         % returns first observed factor (useful for PLTF operations)
@@ -1002,6 +1199,9 @@ classdef TFModel
             end
         end
 
+
+
+
         function [factors] = observed_factors(obj)
             factors=[];
             for f=1:length(obj.factors)
@@ -1010,6 +1210,9 @@ classdef TFModel
                 end
             end
         end
+
+
+
 
         function [factors] = input_factors(obj)
             factors=[];
@@ -1020,6 +1223,9 @@ classdef TFModel
             end
         end
 
+
+
+
         function [factors] = temp_factors(obj)
             factors=[];
             for f=1:length(obj.factors)
@@ -1028,6 +1234,9 @@ classdef TFModel
                 end
             end
         end
+
+
+
 
         function [] = rand_init_latent_factors(obj, type, imax)
 
@@ -1054,6 +1263,75 @@ classdef TFModel
 
         end
 
+
+        
+        function [r] = eq(a,b)
+            r = false;
+
+            % mark matched b factors
+            % if there are any unmarked -> inequal
+            % problematic case: 
+            % a.factors ( ip, jpi ) , b.factors (  ip, pi )
+            % b==a matches all b objects with a.factors(1)
+            % but a~=b !
+
+            b_marks = zeros(size(b.factors));
+
+            if length(a.factors) == length(b.factors)
+                for f_a = 1:length(a.factors)
+                    found = 0;
+                    for f_b = 1:length(b.factors)
+                        if a.factors(f_a) == b.factors(f_b) && ...
+                                b_marks(f_b) == 0
+                            found = 1;
+                            b_marks(f_b) = 1;
+                            break
+                        end
+                    end
+
+                    if found == 0
+                        return
+                    end
+                end
+
+                r = true;
+            end
+        end
+
+
+
+
+        function [uncontraction_dims] = get_uncontraction_dims(obj)
+        % returns list of TFDimension objects representing
+        % dimensions which are required to be added to the current
+        % TFModel object in order to reach initial model where
+        % uncontraction_dims = {}
+        % Calculation is performed as follows: 
+        % uncontraction_dims = contraction_dims - current_contraction_dims
+
+            contraction_dims = obj.get_contraction_dims();
+            current_contraction_dims = ...
+                obj.get_current_contraction_dims();
+            uncontraction_dims = [];
+
+            for cdi = 1:length(contraction_dims)
+                found=0;
+                for ccdi = 1:length(current_contraction_dims)
+                    if contraction_dims(cdi) == ...
+                            char(current_contraction_dims(ccdi))
+                        found=1;
+                        break;
+                    end
+                end
+                if ~found
+                    uncontraction_dims = [ uncontraction_dims ...
+                                        contraction_dims(cdi) ];
+                end
+            end
+        end
+
+
     end
+
 
 end
