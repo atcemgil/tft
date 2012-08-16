@@ -93,6 +93,11 @@ classdef TFFactor
             %a.isInput == b.isInput && ...
             %a.isTemp == b.isTemp
 
+            if a.isLatent ~= b.isLatent
+                r=false;
+                return
+            end
+
 
             % from TFModel.eq:
             % mark matched b factors

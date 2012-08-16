@@ -9,9 +9,13 @@ digraph m2html {
   TFModel -> TFFactor;
   TFModel -> TFGraph;
   TFModel -> TFModel;
+  TFModel -> TFOCSCache;
+  TFOCSCache -> TFModel;
+  TFOCSCache -> TFOCSCache;
 
   TFDimension [URL="TFDimension.html"];
   TFFactor [URL="TFFactor.html"];
   TFGraph [URL="TFGraph.html"];
   TFModel [URL="TFModel.html"];
+  TFOCSCache [URL="TFOCSCache.html"];
 }

@@ -86,6 +86,10 @@ classdef TFModel
                 contract_type = '';
             end
 
+            % init optimal model cache
+            global ocs_cache;
+            ocs_cache = [];
+
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
 
@@ -101,6 +105,7 @@ classdef TFModel
 
             KL=zeros(1,iternum);
             for iter = 1:iternum
+                iter
                 for alpha=1:length(obj.latent_factor_indices)
                     % access global data
                     X_name = ...
@@ -288,7 +293,31 @@ classdef TFModel
         % Runs schedule_dp function to generate graph with least
         % memory using contraction sequence information in it. Then
         % searches TFGraph.optimal_edges for the optimal path and
-        % returns a cell of contraction dimension names.
+        % returns a cell list of contraction dimension names.
+
+            global ocs_cache;
+
+            found = false;
+            for o = 1:length(ocs_cache)
+                if ocs_cache(o).model == obj
+                    found=true;
+                    break
+                end
+            end
+
+            if found
+                %display('cache hit')
+
+                %display([ 'ocs dims' ])
+                ocs_dims = ocs_cache(o).ocs_dims;
+                %for a =1:length(ocs_dims)
+                %    ocs_dims{a}
+                %end
+                return
+            %else
+            %    display('cache miss')
+            end
+
 
             graph = obj.schedule_dp();
             t = graph.optimal_edges;
@@ -301,7 +330,7 @@ classdef TFModel
             end
             ocs_models = [ ocs_models graph.node_list(i) ];
 
-            ocs_dims = {};
+            ocs_dims = [];
             for i = 1:(length(ocs_models)-1)
                 ocs_dims = [ ocs_dims ...
                              { setdiff( ...
@@ -313,6 +342,11 @@ classdef TFModel
                            ];
             end
 
+            %display([ 'cache store' ])
+            %for a =1:length(ocs_dims)
+            %    ocs_dims{a}
+            %end
+            ocs_cache = [ ocs_cache TFOCSCache(obj, ocs_dims) ];
         end
             
 

@@ -152,118 +152,123 @@ This function is called by:
 0093             <span class="comment">%a.isInput == b.isInput &amp;&amp; ...</span>
 0094             <span class="comment">%a.isTemp == b.isTemp</span>
 0095 
-0096 
-0097             <span class="comment">% from TFModel.eq:</span>
-0098             <span class="comment">% mark matched b factors</span>
-0099             <span class="comment">% if there are any unmarked -&gt; inequal</span>
-0100             <span class="comment">% problematic case:</span>
-0101             <span class="comment">% a.factors ( ip, jpi ) , b.factors (  ip, pi )</span>
-0102             <span class="comment">% b==a matches all b objects with a.factors(1)</span>
-0103             <span class="comment">% but a~=b !</span>
-0104 
-0105             b_marks = zeros(size(b.dims));
-0106 
-0107             <span class="keyword">if</span> length(a.dims) == length(b.dims)<span class="comment">% &amp;&amp; ...</span>
-0108                 <span class="keyword">for</span> d_a = 1:length(a.dims)
-0109                     found = 0;
-0110                     <span class="keyword">for</span> d_b = 1:length(b.dims)
-0111                         <span class="keyword">if</span> a.dims(d_a) == b.dims(d_b) &amp;&amp; <span class="keyword">...</span>
-0112                                 b_marks(d_b) == 0
-0113                             found = 1;
-0114                             b_marks(d_b) = 1;
-0115                             <span class="keyword">break</span>;
-0116                         <span class="keyword">end</span>
-0117                     <span class="keyword">end</span>
-0118 
-0119                     <span class="keyword">if</span> found == 0
-0120                         <span class="keyword">return</span>
-0121                     <span class="keyword">end</span>
-0122                 <span class="keyword">end</span>
+0096             <span class="keyword">if</span> a.isLatent ~= b.isLatent
+0097                 r=false;
+0098                 <span class="keyword">return</span>
+0099             <span class="keyword">end</span>
+0100 
+0101 
+0102             <span class="comment">% from TFModel.eq:</span>
+0103             <span class="comment">% mark matched b factors</span>
+0104             <span class="comment">% if there are any unmarked -&gt; inequal</span>
+0105             <span class="comment">% problematic case:</span>
+0106             <span class="comment">% a.factors ( ip, jpi ) , b.factors (  ip, pi )</span>
+0107             <span class="comment">% b==a matches all b objects with a.factors(1)</span>
+0108             <span class="comment">% but a~=b !</span>
+0109 
+0110             b_marks = zeros(size(b.dims));
+0111 
+0112             <span class="keyword">if</span> length(a.dims) == length(b.dims)<span class="comment">% &amp;&amp; ...</span>
+0113                 <span class="keyword">for</span> d_a = 1:length(a.dims)
+0114                     found = 0;
+0115                     <span class="keyword">for</span> d_b = 1:length(b.dims)
+0116                         <span class="keyword">if</span> a.dims(d_a) == b.dims(d_b) &amp;&amp; <span class="keyword">...</span>
+0117                                 b_marks(d_b) == 0
+0118                             found = 1;
+0119                             b_marks(d_b) = 1;
+0120                             <span class="keyword">break</span>;
+0121                         <span class="keyword">end</span>
+0122                     <span class="keyword">end</span>
 0123 
-0124                 r=true;
-0125             <span class="keyword">end</span>
-0126         <span class="keyword">end</span>
-0127 
+0124                     <span class="keyword">if</span> found == 0
+0125                         <span class="keyword">return</span>
+0126                     <span class="keyword">end</span>
+0127                 <span class="keyword">end</span>
 0128 
-0129         <a name="_sub4" href="#_subfunctions" class="code">function r = ne(a,b)</a>
-0130             r = ~(a==b);
+0129                 r=true;
+0130             <span class="keyword">end</span>
 0131         <span class="keyword">end</span>
 0132 
 0133 
-0134         <a name="_sub5" href="#_subfunctions" class="code">function [r] = got_dimension(obj, dim)</a>
-0135         <span class="comment">% returns index of dimension dim in obj.dims if obj</span>
-0136         <span class="comment">% contains TFDimension (or char) dim returns 0 otherwise</span>
+0134         <a name="_sub4" href="#_subfunctions" class="code">function r = ne(a,b)</a>
+0135             r = ~(a==b);
+0136         <span class="keyword">end</span>
 0137 
-0138             r=0;
-0139             <span class="keyword">for</span> d = 1:length(obj.dims)
-0140                 <span class="keyword">if</span> obj.dims(d) == dim
-0141                     r=d;
-0142                     <span class="keyword">break</span>;
-0143                 <span class="keyword">end</span>
-0144             <span class="keyword">end</span>
-0145         <span class="keyword">end</span>
-0146 
-0147 
-0148         <a name="_sub6" href="#_subfunctions" class="code">function [name] = get_data_name(obj)</a>
-0149             name = [obj.name <span class="string">'_data'</span>];
+0138 
+0139         <a name="_sub5" href="#_subfunctions" class="code">function [r] = got_dimension(obj, dim)</a>
+0140         <span class="comment">% returns index of dimension dim in obj.dims if obj</span>
+0141         <span class="comment">% contains TFDimension (or char) dim returns 0 otherwise</span>
+0142 
+0143             r=0;
+0144             <span class="keyword">for</span> d = 1:length(obj.dims)
+0145                 <span class="keyword">if</span> obj.dims(d) == dim
+0146                     r=d;
+0147                     <span class="keyword">break</span>;
+0148                 <span class="keyword">end</span>
+0149             <span class="keyword">end</span>
 0150         <span class="keyword">end</span>
 0151 
 0152 
-0153         <a name="_sub7" href="#_subfunctions" class="code">function [] = rand_init(obj, all_dims, imax)</a>
-0154 
-0155             eval( [ <span class="string">'global '</span> obj.get_data_name() <span class="string">';'</span> ] );
-0156             sz = <span class="string">''</span>;
-0157             <span class="keyword">for</span> ad = 1:length(all_dims)
-0158                 <span class="keyword">if</span> ad ~= 1
-0159                     sz = [sz <span class="string">', '</span>];
-0160                 <span class="keyword">end</span>
-0161 
-0162                 found=0;
-0163                 <span class="keyword">for</span> od = 1:length(obj.dims)
-0164                     <span class="keyword">if</span> all_dims(ad) == obj.dims(od)
-0165                         found=1;
-0166                         <span class="keyword">break</span>
-0167                     <span class="keyword">end</span>
-0168                 <span class="keyword">end</span>
-0169 
-0170                 <span class="keyword">if</span> found
-0171                     sz = [sz num2str(all_dims(ad).cardinality) ];
-0172                 <span class="keyword">else</span>
-0173                     sz = [sz num2str(1) ];
-0174                 <span class="keyword">end</span>
-0175             <span class="keyword">end</span>
-0176 
-0177             <span class="keyword">if</span> nargin == 2
-0178                 eval( [ obj.get_data_name() <span class="string">' = rand('</span> sz <span class="string">');'</span>] );
-0179             <span class="keyword">else</span>
-0180                 eval( [ obj.get_data_name() <span class="keyword">...</span>
-0181                         <span class="string">' = randi('</span> num2str(imax) <span class="string">', '</span> sz <span class="string">');'</span> ] );
-0182             <span class="keyword">end</span>
-0183         <span class="keyword">end</span>
-0184 
-0185 
-0186         <a name="_sub8" href="#_subfunctions" class="code">function [contract_dims] = </a><span class="keyword">...</span>
-0187                 get_contraction_to(obj, sub_dims)
-0188             contract_dims = [];
-0189             <span class="keyword">for</span> od = 1:length(obj.dims)
-0190                 found=0;
-0191                 <span class="keyword">for</span> sd = 1:length(sub_dims)
-0192                     <span class="keyword">if</span> obj.dims(od) == sub_dims(sd)
-0193                         found=1;
-0194                         <span class="keyword">break</span>;
-0195                     <span class="keyword">end</span>
-0196                 <span class="keyword">end</span>
-0197 
-0198                 <span class="keyword">if</span> ~found
-0199                     contract_dims = [ contract_dims obj.dims(od) ];
-0200                 <span class="keyword">end</span>
-0201             <span class="keyword">end</span>
-0202         <span class="keyword">end</span>
-0203 
-0204 
-0205     <span class="keyword">end</span>
-0206 
-0207 <span class="keyword">end</span></pre></div>
-<hr><address>Generated on Tue 14-Aug-2012 17:57:05 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+0153         <a name="_sub6" href="#_subfunctions" class="code">function [name] = get_data_name(obj)</a>
+0154             name = [obj.name <span class="string">'_data'</span>];
+0155         <span class="keyword">end</span>
+0156 
+0157 
+0158         <a name="_sub7" href="#_subfunctions" class="code">function [] = rand_init(obj, all_dims, imax)</a>
+0159 
+0160             eval( [ <span class="string">'global '</span> obj.get_data_name() <span class="string">';'</span> ] );
+0161             sz = <span class="string">''</span>;
+0162             <span class="keyword">for</span> ad = 1:length(all_dims)
+0163                 <span class="keyword">if</span> ad ~= 1
+0164                     sz = [sz <span class="string">', '</span>];
+0165                 <span class="keyword">end</span>
+0166 
+0167                 found=0;
+0168                 <span class="keyword">for</span> od = 1:length(obj.dims)
+0169                     <span class="keyword">if</span> all_dims(ad) == obj.dims(od)
+0170                         found=1;
+0171                         <span class="keyword">break</span>
+0172                     <span class="keyword">end</span>
+0173                 <span class="keyword">end</span>
+0174 
+0175                 <span class="keyword">if</span> found
+0176                     sz = [sz num2str(all_dims(ad).cardinality) ];
+0177                 <span class="keyword">else</span>
+0178                     sz = [sz num2str(1) ];
+0179                 <span class="keyword">end</span>
+0180             <span class="keyword">end</span>
+0181 
+0182             <span class="keyword">if</span> nargin == 2
+0183                 eval( [ obj.get_data_name() <span class="string">' = rand('</span> sz <span class="string">');'</span>] );
+0184             <span class="keyword">else</span>
+0185                 eval( [ obj.get_data_name() <span class="keyword">...</span>
+0186                         <span class="string">' = randi('</span> num2str(imax) <span class="string">', '</span> sz <span class="string">');'</span> ] );
+0187             <span class="keyword">end</span>
+0188         <span class="keyword">end</span>
+0189 
+0190 
+0191         <a name="_sub8" href="#_subfunctions" class="code">function [contract_dims] = </a><span class="keyword">...</span>
+0192                 get_contraction_to(obj, sub_dims)
+0193             contract_dims = [];
+0194             <span class="keyword">for</span> od = 1:length(obj.dims)
+0195                 found=0;
+0196                 <span class="keyword">for</span> sd = 1:length(sub_dims)
+0197                     <span class="keyword">if</span> obj.dims(od) == sub_dims(sd)
+0198                         found=1;
+0199                         <span class="keyword">break</span>;
+0200                     <span class="keyword">end</span>
+0201                 <span class="keyword">end</span>
+0202 
+0203                 <span class="keyword">if</span> ~found
+0204                     contract_dims = [ contract_dims obj.dims(od) ];
+0205                 <span class="keyword">end</span>
+0206             <span class="keyword">end</span>
+0207         <span class="keyword">end</span>
+0208 
+0209 
+0210     <span class="keyword">end</span>
+0211 
+0212 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Thu 16-Aug-2012 11:19:41 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
 </body>
 </html>
