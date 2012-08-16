@@ -103,75 +103,15 @@ classdef TFModel
             global mask_data;
             mask_data = ones(size(hat_X_data));
 
+
             KL=zeros(1,iternum);
             for iter = 1:iternum
                 iter
-                for alpha=1:length(obj.latent_factor_indices)
-                    % access global data
-                    X_name = ...
-                        obj.factors(obj.observed_factor_index) ...
-                        .get_data_name();
-                    eval(['global ' X_name ';']);
-                    Z_alpha_name = ...
-                        obj.factors(alpha).get_data_name();
-                    eval( [ 'global ' Z_alpha_name ';' ] );
-
-
-
-
-                    % recalculate hat_X
-                    newmodel = obj;
-
-                    if iter==1 && alpha==1
-                        %g = newmodel.schedule_dp();
-                        %system([ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
-                        %                    ' dot -o /tmp/img.eps; ' ...
-                        %                    ' display  /tmp/img.eps ' ...
-                        %                    ' ' ] ] );
-                    end
-
-                    % perform contraction
-                    newmodel = newmodel.contract_all(contract_type);
-
-                    % store result in hat_X_data
-                    result_name = ...
-                        newmodel.get_first_non_observed_factor() ...
-                        .get_data_name();
-                    eval(['global ' result_name ';'] );
-                    eval(['hat_X_data = ' result_name ';' ] ); 
-
-
-
-                    % store X / hat_X in hat_X data
-                    eval( [ 'hat_X_data  =  ' ...
-                            X_name ...
-                            ' ./ ' ...
-                            ' hat_X_data ;' ] );
-
-
-                    % generate D1
-                    obj.delta(alpha, 'D1_data', contract_type, hat_X);
-
-                    % generate D2
-                    obj.delta(alpha, 'D2_data', contract_type, mask);
-
-                    % update Z_alpha
-                    global D1_data D2_data;
-                    eval( [ Z_alpha_name '=' Z_alpha_name ' .* ' ...
-                            'D1_data'                     ' ./ ' ...
-                            'D2_data ;' ] );
-
-
-                    % calculate KL divergence
-                    eval ( [ 'KL(iter) = sum(sum(sum( (hat_X_data .* ' X_name ') .* ' ...
-                             ' (log( (hat_X_data .* ' X_name ') ) - ' ...
-                             'log(' X_name ...
-                             ') ) - (hat_X_data .* ' X_name ')' ...
-                             '+ ' X_name ...
-                             ')));' ]);
-
-                end
+                kl = obj.pltf_iteration(contract_type, hat_X, ...
+                                        mask, 'operate');
+                KL(iter) = kl;
             end
+
             display(['KL divergence over iterations: ']);
             display(KL);
             plot(KL);
@@ -179,6 +119,81 @@ classdef TFModel
             xlabel('iteration number');
             ylabel('KL divergence');
         end
+
+
+        function [kl] = pltf_iteration(obj, contract_type, ...
+                                       hat_X, mask, ...
+                                       operation_type)
+
+            % helper function for the pltf inner loop
+            % operation_type: 'compute' if actual computation is
+            % requested, 'calc_mem' if only memory usage
+            % computation is requested
+
+            for alpha=1:length(obj.latent_factor_indices)
+                % access global data
+                eval( [ 'global ' obj.observed_factor.get_data_name() ...
+                        ';' ] );
+                global hat_X_data mask_data;
+                X_name = obj.factors(obj.observed_factor_index) ...
+                         .get_data_name();
+                eval(['global ' X_name ';']);
+                Z_alpha_name = ...
+                    obj.factors(alpha).get_data_name();
+                eval( [ 'global ' Z_alpha_name ';' ] );
+
+                % recalculate hat_X
+                newmodel = obj;
+
+                %if iter==1 && alpha==1
+                    %g = newmodel.schedule_dp();
+                    %system([ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
+                    %                    ' dot -o /tmp/img.eps; ' ...
+                    %                    ' display  /tmp/img.eps ' ...
+                    %                    ' ' ] ] );
+                %end
+
+                % perform contraction
+                newmodel = newmodel.contract_all(contract_type);
+
+                % store result in hat_X_data
+                result_name = ...
+                    newmodel.get_first_non_observed_factor() ...
+                    .get_data_name();
+                eval(['global ' result_name ';'] );
+                eval(['hat_X_data = ' result_name ';' ] ); 
+
+
+
+                % store X / hat_X in hat_X data
+                eval( [ 'hat_X_data  =  ' ...
+                        X_name ...
+                        ' ./ ' ...
+                        ' hat_X_data ;' ] );
+
+
+                % generate D1
+                obj.delta(alpha, 'D1_data', contract_type, hat_X);
+
+                % generate D2
+                obj.delta(alpha, 'D2_data', contract_type, mask);
+
+                % update Z_alpha
+                global D1_data D2_data;
+                eval( [ Z_alpha_name '=' Z_alpha_name ' .* ' ...
+                        'D1_data'                     ' ./ ' ...
+                        'D2_data ;' ] );
+            end
+
+            % calculate KL divergence
+            eval ( [ 'kl = sum(sum(sum( (hat_X_data .* ' X_name ') .* ' ...
+                     ' (log( (hat_X_data .* ' X_name ') ) - ' ...
+                     'log(' X_name ...
+                     ') ) - (hat_X_data .* ' X_name ')' ...
+                     '+ ' X_name ...
+                     ')));' ]);
+        end
+
 
         function [] = delta(obj, alpha, output_name, contract_type, ...
                             A)
@@ -226,6 +241,7 @@ classdef TFModel
                     d_model.get_first_non_observed_factor().get_data_name() ...
                     ';' ]);
         end
+
 
         function [r] = eq(a,b)
             r = false;
