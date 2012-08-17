@@ -125,6 +125,74 @@ system([ 'echo " ' g.print_dot [ ' " | dot | display' ]]);
 
 
 
+<h3>Memory Analysis</h3>
+It is possible to analyse memory usage of models before executing PLTF updates with the third optional parameter of TFModel.pltf(iteration_number, contraction_type, operation_type) function. Full list of possible parameters are listed below for tucker_model:
+
+<pre>
+tucker_model.pltf(10, 'optimal', 'compute')                                                         
+iteration       1
+iteration       2
+iteration       3
+iteration       4
+iteration       5
+iteration       6
+iteration       7
+iteration       8
+iteration       9
+iteration       10
+KL divergence over iterations: 
+KL =
+   1.0e+03 *
+    1.7094    1.7007    1.6900    1.6794    1.6688    1.6581    1.6471    1.6357    1.6238    1.6114
+
+data elements required: 14854
+memory size with (8 byte) double precision: 0.11883 MB
+</pre>
+
+Above command executes PLTF update rules on Tucker3 model defined in previous sections. At the end of the execution amount of data memory employed is listed. This figure includes all model data elements as well as all temporary tensors generated in intermediate contraction operations. Another version of this command lists memory usage without executing the actual data operations:
+
+<pre>
+tucker_model.pltf(10, 'optimal', 'mem_analysis')
+
+data elements required: 14854
+memory size with (8 byte) double precision: 0.11883 MB
+</pre>
+
+For large models it may be wise to first check how much memory will be used before starting to execute PLTF update rules.
+
+Using the memory analyser options it is possible to observe the effects of the optimal contraction sequence on memory requirements. For instance if we did not use the optimal contraction sequence for the same problem as above we would use slightly more memory:
+
+<pre>
+tucker_model.pltf(10, 'standard', 'mem_analysis')
+
+data elements required: 16574
+memory size with (8 byte) double precision: 0.13259 MB
+</pre>
+
+For experimental purposes a third contraction function is also available. This function is expected to be the fastest version of contraction as well as the most memory using. In this mode each contraction operation is performed using a "full tensor", which is the largest possible tensor for a given model. All latent tensors are multiplied into the full tensor and then full tensor is contracted over necessary indices to calculate the output. Following code displays an example:
+
+<pre>
+tucker_model.pltf(10, 'full', 'compute');
+iteration       1
+iteration       2
+iteration       3
+iteration       4
+iteration       5
+iteration       6
+iteration       7
+iteration       8
+iteration       9
+iteration       10
+KL divergence over iterations: 
+KL =
+   1.0e+03 *
+    1.0944    1.0708    1.0467    1.0226    0.9986    0.9748    0.9515    0.9288    0.9067    0.8854
+
+data elements required: 1815704
+memory size with (8 byte) double precision: 14.5256 MB
+</pre>
+
+Please note that currently memory values for the full tensor case is a bit misleading. Each contraction operation needs a full tensor, thus each operation creates a full tensor and counts its elements as required data size. However in next release with the "intermediate temporary variable re-use" feature, required data size for the full tensor case will be drammatically decreased.
 
 <h3>Model Visualization</h3>
 
@@ -154,6 +222,11 @@ system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 
 
 <h2>Changelog</h2>
+<h3>v0.02 - 16.08.2012</h3>
+<ul>
+  <li>Memory analysis with TFModel.pltf() parameter</li>
+  <li>Full tensor contraction implementation added</li>
+</ul>
 <h3>v0.01 - 16.08.2012</h3>
 <ul>
   <li>Initial release</li>

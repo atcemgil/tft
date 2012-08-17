@@ -594,13 +594,13 @@ classdef TFModel
 
             % generate full tensor
             F = TFFactor;
-            F.name = 'full_tensor'
+            F.name = 'full_tensor';
             F.isTemp = 1;
             F.dims = obj.dims;    % full indices
 
             if strcmp( operation_type, 'compute' )
                 % generate global full_tensor_data
-                global full_tensor_data
+                global full_tensor_data;
 
                 sz = '';
                 for adi = 1:length(obj.dims)
@@ -609,7 +609,7 @@ classdef TFModel
                     end
                     sz = [sz num2str(obj.dims(adi).cardinality) ];
                 end
-                eval( [ ' full_tensor_data = zeros(' sz ');'] );
+                eval( [ ' full_tensor_data = ones(' sz ');'] );
             end
 
             extra_mem = F.get_element_size();
@@ -624,28 +624,10 @@ classdef TFModel
                 end
 
                 % multiply all latent tensors, store result in data_F
-                count = 0;
-                first_ind = 0;
                 for lfii = 1:length(lfi)
-                    if ~count
-                        first_ind = lfi(lfii);
-                        count = count + 1
-                        continue
-                    end
-
-                    if count == 1
-                        % in second latent factor store result in
-                        % data_F
-                        eval([ 'full_tensor_data = bsxfun(@times, ' ...
-                               obj.factors(first_ind).get_data_name() ','
-                               obj.factors(lfi(lfii)).get_data_name() ')' ]);
-                    else
-                        % following tensors should be multiplied with
-                        % data_F
-                        eval([ 'full_tensor_data = bsxfun(@times, full_tensor_data' ...
-                               obj.factors(lfi(lfii)).get_data_name() ')' ]);
-                    end
-                    count = count + 1;
+                    % following tensors should be multiplied with data_F
+                    eval([ 'full_tensor_data = bsxfun(@times, full_tensor_data, ' ...
+                           obj.factors(lfi(lfii)).get_data_name() ');' ]);
                 end
 
                 % contract necessary dimensions from full_tensor_data
