@@ -11,7 +11,7 @@ Matlab Toolbox implementing Probabilistic Latent Tensor Factorization (PLTF)[1] 
 <li>PLTF data structures are represented with TFModel, TFFactor and TFDimension classes.</li>
 <li>PLTF update rules: given a PLTF model, PLTF update rules can be performed using TFModel.pltf(iteration_number) function. Function prints and displays a plot of resulting KL divergence values over given number of iterations.</li>
 <li>Model visualization: models can be visualized using TFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
-<li>Contraction scheduling: TFModel.schedule_dp() function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences.
+<li>Contraction scheduling: TFModel.schedule_dp(operation_type) function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences.
 <li>Contraction scheduling visualization: contraction operations required for PLTF update rules can be visualized using <a href="http://www.graphviz.org/">GraphViz</a> with TFGraph.print_dot() function.
 <li>Global data usage: all essential data elements are stored as global variables so that duplicate copies of large data structures are avoided.</li>
 </ul>
@@ -108,15 +108,15 @@ To utilize contraction scheduling on PLTF update rule calculations second parame
 
 PLTF update equations involve a number of Generalized Tensor Multiplication (GTM) operations. Similar to the case in chain matrix multiplication, due to the associativity property of the operation order of chain GTM operations result in different amount of memory usage.
 <br><br>
-TFModel.schedule_dp() function performs a dynamic programming search among all possible contraction sequences and finds the contraction sequence which requires the least amount of memory. Depending on the model specification optimal contraction sequence may improve PLTF operation performance and increase tractable problem size. The function does not manipulate any data. Search operations are conducted on objects which define the required contraction. Once optimal path is discovered, operations on the data are performed only once using the optimal sequence.
+TFModel.schedule_dp(operation_type) function performs a dynamic programming search among all possible contraction sequences and finds the contraction sequence which requires the least amount of memory. Depending on the model specification optimal contraction sequence may improve PLTF operation performance and increase tractable problem size. The function does not manipulate any data. Search operations are conducted on objects which define the required contraction. Once optimal path is discovered, operations on the data are performed only once using the optimal sequence.
 <br><br>
 TFGraph object is used to store the dyanmic acyclic graph (DAG) structures produced during the search. TFGraph.print_dot() function can be used to visualize the graph objects. Following graph displays the DAG generated for the first operation of PLTF in Tucker3 model. Top part of each node shows dimensions on which contraction must be applied. Bottom part of each node describes factors required by the node. Some of these factors are latent factors and some are temporary factors. 
 <br><br>
 Since different contraction sequences utilize different temporary factors, different contraction sequences result in different amounts of memory usage. Numbers in paranthesis display the cumulative memory required for the contraction operation defined by the edge. Edges of the DAG are displayed in the direction of the dynamic programming search. Actual contraction operation is performed in the reverse direction. Once search is complete, selecting the minimal memory using edge suffices to follow the least memory using sequence.
 
 <pre>
-graph = tucker_model.schedule_dp();
-system([ 'echo " ' g.print_dot [ ' " | dot | display' ]]);
+graph = tucker_model.schedule_dp('mem_analysis');
+system([ 'echo " ' graph.print_dot [ ' " | dot | display' ]]);
 </pre>
 
 <div align="center">
@@ -222,7 +222,7 @@ system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 
 
 <h2>Changelog</h2>
-<h3>v0.02 - 16.08.2012</h3>
+<h3>v0.02 - 17.08.2012</h3>
 <ul>
   <li>Memory analysis with TFModel.pltf() parameter</li>
   <li>Full tensor contraction implementation added</li>
