@@ -79,7 +79,28 @@ classdef TFModel
 
 
 
-        function [] = pltf(obj, iternum, contract_type, operation_type)
+        function [] = pltf_optimal_dot(obj)
+        % Calls PLTF function and collects output of print_dot from
+        % each GTM operation and plots in a single graph
+            global last_node_id;
+            last_node_id = 1;
+
+            dot_str = obj.pltf(1, 'optimal', 'mem_analysis', ...
+                               'yes');
+
+            str = [ 'digraph structs{' char(10) ...
+                    'rankdir=LR;' char(10) ...
+                    'node [shape=plaintext];' char(10) ...
+                    'splines=false; ' char(10)];
+            system([ 'echo ''' str char(10) dot_str '}'' | dot -T svg | ' ...
+                     'display' ]);
+        end
+
+
+
+        function [ dot_data ] = pltf(obj, iternum, contract_type, ...
+                                     operation_type, ...
+                                     return_dot_data)
         % performs PLTF update operations on the model
         % returns estimated TFFactor (\hat(X))
         %
@@ -95,6 +116,13 @@ classdef TFModel
         % operations are performed. if equals to 'mem_analysis'
         % operation are not performed but memory requirement is
         % calculated and reported.
+        %
+        % return_dot_data: if equals to 'yes' then dot data for all
+        % generalized tensor multiplication operations are returned
+        % in a string. In this case contract_type is expected to be
+        % equal to 'optimal', operation_type is expected to be
+        % equal to 'mem_analysis', iternum is expected to be equal
+        % to 1 . See pltf_optimal_dot function for example usage.
 
             if nargin == 2
                 contract_type = '';
@@ -102,6 +130,10 @@ classdef TFModel
             if nargin < 4
                 operation_type = 'compute';
             end
+            if nargin < 5
+                return_dot_data = 'no';
+            end
+            dot_data = '';
 
 
             % init optimal model cache
@@ -150,10 +182,11 @@ classdef TFModel
                 ylabel('KL divergence');
 
             elseif strcmp( operation_type, 'mem_analysis' )
-                [ kl extra_mem ] = obj.pltf_iteration(contract_type, hat_X, ...
-                                                      mask, ...
-                                                      operation_type);
-                
+                [ kl extra_mem dot_data ] = ...
+                    obj.pltf_iteration(contract_type, hat_X, ...
+                                       mask, ...
+                                       operation_type, ...
+                                       return_dot_data );
             end
 
             data_mem = data_mem + extra_mem;
@@ -167,18 +200,27 @@ classdef TFModel
 
 
 
-        function [ kl extra_mem ] = pltf_iteration(obj, ...
-                                                  contract_type, ...
-                                                  hat_X, mask, ...
-                                                  operation_type)
+        function [ kl extra_mem dot_data ] = pltf_iteration(obj, ...
+                                                   contract_type, ...
+                                                   hat_X, mask, ...
+                                                   operation_type, ...
+                                                   return_dot_data )
             % helper function for the pltf inner loop
             % operation_type: 'compute' if actual computation is
             % requested, 'mem_analysis' if only memory usage
             % computation is requested
             % 
             % returns KL divergence value calculated at the end of
-            % the operations. extra_mem is incremented with
-            % temporary data usage requirements
+            % the operations. extra_mem equals to
+            % temporary data usage requirements. dot_data contains
+            % graphviz data for the generalized tensor
+            % multiplication operations if return_dot_data is equal
+            % to 'yes'.
+
+            if nargin < 6
+                return_dot_data = 'no';
+            end
+            dot_data = '';
 
             extra_mem = 0;
             for alpha=1:length(obj.latent_factor_indices)
@@ -196,13 +238,12 @@ classdef TFModel
                 % recalculate hat_X
                 newmodel = obj;
 
-                %if iter==1 && alpha==1
-                    %g = newmodel.schedule_dp(operation_type);
-                    %system([ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
-                    %                    ' dot -o /tmp/img.eps; ' ...
-                    %                    ' display  /tmp/img.eps ' ...
-                    %                    ' ' ] ] );
-                %end
+                if strcmp(return_dot_data, 'yes')
+                    g = newmodel.schedule_dp('optimal');
+                    global last_node_id;
+                    [str last_node_id] = g.print_dot(last_node_id);
+                    dot_data = [ dot_data char(10) str ];
+                end
 
                 % perform contraction
                 [ newmodel e_m ] = ...
@@ -231,17 +272,21 @@ classdef TFModel
 
 
                 % generate D1
-                [ e_m ] = obj.delta(alpha, 'D1_data', ...
-                                    contract_type, ...
-                                    operation_type, ...
-                                    hat_X);
-                extra_mem = extra_mem + e_m;                
+                [ e_m dd ] = obj.delta(alpha, 'D1_data', ...
+                                       contract_type, ...
+                                       operation_type, ...
+                                       hat_X, ...
+                                       return_dot_data );
+                dot_data = [ dot_data char(10) dd ];
+                extra_mem = extra_mem + e_m;
 
                 % generate D2
-                [ e_m ] = obj.delta(alpha, 'D2_data', ...
-                                    contract_type, ...
-                                    operation_type, ...
-                                    mask);
+                [ e_m dd ] = obj.delta(alpha, 'D2_data', ...
+                                       contract_type, ...
+                                       operation_type, ...
+                                       mask, ...
+                                       return_dot_data);
+                dot_data = [ dot_data char(10) dd ];
                 extra_mem = extra_mem + e_m;
 
                 % update Z_alpha
@@ -269,9 +314,11 @@ classdef TFModel
 
 
 
-        function [extra_mem] = delta(obj, alpha, output_name, ...
-                                     contract_type, operation_type, ...
-                                     A)
+        function [ extra_mem dot_data ] = delta(obj, alpha, ...
+                                                output_name, ...
+                                                contract_type, ...
+                                                operation_type, ...
+                                                A, return_dot_data)
         % PLTF delta function implementation
         % alpha: index of latent factor in TFModel.factors array
         % which will be updated
@@ -281,9 +328,19 @@ classdef TFModel
         % A: operand element of delta function assumed all ones if
         % not given
         %
-        % returns extra_mem required by temporary tensor usage
+        % returns extra_mem required by temporary tensor usage and
+        % dot_data contains
+        % graphviz data for the generalized tensor
+        % multiplication operations if return_dot_data is equal
+        % to 'yes'.
+
             
+            if nargin < 7
+                return_dot_data = 'no';
+            end
+
             extra_mem = 0;
+            dot_data = '';
 
             % create new model for delta operation
             d_model = obj;
@@ -296,16 +353,18 @@ classdef TFModel
             d_model.factors(alpha).isObserved= 1;
 
             % if given, add A as a new latent factor
-            if nargin == 6
+            if nargin == 7
                 A.isLatent = 1;
                 A.isObserved = 0;
                 d_model.factors = [d_model.factors A];
             end
 
-
-            %g = d_model.schedule_dp(operation_type);
-            %system( [ 'rm /tmp/img.eps; echo '' ' g.print_dot  [' '' |' ...
-            %                    ' dot -o /tmp/img.eps ;  display  /tmp/img.eps; ' ] ] );
+            if strcmp(return_dot_data, 'yes')
+                g = d_model.schedule_dp('optimal');
+                global last_node_id;
+                [ dot_data last_node_id ] = ...
+                    g.print_dot(last_node_id);
+            end
 
             % perform contraction
             [ d_model e_m ] = d_model.contract_all(contract_type, ...
@@ -510,9 +569,10 @@ classdef TFModel
                     tmpf.name = [ tmpf.name '_' char(names(d)) ];
                 end
                 %tmpf.name = [tmpf.name '_minus_' ? ];
-                
-                newmodel.factors = [ newmodel.factors tmpf ];
 
+                tmpf = obj.intermediate_factor_reuse(tmpf, ...
+                                                     'uncontract');
+                newmodel.factors = [ newmodel.factors tmpf ];
                 newmodel = newmodel.update_cost_from_latent();
             end
 
@@ -554,10 +614,10 @@ classdef TFModel
                 contract_dims = ...
                     obj.get_optimal_contraction_sequence_dims(operation_type);
 
-                %for i=1:length(contract_dims)
-                %    display(['optimal contracting ' ...
-                %             char(contract_dims{i})]);
-                %end
+                for i=1:length(contract_dims)
+                    display(['optimal contracting ' ...
+                             char(contract_dims{i})]);
+                end
             elseif  ~strcmp( contract_type, 'full' )
                 contract_dims = obj.get_contraction_dims();
 
@@ -642,6 +702,7 @@ classdef TFModel
             % create and return a newmodel compatible with other
             % contract functions
             newmodel = obj;
+            F = obj.intermediate_factor_reuse(F, 'contract_full');
             newmodel.factors = [ obj.observed_factor F ];
         end
 
@@ -777,7 +838,8 @@ classdef TFModel
                         num2str(con_dim_index) ');'] );
 
             end
-               
+
+            tmp = obj.intermediate_factor_reuse(tmp, 'contract');
             newmodel.factors = [newmodel.factors tmp];
             extra_mem = tmp.get_element_size();
 
@@ -826,27 +888,8 @@ classdef TFModel
 
 
             graph = obj.schedule_dp(operation_type);
-            t = graph.optimal_edges;
-            t(t==0) = Inf;
-            ocs_models = [];
-            i = length(t);
-            while i ~= 1
-                ocs_models = [ ocs_models graph.node_list(i) ];
-                i = find( t(:,i) == min(t(:, i)) );
-            end
-            ocs_models = [ ocs_models graph.node_list(i) ];
+            ocs_dims = graph.optimal_sequence_from_graph();
 
-            ocs_dims = [];
-            for i = 1:(length(ocs_models)-1)
-                ocs_dims = [ ocs_dims ...
-                             { setdiff( ...
-                                 ocs_models(i)...
-                                 .get_current_contraction_dims, ...
-                                 ocs_models(i+ ...
-                                            1)...
-                                 .get_current_contraction_dims) }; ...
-                           ];
-            end
 
             %display([ 'cache store' ])
             %for a =1:length(ocs_dims)
@@ -854,7 +897,6 @@ classdef TFModel
             %end
             ocs_cache = [ ocs_cache TFOCSCache(obj, ocs_dims) ];
         end
-
 
 
 
@@ -1246,7 +1288,38 @@ classdef TFModel
         end
 
 
-        
+
+
+        function [factor] = intermediate_factor_reuse(obj, factor, key)
+        % Checks global tmp_factors TFFactor list to see if given
+        % factor is already generated. If the factor is found
+        % returned factor has isReUsed variable set to true.
+        % character array key parameter makes sure different
+        % contraction processes do not get each others ways
+
+            storage_name = ['tmp_factors_' key];
+
+            eval([ 'global ' storage_name ';']);
+            storage_length = eval([ 'length(' storage_name ');' ]);
+
+            found = false;
+            for i = 1:storage_length
+                if eval([ storage_name '(i) == factor' ])
+                    factor.isReUsed = 1;
+                    found = true;
+                    break
+                end
+            end
+
+            if ~found
+                eval([ storage_name ...
+                       ' = [ ' storage_name ' factor ];' ]);
+            end
+        end
+
+
+
+
         function [r] = eq(a,b)
             r = false;
 

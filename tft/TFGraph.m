@@ -14,13 +14,35 @@ classdef TFGraph
         node_list = TFModel; % list TFModel objects
         edges;     % half full binary matrix of node_list relations
 
-        optimal_edges % half full minimal cost node_list edges
+        optimal_edges; % half full minimal cost node_list edges
     end
 
     methods
         function obj = TFGraph()
             obj.node_list = [];
         end
+
+%        function [r] = eq(a,b)
+%            r = false;
+%            if length(a.node_list) == length(b.node_list)
+%                for i_a = 1:length(a.node_list)
+%                    found = false;
+%                    for i_b = 1:length(b.node_list)
+%                        if a.node_list(a_i) == b.node_list(b_i)
+%                            found = true;
+%                            break
+%                        end
+%                    end
+%
+%                    if ~found
+%                        return
+%                    end
+%                end
+%
+%                r = true;
+%            end
+%        end
+
 
         function [r] = exists(obj, tfmodel)
         % returns index of given node
@@ -107,10 +129,17 @@ classdef TFGraph
                        length(obj.node_list(node_list_index) ...
                               .factors)
                 if obj.node_list(node_list_index).factors(find).isLatent
-                    if ~first
+                    if first
+                        first=0;
+                        str = [ str '<FONT ' ];
+                        if obj.node_list(node_list_index)...
+                                .factors(find).isReUsed
+                            str = [ str 'COLOR="red"' ];
+                        end
+                        str = [ str '>' ];
+                    else
                         str = [ str ', ' ];
                     end
-                    first=0;
 
                     for dind = length(...
                         obj.node_list(node_list_index).factors(find) ...
@@ -120,6 +149,9 @@ classdef TFGraph
                                      .factors(find).dims(dind).name) ];
                     end
                 end
+            end
+            if ~first
+                str = [ str '</FONT>' ];
             end
         end
 
@@ -138,37 +170,107 @@ classdef TFGraph
         end
 
 
-        function [str] = print_dot(obj)
-            str= [ 'digraph structs{' char(10) ...
-                   'rankdir=LR;' char(10) ...
-                   'node [shape=Mrecord];' char(10) ...
-                   'splines=false ' char(10)];
+        function [ocs_dims] = optimal_sequence_from_graph(graph)
+        % return optimal contraction sequence from a TFGraph
+        % developed as a part of
+        % TFModel.get_optimal_contraction_sequence_dims and then turned
+        % into a helper function for use from other points in the
+        % code
+            t = graph.optimal_edges;
+            t(t==0) = Inf;
+            ocs_models = [];
+            i = length(t);
+            while i ~= 1
+                ocs_models = [ ocs_models graph.node_list(i) ];
+                i = find( t(:,i) == min(t(:, i)) );
+            end
+            ocs_models = [ ocs_models graph.node_list(i) ];
+
+            ocs_dims = [];
+            for i = (length(ocs_models)):-1:2
+                ocs_dims = [ ocs_dims ...
+                             { setdiff( ...
+                                 ocs_models(i-1)...
+                                 .get_current_contraction_dims, ...
+                                 ocs_models(i) ...
+                                 .get_current_contraction_dims) }; ...
+                           ];
+            end
+        end
+
+
+        function [str, nid_end] = print_dot(obj, nid_start)
+        % start from number nid, used when multiple TFGraph objects
+        % are plotted in a single graph
+
+            if nargin == 1
+                nid_start = 0;
+
+                % put header only if drawing single graph
+                str = [ 'digraph structs{' char(10) ...
+                        'rankdir=LR;' char(10) ...
+                        'node [shape=plaintext];' char(10) ...
+                        'splines=false; ' char(10)];
+            else
+                str = [ 'subgraph cluster_' num2str(nid_start) ' {' ...
+                        ];
+            end
+
 
             for nid = 1:length(obj.node_list)
-                str = [ str 'struct' num2str(nid) ' [label=\"<f0> ' ...
-                        obj.get_current_contraction_dims_string(nid) ...
-                        ' | <f1> ' obj.get_factor_dim_string(nid) '\"];' ...
+                top = obj.get_current_contraction_dims_string(nid);
+                if ~length(top)
+                    top = '&empty;';
+                end
+
+                str = [ str 'struct' num2str(nid+nid_start) ' [label=< <TABLE FIXEDSIZE="FALSE" CELLBORDER="0" STYLE="ROUNDED"><TR><TD>' ...
+                        top ...
+                        char(10) '</TD></TR> <HR/> <TR><TD FIXEDSIZE="FALSE">' ...
+                        obj.get_factor_dim_string(nid) '</TD></TR> <TR><TD FIXEDSIZE="FALSE"></TD></TR></TABLE> >];' ...
                         char(10) 
                       ];
             end
 
+            ocs_dims = obj.optimal_sequence_from_graph();
+            ocs_dims{1}
+            ocs_dims{2}
+            ocs_dims{3}
+            k = 1;
+            next_optimal=0;
             for i = 1:length(obj.edges)
                 for j = 1:i
                     if obj.edges(j,i)
+
+                        lbl = setdiff(obj ...
+                                      .get_current_contraction_dims_string(i), ...
+                                      obj ...
+                                      .get_current_contraction_dims_string(j))
+
+                        if k <= length(ocs_dims) && ...
+                                strcmp(lbl, ocs_dims{k}) && ...
+                                (next_optimal == 0 || ...
+                                 next_optimal == j)
+                            lbl_color = 'blue';
+                            k = k+1
+                            next_optimal = i;
+                        else
+                            lbl_color = 'black';
+                        end
+
                         str = [ str ...
-                                'struct' num2str(j) ':f0 ->' ...
-                                'struct' num2str(i) ':f0 ' ...
-                                '[ label=\"' ...
-                                setdiff(obj ...
-                                        .get_current_contraction_dims_string(i), ...
-                                        obj.get_current_contraction_dims_string(j)) ...
-                                '(' num2str(obj.optimal_edges(j,i))  ')\" ];' char(10) ];
+                                'struct' num2str(j + nid_start) ' ->' ...
+                                'struct' num2str(i + nid_start) ' ' ...
+                                '[ label="' lbl ...
+                                '(' num2str(obj.optimal_edges(j,i))  ...
+                                ')" color = ' lbl_color ' ];' char(10) ];
+
                     end
                 end
             end
 
-            str = [ str char(10) '}' ];
 
+            str = [ str char(10) '}' ];
+            nid_end = nid_start + nid;
         end
 
 

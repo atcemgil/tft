@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html>
 <body>
 
@@ -116,14 +116,14 @@ Since different contraction sequences utilize different temporary factors, diffe
 
 <pre>
 graph = tucker_model.schedule_dp('mem_analysis');
-system([ 'echo " ' graph.print_dot [ ' " | dot | display' ]]);
+system([ 'echo " ' graph.print_dot [ ' " | dot -T svg | display' ]]);
 </pre>
 
 <div align="center">
   <img src="img/tucker3_dp1.png"/>
 </div>
 
-
+Note: dot comes in GraphViz package, display comes in ImageMagick package both are available in Debian/Ubuntu repositories. Please not that required GraphViz version is 2.29.
 
 <h3>Memory Analysis</h3>
 It is possible to analyse memory usage of models before executing PLTF updates with the third optional parameter of TFModel.pltf(iteration_number, contraction_type, operation_type) function. Full list of possible parameters are listed below for tucker_model:

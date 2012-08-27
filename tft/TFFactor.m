@@ -26,6 +26,7 @@ classdef TFFactor
         isObserved=0;
         isInput=0;
         isTemp=0;
+        isReUsed=0; % true if this tensor is re-used (temporary) factor
     end
 
     methods
