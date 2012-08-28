@@ -79,7 +79,7 @@ classdef TFModel
 
 
 
-        function [] = pltf_optimal_dot(obj)
+        function [] = pltf_optimal_dot(obj, filename)
         % Calls PLTF function and collects output of print_dot from
         % each GTM operation and plots in a single graph
             global last_node_id;
@@ -92,8 +92,13 @@ classdef TFModel
                     'rankdir=LR;' char(10) ...
                     'node [shape=plaintext];' char(10) ...
                     'splines=false; ' char(10)];
-            system([ 'echo ''' str char(10) dot_str '}'' | dot -T svg | ' ...
-                     'display' ]);
+            cmd = [ 'echo ''' str char(10) dot_str ...
+                    '}'' | dot -T svg ' ];
+            if nargin == 2
+                system([ cmd ' -o ' filename ]);
+            else
+                system([ cmd ' | display ' ]);
+            end
         end
 
 
@@ -115,7 +120,9 @@ classdef TFModel
         % operation_type: if equals to 'compute' normal contraction
         % operations are performed. if equals to 'mem_analysis'
         % operation are not performed but memory requirement is
-        % calculated and reported.
+        % calculated and reported. In 'mem_analysis' mode iternum
+        % argument is not considered only a single iteration is
+        % performed.
         %
         % return_dot_data: if equals to 'yes' then dot data for all
         % generalized tensor multiplication operations are returned
@@ -142,12 +149,12 @@ classdef TFModel
 
             % initalize data_mem with memory requirements of the
             % model elements
-            data_mem = obj.get_element_size();
+            data_mem = obj.get_element_size()
 
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
             % hat_X requires extra memory
-            data_mem = data_mem + hat_X.get_element_size();
+            data_mem = data_mem + hat_X.get_element_size()
 
             if strcmp( operation_type, 'compute' )
                 eval( [ 'global ' obj.observed_factor.get_data_name() ...
@@ -159,7 +166,7 @@ classdef TFModel
             mask = obj.observed_factor;
             mask.name = 'mask';
             % mask requires extra memory
-            data_mem = data_mem + mask.get_element_size();
+            data_mem = data_mem + mask.get_element_size()
 
             if strcmp( operation_type, 'compute' )
                 global mask_data;
@@ -189,7 +196,8 @@ classdef TFModel
                                        return_dot_data );
             end
 
-            data_mem = data_mem + extra_mem;
+            'e9'
+            data_mem = data_mem + extra_mem
             display([char(10) ...
                      'data elements required: ' num2str(data_mem) ...
                      char(10) ...
@@ -241,7 +249,8 @@ classdef TFModel
                 if strcmp(return_dot_data, 'yes')
                     g = newmodel.schedule_dp('optimal');
                     global last_node_id;
-                    [str last_node_id] = g.print_dot(last_node_id);
+                    [str last_node_id] = g.print_dot(last_node_id, ...
+                                                     're-calculate hat_X');
                     dot_data = [ dot_data char(10) str ];
                 end
 
@@ -249,8 +258,8 @@ classdef TFModel
                 [ newmodel e_m ] = ...
                     newmodel.contract_all(contract_type, ...
                                           operation_type);
-
-                extra_mem = extra_mem + e_m;
+                'e1'
+                extra_mem = extra_mem + e_m
 
 
                 % store result in hat_X_data
@@ -277,8 +286,11 @@ classdef TFModel
                                        operation_type, ...
                                        hat_X, ...
                                        return_dot_data );
-                dot_data = [ dot_data char(10) dd ];
-                extra_mem = extra_mem + e_m;
+                if strcmp( return_dot_data, 'yes') 
+                    dot_data = [ dot_data char(10) dd ];
+                end
+                'e2'
+                extra_mem = extra_mem + e_m
 
                 % generate D2
                 [ e_m dd ] = obj.delta(alpha, 'D2_data', ...
@@ -286,8 +298,11 @@ classdef TFModel
                                        operation_type, ...
                                        mask, ...
                                        return_dot_data);
-                dot_data = [ dot_data char(10) dd ];
-                extra_mem = extra_mem + e_m;
+                if strcmp( return_dot_data, 'yes') 
+                    dot_data = [ dot_data char(10) dd ];
+                end
+                'e3'
+                extra_mem = extra_mem + e_m
 
                 % update Z_alpha
                 if strcmp( operation_type, 'compute' )
@@ -363,12 +378,15 @@ classdef TFModel
                 g = d_model.schedule_dp('optimal');
                 global last_node_id;
                 [ dot_data last_node_id ] = ...
-                    g.print_dot(last_node_id);
+                    g.print_dot(last_node_id, ...
+                                ['alpha ' num2str(alpha) ' ' ...
+                                 output_name ] );
             end
 
             % perform contraction
             [ d_model e_m ] = d_model.contract_all(contract_type, ...
                                                    operation_type);
+            %'e4'
             extra_mem = extra_mem + e_m;
 
             if strcmp( operation_type, 'compute' )
@@ -406,7 +424,7 @@ classdef TFModel
 
             while length(process_nodes) >= processing_node
                 cur_node = process_nodes(processing_node);
-                cur_node = cur_node.update_cost_from_latent();
+                cur_node = cur_node.update_cost_from_temp();
 
                 % init graph.node_list
                 if length(graph.node_list) == 0
@@ -418,7 +436,7 @@ classdef TFModel
                 for udi = 1:length(uncontraction_dims)
                     new_node = cur_node.uncontract(obj, ...
                                                    uncontraction_dims(udi));
-                    new_node = new_node.update_cost_from_latent();
+                    new_node = new_node.update_cost_from_temp();
 
                     % memoization
                     nnidx = graph.exists(new_node);
@@ -573,7 +591,7 @@ classdef TFModel
                 tmpf = obj.intermediate_factor_reuse(tmpf, ...
                                                      'uncontract');
                 newmodel.factors = [ newmodel.factors tmpf ];
-                newmodel = newmodel.update_cost_from_latent();
+                newmodel = newmodel.update_cost_from_temp();
             end
 
         end
@@ -614,10 +632,10 @@ classdef TFModel
                 contract_dims = ...
                     obj.get_optimal_contraction_sequence_dims(operation_type);
 
-                for i=1:length(contract_dims)
-                    display(['optimal contracting ' ...
-                             char(contract_dims{i})]);
-                end
+                %for i=1:length(contract_dims)
+                %    display(['optimal contracting ' ...
+                %             char(contract_dims{i})]);
+                %end
             elseif  ~strcmp( contract_type, 'full' )
                 contract_dims = obj.get_contraction_dims();
 
@@ -631,13 +649,16 @@ classdef TFModel
             newmodel = obj;
 
             if strcmp( contract_type, 'full')
-                [ newmodel e_m ] = obj.contract_full(operation_type);
+                [ newmodel e_m ] = ...
+                    obj.contract_full(operation_type);
+                %['e5' contract_type]
                 extra_mem = extra_mem + e_m;
             else
                 for i = 1:length(contract_dims)
                     [ newmodel e_m ]= ...
                         newmodel.contract(contract_dims(i), ...
                                           operation_type);
+                    %['e6 ' contract_type]
                     extra_mem = extra_mem + e_m;
                 end
             end
@@ -672,6 +693,7 @@ classdef TFModel
                 eval( [ ' full_tensor_data = ones(' sz ');'] );
             end
 
+            %'e7'
             extra_mem = F.get_element_size();
 
             if strcmp( operation_type, 'compute' )
@@ -841,6 +863,7 @@ classdef TFModel
 
             tmp = obj.intermediate_factor_reuse(tmp, 'contract');
             newmodel.factors = [newmodel.factors tmp];
+            ['e8 ' tmp.name]
             extra_mem = tmp.get_element_size();
 
             % remove contracted factors
@@ -897,6 +920,21 @@ classdef TFModel
             %end
             ocs_cache = [ ocs_cache TFOCSCache(obj, ocs_dims) ];
         end
+
+
+
+
+        function [obj] = update_cost_from_temp(obj)
+            obj.cost = 0;
+            lfi=obj.latent_factor_indices();
+            for fi = 1:length(lfi)
+                if obj.factors(lfi(fi)).isTemp
+                    obj.cost = obj.cost + ...
+                        obj.factors(lfi(fi)).get_element_size();
+                end
+            end
+        end
+
 
 
 

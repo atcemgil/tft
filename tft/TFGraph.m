@@ -187,21 +187,23 @@ classdef TFGraph
             ocs_models = [ ocs_models graph.node_list(i) ];
 
             ocs_dims = [];
-            for i = (length(ocs_models)):-1:2
+            %for i = (length(ocs_models)):-1:2
+            for i = 1:(length(ocs_models)-1)
                 ocs_dims = [ ocs_dims ...
                              { setdiff( ...
-                                 ocs_models(i-1)...
+                                 ocs_models(i)...
                                  .get_current_contraction_dims, ...
-                                 ocs_models(i) ...
+                                 ocs_models(i+1) ...
                                  .get_current_contraction_dims) }; ...
                            ];
             end
         end
 
 
-        function [str, nid_end] = print_dot(obj, nid_start)
-        % start from number nid, used when multiple TFGraph objects
+        function [str, nid_end] = print_dot(obj, nid_start, subgraph_label)
+        % nid_start: start from number nid, used when multiple TFGraph objects
         % are plotted in a single graph
+        % subgraph_label: can be used to label subgraphs
 
             if nargin == 1
                 nid_start = 0;
@@ -213,7 +215,11 @@ classdef TFGraph
                         'splines=false; ' char(10)];
             else
                 str = [ 'subgraph cluster_' num2str(nid_start) ' {' ...
-                        ];
+                      ];
+                if nargin == 3 
+                    str = [str char(10) 'label = "' ...
+                           char(subgraph_label) '"' ];
+                end
             end
 
 
@@ -232,9 +238,8 @@ classdef TFGraph
             end
 
             ocs_dims = obj.optimal_sequence_from_graph();
-            ocs_dims{1}
-            ocs_dims{2}
-            ocs_dims{3}
+            % reverse ocs_dims for display
+            ocs_dims = fliplr(ocs_dims);
             k = 1;
             next_optimal=0;
             for i = 1:length(obj.edges)
@@ -244,14 +249,14 @@ classdef TFGraph
                         lbl = setdiff(obj ...
                                       .get_current_contraction_dims_string(i), ...
                                       obj ...
-                                      .get_current_contraction_dims_string(j))
+                                      .get_current_contraction_dims_string(j));
 
                         if k <= length(ocs_dims) && ...
                                 strcmp(lbl, ocs_dims{k}) && ...
                                 (next_optimal == 0 || ...
                                  next_optimal == j)
                             lbl_color = 'blue';
-                            k = k+1
+                            k = k+1;
                             next_optimal = i;
                         else
                             lbl_color = 'black';

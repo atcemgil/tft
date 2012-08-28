@@ -65,7 +65,7 @@ classdef TFFactor
                 obj.isTemp = 1;
             end
 
-            obj.isTemp = p.Results.isClamped;
+            obj.isInput = p.Results.isClamped;
 
         end
 
