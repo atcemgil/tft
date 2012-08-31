@@ -103,6 +103,12 @@ classdef TFGraph
             obj.optimal_edges(parent_index, end) = ...
                 obj.get_min_arriving_cost(parent_index) + ...
                 new_node.cost;
+
+            %['append node ' obj.node_list(parent_index).name ' -> ' obj.node_list(length(obj.optimal_edges)).name ' ' ...
+            % num2str(obj.get_min_arriving_cost(parent_index)) ' + ' ...
+            % num2str(new_node.cost) ' = ' ...
+            % num2str(obj.optimal_edges(parent_index, end))]
+
         end
 
 
@@ -118,6 +124,10 @@ classdef TFGraph
             obj.optimal_edges(pidx, nnidx) = ...
                 obj.get_min_arriving_cost(pidx) + ...
                 child_node.cost;
+
+            %['update node ' obj.node_list(pidx).name ' -> ' obj.node_list(nnidx).name ' ' ...
+            % num2str(obj.get_min_arriving_cost(pidx)) ' + ' ...
+            % num2str(child_node.cost) ' = ' num2str(obj.optimal_edges(pidx, nnidx))]
         end
 
 
@@ -131,27 +141,47 @@ classdef TFGraph
                 if obj.node_list(node_list_index).factors(find).isLatent
                     if first
                         first=0;
-                        str = [ str '<FONT ' ];
-                        if obj.node_list(node_list_index)...
-                                .factors(find).isReUsed
-                            str = [ str 'COLOR="red"' ];
-                        end
-                        str = [ str '>' ];
                     else
                         str = [ str ', ' ];
                     end
 
+                    if node_list_index == 1
+                        str = [ str '<FONT COLOR="green"' ];
+                    else
+
+                        if obj.node_list(node_list_index)...
+                                .factors(find).isReUsed
+                            str = [ str '<U>' ];
+                        end
+
+                        str = [ str '<FONT ' ];
+                        if obj.node_list(node_list_index)...
+                                .factors(find).isTemp
+                            str = [ str 'COLOR="red"' ];
+                        end
+                    end
+                    str = [ str '>' ];
+
+
+                    nstr = {};
                     for dind = length(...
                         obj.node_list(node_list_index).factors(find) ...
                         .dims):-1:1
-                        str = [ str ...
-                                char(obj.node_list(node_list_index) ...
-                                     .factors(find).dims(dind).name) ];
+                        nstr = [ nstr ...
+                                 {char(obj.node_list(node_list_index) ...
+                                      .factors(find).dims(dind).name)} ];
                     end
+
+                    nstr = char(obj.node_list(1).order_dims(nstr))';
+
+                    str = [ str nstr '</FONT>' ];
+                    if obj.node_list(node_list_index)...
+                            .factors(find).isReUsed && ...
+                            node_list_index ~= 1 ...
+                        str = [ str '</U>' ];
+                    end
+
                 end
-            end
-            if ~first
-                str = [ str '</FONT>' ];
             end
         end
 
@@ -182,7 +212,10 @@ classdef TFGraph
             i = length(t);
             while i ~= 1
                 ocs_models = [ ocs_models graph.node_list(i) ];
-                i = find( t(:,i) == min(t(:, i)) );
+                m = min(t(:, i)); % if same value appears twice
+                                  % pick first
+                i = find( t(:,i) == m(1) );
+                i = i(1); % pick first
             end
             ocs_models = [ ocs_models graph.node_list(i) ];
 
@@ -252,7 +285,7 @@ classdef TFGraph
                                       .get_current_contraction_dims_string(j));
 
                         if k <= length(ocs_dims) && ...
-                                strcmp(lbl, ocs_dims{k}) && ...
+                                strcmp(lbl, char(ocs_dims{k})) && ...
                                 (next_optimal == 0 || ...
                                  next_optimal == j)
                             lbl_color = 'blue';

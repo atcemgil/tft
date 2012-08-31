@@ -247,27 +247,29 @@ classdef TFModel
                 newmodel = obj;
 
                 if strcmp(return_dot_data, 'yes')
-                    g = newmodel.schedule_dp('optimal');
+                    g = newmodel.schedule_dp();
                     global last_node_id;
                     [str last_node_id] = g.print_dot(last_node_id, ...
                                                      're-calculate hat_X');
-                    dot_data = [ dot_data char(10) str ];
+                    dot_data = [ str char(10) dot_data ];
                 end
 
                 % perform contraction
-                [ newmodel e_m ] = ...
+                % store result in hat_X_data
+                [ ~, e_m ] = ...
                     newmodel.contract_all(contract_type, ...
-                                          operation_type);
+                                          operation_type, ...
+                                          'hat_X_data');
                 'e1'
                 extra_mem = extra_mem + e_m
 
 
-                % store result in hat_X_data
-                result_name = ...
-                    newmodel.get_first_non_observed_factor() ...
-                    .get_data_name();
-                eval(['global ' result_name ';'] );
-                eval(['hat_X_data = ' result_name ';' ] ); 
+
+                %result_name = ...
+                %    newmodel.get_first_non_observed_factor() ...
+                %    .get_data_name();
+                %eval(['global ' result_name ';'] );
+                %eval(['hat_X_data = ' result_name ';' ] ); 
 
 
 
@@ -287,7 +289,7 @@ classdef TFModel
                                        hat_X, ...
                                        return_dot_data );
                 if strcmp( return_dot_data, 'yes') 
-                    dot_data = [ dot_data char(10) dd ];
+                    dot_data = [ dd char(10) dot_data ];
                 end
                 'e2'
                 extra_mem = extra_mem + e_m
@@ -299,7 +301,7 @@ classdef TFModel
                                        mask, ...
                                        return_dot_data);
                 if strcmp( return_dot_data, 'yes') 
-                    dot_data = [ dot_data char(10) dd ];
+                    dot_data = [ dd char(10) dot_data ];
                 end
                 'e3'
                 extra_mem = extra_mem + e_m
@@ -375,7 +377,7 @@ classdef TFModel
             end
 
             if strcmp(return_dot_data, 'yes')
-                g = d_model.schedule_dp('optimal');
+                g = d_model.schedule_dp();
                 global last_node_id;
                 [ dot_data last_node_id ] = ...
                     g.print_dot(last_node_id, ...
@@ -384,28 +386,29 @@ classdef TFModel
             end
 
             % perform contraction
-            [ d_model e_m ] = d_model.contract_all(contract_type, ...
-                                                   operation_type);
+            [ ~, e_m ] = d_model.contract_all(contract_type, ...
+                                                   operation_type, ...
+                                                   output_name);
             %'e4'
             extra_mem = extra_mem + e_m;
 
-            if strcmp( operation_type, 'compute' )
-
-                eval( [ 'global ' output_name ';'] );
-                eval( [ 'global ' ...
-                        d_model.get_first_non_observed_factor().get_data_name() ';'...
-                      ] );
-
-                eval( [ output_name '=' ...
-                        d_model.get_first_non_observed_factor().get_data_name() ...
-                        ';' ]);
-            end
+            %if strcmp( operation_type, 'compute' )
+            %
+            %    eval( [ 'global ' output_name ';'] );
+            %    eval( [ 'global ' ...
+            %            d_model.get_first_non_observed_factor().get_data_name() ';'...
+            %          ] );
+            %
+            %    eval( [ output_name '=' ...
+            %            d_model.get_first_non_observed_factor().get_data_name() ...
+            %            ';' ]);
+            %end
         end
 
 
 
 
-        function [graph] = schedule_dp(obj, operation_type)
+        function [graph] = schedule_dp(obj)
         % returns a tree of TFModel generated as a result of the
         % search for least memory consuming contraction sequence
         % with a dynamic programming approach
@@ -415,8 +418,9 @@ classdef TFModel
             
             % generate final state of contraction operation to be
             % used as the initial state of dp search
-            end_node = obj.contract_all('standard', ...  % must not be optimal or infinite loop!
-                                        operation_type);
+            end_node = obj.contract_all('standard', ...   % must not be optimal or infinite loop!
+                                        'mem_analysis' ); % do not waste time computing
+
 
             graph = TFGraph;
             process_nodes = [end_node];
@@ -427,7 +431,7 @@ classdef TFModel
                 cur_node = cur_node.update_cost_from_temp();
 
                 % init graph.node_list
-                if length(graph.node_list) == 0
+                if isempty(graph.node_list)
                     graph.node_list = [cur_node];
                     graph=graph.clear_edges();
                 end
@@ -436,7 +440,6 @@ classdef TFModel
                 for udi = 1:length(uncontraction_dims)
                     new_node = cur_node.uncontract(obj, ...
                                                    uncontraction_dims(udi));
-                    new_node = new_node.update_cost_from_temp();
 
                     % memoization
                     nnidx = graph.exists(new_node);
@@ -574,7 +577,7 @@ classdef TFModel
 
             % if no names are found then there is no temporary
             % factor added
-            if length(names)
+            if ~isempty(names)
                 % make sure tmp.factor dims are unique
                 %'önce'
                 %tmpf.dims.name
@@ -591,15 +594,29 @@ classdef TFModel
                 tmpf = obj.intermediate_factor_reuse(tmpf, ...
                                                      'uncontract');
                 newmodel.factors = [ newmodel.factors tmpf ];
+            end
+
+            % if temporary is reused cost is eliminated, single
+            % temporary factor generation assumed
+            if tmpf.isReUsed
+                newmodel.cost = 0;
+                %['reuse: cost eliminate ' tmpf.name ' for model ' ...
+                % newmodel.name]
+            else
                 newmodel = newmodel.update_cost_from_temp();
             end
 
+            newmodel = newmodel.update_cost_from_temp();
+
+            %[' uncontract newmodel ' newmodel.name ' cost ' num2str(newmodel.cost)]
         end
 
 
 
 
-        function [newmodel extra_mem] = contract_all(obj, contract_type, operation_type)
+        function [newmodel extra_mem] = contract_all(obj, contract_type, ...
+                                                     operation_type, ...
+                                                     output_name )
         % Performs all necessary contraction operations for the
         % model. If contract_type argument is equal to 'optimal'
         % then schedule_dp() is used to find the optimal (least
@@ -610,6 +627,9 @@ classdef TFModel
         % contract_type equals to 'full', no intermediate
         % contractions are performed, full tensor is calculated and
         % then contracted into the output tensor
+        % output_name: name of the global data structure to store
+        % the final result into, not used if operation type is not
+        % 'compute'.
         % 
         % operation_type argument may be 'compute' or
         % 'mem_analysis'. Normal operations are performed in
@@ -620,6 +640,10 @@ classdef TFModel
         % necessary dimension and the total extra memory required
         % by all temporary elements
 
+            if nargin < 4
+                output_name = '';
+            end
+
             if nargin < 3
                 operation_type = 'compute';
             end
@@ -628,9 +652,18 @@ classdef TFModel
                 contract_type = 'standard';
             end
 
+            if strcmp(operation_type, 'compute') && ...
+                    isempty(output_name)
+                throw(MException('TFModel:ContractAllNoOutputName', ...
+                                 ['output_name must be specified if ' ...
+                                  'operation type is ''compute''' ]));
+            end
+
+
+
             if strcmp( contract_type, 'optimal' )
                 contract_dims = ...
-                    obj.get_optimal_contraction_sequence_dims(operation_type);
+                    obj.get_optimal_contraction_sequence_dims();
 
                 %for i=1:length(contract_dims)
                 %    display(['optimal contracting ' ...
@@ -645,6 +678,8 @@ classdef TFModel
             end
 
 
+
+
             extra_mem = 0;
             newmodel = obj;
 
@@ -655,9 +690,17 @@ classdef TFModel
                 extra_mem = extra_mem + e_m;
             else
                 for i = 1:length(contract_dims)
+                    if i == length(contract_dims)
+                        on = output_name;
+                    else
+                        on = '';
+                    end
+
                     [ newmodel e_m ]= ...
                         newmodel.contract(contract_dims(i), ...
-                                          operation_type);
+                                          operation_type, ...
+                                          on );
+
                     %['e6 ' contract_type]
                     extra_mem = extra_mem + e_m;
                 end
@@ -667,11 +710,13 @@ classdef TFModel
 
 
 
-        function [newmodel extra_mem] = contract_full(obj, operation_type)
+        function [newmodel extra_mem] = contract_full(obj, operation_type, ...
+                                                      output_name)
         % generates a new full (temporary) tensor, multiplies all
         % latent tensors in to the full tensor and then 
         % contracts full tensor over necessary indices and returns
-        % newmodel with full_tensor in it
+        % newmodel with full_tensor and contracted result in global
+        % data named 'output_name'
 
             % generate full tensor
             F = TFFactor;
@@ -721,28 +766,32 @@ classdef TFModel
                 end
             end
 
-            % create and return a newmodel compatible with other
-            % contract functions
             newmodel = obj;
             F = obj.intermediate_factor_reuse(F, 'contract_full');
-            newmodel.factors = [ obj.observed_factor F ];
+            newmodel.factors = [ obj.observed_factor ];
         end
 
 
 
 
-        function [newmodel extra_mem] = contract(obj, dim, operation_type)
+        function [newmodel extra_mem] = contract(obj, dim, operation_type, ...
+                                                 output_name)
         % returns a new TFModel generated by contracting obj with
         % dim which may add new temporary factors and mem_delta
         % integer value. extra_mem will be positive if a temporary
         % factor is generated and its value will indicate memory
-        % usage of new factor. mem_delta will be zero if no
-        % temporary factors are generated.
+        % usage of new factor. extra_mem will be zero if no
+        % temporary factors are generated. extra_mem will also be
+        % zero if output_name is specified.
         % dim: TFDimension or char array or cell with the name of
         % the dimension
         % operation_type: if equals to 'compute' contraction is
         % calculated. if equals to 'mem_analysis' data elements are
         % not created.
+        % output_name: if has length > 0 do not generate temporary
+        % factor but use global data storage named 'output
+        % name'. In this case extra_mem is not incremented and
+        % returned model does not contain temporary factor created.
             extra_mem = 0;
 
             if isa(dim, 'TFDimension')
@@ -815,15 +864,27 @@ classdef TFModel
 
 
 
+
+            % calculate output data
+            if isempty(output_name)
+                on = tmp.get_data_name();
+            else
+                on = output_name;
+
+                % TODO: make sure output has correct dimensions
+                % eval( [ 'global ' on  ';'] );
+                % tmpsz = size(tmp.get_data_name());
+            end
+
             if strcmp( operation_type, 'compute' )
-                eval( [ 'global ' tmp.get_data_name()  ';'] );
+                eval( [ 'global ' on  ';'] );
 
                 if length(contracted_factor_inds) == 1
                     % no multiplication
                     eval( [ 'global ' ...
                             obj.factors(contracted_factor_inds(1)) ...
                             .get_data_name() ';'] );
-                    eval( [ tmp.get_data_name() ' = ' ...
+                    eval( [ on ' = ' ...
                             obj.factors(contracted_factor_inds(1)) ...
                             .get_data_name() ';'] );
                 else
@@ -833,7 +894,7 @@ classdef TFModel
                             ' ' obj.factors(contracted_factor_inds(1)).get_data_name() ...
                             ' ' obj.factors(contracted_factor_inds(2)).get_data_name() ';'] );
 
-                    eval( [ tmp.get_data_name() ' = bsxfun (@times, ' ...
+                    eval( [ on ' = bsxfun (@times, ' ...
                             obj.factors(contracted_factor_inds(1)).get_data_name() ', '...
                             obj.factors(contracted_factor_inds(2)).get_data_name() ');' ...
                           ] );
@@ -843,8 +904,8 @@ classdef TFModel
                         eval( [ 'global '...
                                 obj.factors(contracted_factor_inds(cfii)) ...
                                 .get_data_name() ';'] );
-                        eval( [ tmp.get_data_name() ' = bsxfun (@times, ' ...
-                                tmp.get_data_name() ','...
+                        eval( [ on ' = bsxfun (@times, ' ...
+                                on ','...
                                 obj.factors(contracted_factor_inds(cfii)) ...
                                 .get_data_name() ');' ] );
                     end
@@ -855,16 +916,24 @@ classdef TFModel
                 
                 con_dim_index = obj.get_dimension_index(dim);
 
-                eval( [ tmp.get_data_name() ' = sum( ' ...
-                        tmp.get_data_name() ', ' ...
+                eval( [ on ' = sum( ' ...
+                        on ', ' ...
                         num2str(con_dim_index) ');'] );
 
             end
 
-            tmp = obj.intermediate_factor_reuse(tmp, 'contract');
-            newmodel.factors = [newmodel.factors tmp];
-            ['e8 ' tmp.name]
-            extra_mem = tmp.get_element_size();
+
+            if isempty(output_name)
+                tmp = obj.intermediate_factor_reuse(tmp, 'contract');
+                newmodel.factors = [newmodel.factors tmp];
+                extra_mem = tmp.get_element_size();
+            else
+                newmodel.factors = [newmodel.factors];
+            end
+
+
+            %['e8 ' tmp.name ' output: ' output_name ' extra mem: ' ...
+            % num2str(extra_mem)]
 
             % remove contracted factors
             % other dimensions live within the tmp factor
@@ -879,8 +948,7 @@ classdef TFModel
 
 
 
-        function [ocs_dims] = get_optimal_contraction_sequence_dims(obj, ...
-                                                              operation_type)
+        function [ocs_dims] = get_optimal_contraction_sequence_dims(obj)
         % Runs schedule_dp function to generate graph with least
         % memory using contraction sequence information in it. Then
         % searches TFGraph.optimal_edges for the optimal path and
@@ -910,7 +978,7 @@ classdef TFModel
             end
 
 
-            graph = obj.schedule_dp(operation_type);
+            graph = obj.schedule_dp();
             ocs_dims = graph.optimal_sequence_from_graph();
 
 
@@ -926,13 +994,15 @@ classdef TFModel
 
         function [obj] = update_cost_from_temp(obj)
             obj.cost = 0;
-            lfi=obj.latent_factor_indices();
+            lfi = obj.latent_factor_indices();
             for fi = 1:length(lfi)
                 if obj.factors(lfi(fi)).isTemp
+                    obj.factors(lfi(fi)).name;
                     obj.cost = obj.cost + ...
                         obj.factors(lfi(fi)).get_element_size();
                 end
             end
+            %['updatecost ' obj.name ' ' num2str(obj.cost)]
         end
 
 
@@ -1344,12 +1414,16 @@ classdef TFModel
             for i = 1:storage_length
                 if eval([ storage_name '(i) == factor' ])
                     factor.isReUsed = 1;
+                    %['reused ' factor.name ' key ' key ...
+                    % ' storage name ' storage_name ]
                     found = true;
                     break
                 end
             end
 
             if ~found
+                %['stored ' factor.name ' key ' key ...
+                % ' storage name ' storage_name ]
                 eval([ storage_name ...
                        ' = [ ' storage_name ' factor ];' ]);
             end
