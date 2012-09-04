@@ -19,7 +19,7 @@ classdef TFFactor
     properties
         name = '';
  
-        dims = TFDimension();  % array of TFDimension
+        dims = TFDimension;  % array of TFDimension
         %data;  % contains data of this factor
 
         isLatent=0;
@@ -152,13 +152,13 @@ classdef TFFactor
 
 
         function [name] = get_data_name(obj)
+        % used with model elements' data
             name = [obj.name '_data'];
         end
 
 
-        function [] = rand_init(obj, all_dims, imax)
+        function [] = rand_init(obj, all_dims, imax, data_name)
 
-            eval( [ 'global ' obj.get_data_name() ';' ] );
             sz = '';
             for ad = 1:length(all_dims)
                 if ad ~= 1
@@ -180,10 +180,19 @@ classdef TFFactor
                 end
             end
 
+            if nargin < 3
+                imax = 100;
+            end
+
+            if nargin < 4
+                data_name = obj.get_data_name();
+            end
+
+            eval( [ 'global ' data_name ';' ] );
             if nargin == 2
-                eval( [ obj.get_data_name() ' = rand(' sz ');'] );
+                eval( [ data_name ' = rand(' sz ');'] );
             else
-                eval( [ obj.get_data_name() ...
+                eval( [ data_name  ...
                         ' = randi(' num2str(imax) ', ' sz ');' ] );
             end
         end

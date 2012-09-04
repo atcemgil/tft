@@ -23,7 +23,7 @@ tucker_model = TFModel('name', 'Tucker3', 'factors', [A B C G X], ...
                        'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);
 
 tucker_model.rand_init_latent_factors('nonClamped');
-X.rand_init(tucker_model.dims, 100) % init observation
+X.rand_init(tucker_model.dims) % init observation
 C.rand_init(tucker_model.dims, 100) % init clamped
 
 

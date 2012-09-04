@@ -149,15 +149,15 @@ classdef TFModel
 
             % initalize data_mem with memory requirements of the
             % model elements
-            data_mem = obj.get_element_size()
+            data_mem = obj.get_element_size();
 
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
             % hat_X requires extra memory
-            data_mem = data_mem + hat_X.get_element_size()
+            data_mem = data_mem + hat_X.get_element_size();
 
             if strcmp( operation_type, 'compute' )
-                eval( [ 'global ' obj.observed_factor.get_data_name() ...
+                eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor) ...
                         ';' ] );
                 global hat_X_data;
                 hat_X.rand_init(obj.dims, 100);
@@ -166,7 +166,7 @@ classdef TFModel
             mask = obj.observed_factor;
             mask.name = 'mask';
             % mask requires extra memory
-            data_mem = data_mem + mask.get_element_size()
+            data_mem = data_mem + mask.get_element_size();
 
             if strcmp( operation_type, 'compute' )
                 global mask_data;
@@ -174,10 +174,13 @@ classdef TFModel
                 KL=zeros(1,iternum);
                 for iter = 1:iternum
                     display(['iteration' char(9) num2str(iter)]);
-                    [ kl extra_mem ] = obj.pltf_iteration(contract_type, ...
+                    [ kl e_m ] = obj.pltf_iteration(contract_type, ...
                                                           hat_X, ...
                                                           mask, ...
                                                           operation_type);
+                    if iter == 1
+                        extra_mem = e_m;
+                    end
                     KL(iter) = kl;
                 end
 
@@ -196,8 +199,8 @@ classdef TFModel
                                        return_dot_data );
             end
 
-            'e9'
-            data_mem = data_mem + extra_mem
+            %'e9'
+            data_mem = data_mem + extra_mem;
             display([char(10) ...
                      'data elements required: ' num2str(data_mem) ...
                      char(10) ...
@@ -233,14 +236,13 @@ classdef TFModel
             extra_mem = 0;
             for alpha=1:length(obj.latent_factor_indices)
                 % access global data
-                eval( [ 'global ' obj.observed_factor.get_data_name() ...
+                eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor ) ...
                         ';' ] );
                 global hat_X_data mask_data;
-                X_name = obj.factors(obj.observed_factor_index) ...
-                         .get_data_name();
+                X_name = obj.get_factor_data_name( obj.observed_factor );
                 eval(['global ' X_name ';']);
-                Z_alpha_name = ...
-                    obj.factors(alpha).get_data_name();
+                Z_alpha_name = obj.get_factor_data_name( ...
+                    obj.factors(alpha) );
                 eval( [ 'global ' Z_alpha_name ';' ] );
 
                 % recalculate hat_X
@@ -260,8 +262,8 @@ classdef TFModel
                     newmodel.contract_all(contract_type, ...
                                           operation_type, ...
                                           'hat_X_data');
-                'e1'
-                extra_mem = extra_mem + e_m
+                %'e1'
+                extra_mem = extra_mem + e_m;
 
 
 
@@ -291,8 +293,9 @@ classdef TFModel
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                'e2'
-                extra_mem = extra_mem + e_m
+                %'e2'
+                extra_mem = extra_mem + e_m ...
+                    + global_data_size(Z_alpha_name); %('D1_data')
 
                 % generate D2
                 [ e_m dd ] = obj.delta(alpha, 'D2_data', ...
@@ -303,8 +306,9 @@ classdef TFModel
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                'e3'
-                extra_mem = extra_mem + e_m
+                %'e3'
+                extra_mem = extra_mem + e_m ...
+                    + global_data_size(Z_alpha_name);  %('D2_data')
 
                 % update Z_alpha
                 if strcmp( operation_type, 'compute' )
@@ -345,7 +349,8 @@ classdef TFModel
         % A: operand element of delta function assumed all ones if
         % not given
         %
-        % returns extra_mem required by temporary tensor usage and
+        % extra_mem contains memory required for temporary tensors
+        % used in contraction operation
         % dot_data contains
         % graphviz data for the generalized tensor
         % multiplication operations if return_dot_data is equal
@@ -387,8 +392,8 @@ classdef TFModel
 
             % perform contraction
             [ ~, e_m ] = d_model.contract_all(contract_type, ...
-                                                   operation_type, ...
-                                                   output_name);
+                                              operation_type, ...
+                                              output_name);
             %'e4'
             extra_mem = extra_mem + e_m;
 
@@ -421,18 +426,17 @@ classdef TFModel
             end_node = obj.contract_all('standard', ...   % must not be optimal or infinite loop!
                                         'mem_analysis' ); % do not waste time computing
 
-
             graph = TFGraph;
             process_nodes = [end_node];
             processing_node = 1;
 
             while length(process_nodes) >= processing_node
                 cur_node = process_nodes(processing_node);
-                cur_node = cur_node.update_cost_from_temp();
+                %cur_node = cur_node.update_cost_from_temp();
 
                 % init graph.node_list
                 if isempty(graph.node_list)
-                    graph.node_list = [cur_node];
+                    graph.node_list = [cur_node];  % move this block out of while loop?
                     graph=graph.clear_edges();
                 end
 
@@ -591,20 +595,18 @@ classdef TFModel
                 end
                 %tmpf.name = [tmpf.name '_minus_' ? ];
 
-                tmpf = obj.intermediate_factor_reuse(tmpf, ...
-                                                     'uncontract');
                 newmodel.factors = [ newmodel.factors tmpf ];
             end
 
             % if temporary is reused cost is eliminated, single
             % temporary factor generation assumed
-            if tmpf.isReUsed
-                newmodel.cost = 0;
-                %['reuse: cost eliminate ' tmpf.name ' for model ' ...
-                % newmodel.name]
-            else
-                newmodel = newmodel.update_cost_from_temp();
-            end
+            %if tmpf.isReUsed
+            %    newmodel.cost = 0.00000001;
+            %    ['reuse: cost eliminate ' tmpf.name ' for model ' ...
+            %     newmodel.name]
+            %else
+            %    newmodel = newmodel.update_cost_from_temp();
+            %end
 
             newmodel = newmodel.update_cost_from_temp();
 
@@ -724,9 +726,17 @@ classdef TFModel
             F.isTemp = 1;
             F.dims = obj.dims;    % full indices
 
+
+            %'e7'
+            global full_tensor_data;
+            if length(full_tensor_data) == 0
+                extra_mem = F.get_element_size();
+            else
+                extra_mem = 0;
+            end
+
             if strcmp( operation_type, 'compute' )
                 % generate global full_tensor_data
-                global full_tensor_data;
 
                 sz = '';
                 for adi = 1:length(obj.dims)
@@ -736,17 +746,18 @@ classdef TFModel
                     sz = [sz num2str(obj.dims(adi).cardinality) ];
                 end
                 eval( [ ' full_tensor_data = ones(' sz ');'] );
+            else
+                % in case of mem_analysis  make length of global data
+                % greater than 0 for memory size computation
+                full_tensor_data = 1;
             end
-
-            %'e7'
-            extra_mem = F.get_element_size();
 
             if strcmp( operation_type, 'compute' )
                 % access global data of all latent factors
                 lfi = obj.latent_factor_indices;
                 for lfii = 1:length(lfi)
                     eval(['global ' ...
-                          obj.factors(lfi(lfii)).get_data_name() ...
+                          obj.get_factor_data_name( obj.factors(lfi(lfii)) ) ...
                          ]);
                 end
 
@@ -754,7 +765,8 @@ classdef TFModel
                 for lfii = 1:length(lfi)
                     % following tensors should be multiplied with data_F
                     eval([ 'full_tensor_data = bsxfun(@times, full_tensor_data, ' ...
-                           obj.factors(lfi(lfii)).get_data_name() ');' ]);
+                           obj.get_factor_data_name( ...
+                               obj.factors(lfi(lfii)) ) ');' ]);
                 end
 
                 % contract necessary dimensions from full_tensor_data
@@ -767,8 +779,7 @@ classdef TFModel
             end
 
             newmodel = obj;
-            F = obj.intermediate_factor_reuse(F, 'contract_full');
-            newmodel.factors = [ obj.observed_factor ];
+            newmodel.factors = [ obj.observed_factor F ];
         end
 
 
@@ -867,7 +878,18 @@ classdef TFModel
 
             % calculate output data
             if isempty(output_name)
-                on = tmp.get_data_name();
+                % if output if not given store in global variable
+                % with tmp.coded_name
+                on = obj.get_factor_data_name(tmp);
+                eval( [ 'global ' on ';' ])
+
+                % if data was not declared before add extra mem
+                eval([ 'on_len = length( ' on ' );' ]);
+                if  on_len == 0
+                    % assume data has more than 0 length if defined
+                    % beforehand
+                    extra_mem = tmp.get_element_size();
+                end
             else
                 on = output_name;
 
@@ -876,38 +898,66 @@ classdef TFModel
                 % tmpsz = size(tmp.get_data_name());
             end
 
+
+            %['SELECTED on ' on  ' tmp.name ' tmp.name ' operation_type ' ...
+            % operation_type]
             if strcmp( operation_type, 'compute' )
                 eval( [ 'global ' on  ';'] );
 
+                %[ 'on0: ' on '' ]
+                %eval([ 'on_len0 = length( ' on ' )' ]);
+
+
                 if length(contracted_factor_inds) == 1
+                    %'sdfa111'
                     % no multiplication
                     eval( [ 'global ' ...
-                            obj.factors(contracted_factor_inds(1)) ...
-                            .get_data_name() ';'] );
-                    eval( [ on ' = ' ...
-                            obj.factors(contracted_factor_inds(1)) ...
-                            .get_data_name() ';'] );
-                else
+                            obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ...
+                            ';'] );
+                    %['aa :' obj.get_factor_data_name( ...
+                    %    obj.factors(contracted_factor_inds(1)) ) ]
+                    %['aalen :']
+                    eval( [ 'length( ' obj.get_factor_data_name( ...
+                        obj.factors(contracted_factor_inds(1)) ) ');' ])
 
+
+                    %[ obj.get_factor_data_name( ...
+                    %    obj.factors(contracted_factor_inds(1)) ) ...
+                    %  ' -> ' ...
+                    %  on ]
+                    eval( [ on ' = ' ...
+                            obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ...
+                            ';'] );
+                else
+                    %'sdfa222'
                     % multiply first two into tmp data
                     eval( [ 'global' ...
-                            ' ' obj.factors(contracted_factor_inds(1)).get_data_name() ...
-                            ' ' obj.factors(contracted_factor_inds(2)).get_data_name() ';'] );
+                            ' ' obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ...
+                            ' ' obj.get_factor_data_name( obj.factors(contracted_factor_inds(2)) ) ...
+                            ';'] );
 
+
+                    %[ obj.get_factor_data_name( ...
+                    %    obj.factors(contracted_factor_inds(1)) ) ...
+                    %  ' * ' ...
+                    %  obj.get_factor_data_name( ...
+                    %      obj.factors(contracted_factor_inds(2)) ) ...
+                    %  ' -> ' ...
+                    %  on ]
                     eval( [ on ' = bsxfun (@times, ' ...
-                            obj.factors(contracted_factor_inds(1)).get_data_name() ', '...
-                            obj.factors(contracted_factor_inds(2)).get_data_name() ');' ...
+                            obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ', '...
+                            obj.get_factor_data_name( obj.factors(contracted_factor_inds(2)) ) ');' ...
                           ] );
 
                     % multiply tmp data with other factors
                     for cfii = 3:length(contracted_factor_inds)
                         eval( [ 'global '...
-                                obj.factors(contracted_factor_inds(cfii)) ...
-                                .get_data_name() ';'] );
+                                obj.get_factor_data_name( obj.factors(contracted_factor_inds(cfii)) ) ...
+                                ';'] );
                         eval( [ on ' = bsxfun (@times, ' ...
                                 on ','...
-                                obj.factors(contracted_factor_inds(cfii)) ...
-                                .get_data_name() ');' ] );
+                                ojb.get_factor_data_name( obj.factors(contracted_factor_inds(cfii)) ) ...
+                                ');' ] );
                     end
                 end
 
@@ -920,20 +970,35 @@ classdef TFModel
                         on ', ' ...
                         num2str(con_dim_index) ');'] );
 
+            else
+                % in case of mem_analysis  make length of global data
+                % greater than 0 for memory size computation
+                
+                % schedule_dp must not perform memory size calculation
+                stack = dbstack();
+                if ~strcmp(stack(3).name, ...
+                           'TFModel.schedule_dp') 
+                    eval([ on ' = 1; ' ]);
+                end
             end
 
 
             if isempty(output_name)
-                tmp = obj.intermediate_factor_reuse(tmp, 'contract');
                 newmodel.factors = [newmodel.factors tmp];
-                extra_mem = tmp.get_element_size();
-            else
-                newmodel.factors = [newmodel.factors];
+                %extra_mem = tmp.get_element_size();
+            %else
+            %    newmodel.factors = [newmodel.factors];
             end
 
-
-            %['e8 ' tmp.name ' output: ' output_name ' extra mem: ' ...
-            % num2str(extra_mem)]
+            %stack = dbstack();
+            %if ~strcmp(stack(3).name, 'TFModel.schedule_dp')
+            %
+            %    [ 'on1: ' on '' ]
+            %    eval([ 'size( ' on ' )' ]);
+            %
+            %    ['e8 tmp.name' tmp.name ' output: .' output_name ' extra mem: ' ...
+            %     num2str(extra_mem)]
+            %end
 
             % remove contracted factors
             % other dimensions live within the tmp factor
@@ -943,6 +1008,12 @@ classdef TFModel
                                  - removed_num) = [];
                 removed_num = removed_num + 1;
             end
+
+            %if extra_mem && strcmp(stack(3).name, ...
+            %                       'TFModel.schedule_dp') 
+            %    %eval([ on '= [];' ]);
+            %    %extra_mem = 0;
+            %end
         end
 
 
@@ -1370,6 +1441,65 @@ classdef TFModel
 
 
 
+        function [index] = get_factor_index(obj, factor)
+        % returns index of a factor in factor list
+        % if factor does not exist returns 0
+            index = 0;
+            for f = 1:length(obj.factors)
+                if factor == obj.factor(f)
+                    index = f;
+                    break;
+                end
+            end
+        end
+
+
+
+
+        function [name] = get_factor_data_name(obj, index)
+        % returns global data name of the factor at index of
+        % factors TFFactor array. index may be an TFFactor instance.
+        % 
+        % To preserve model elements' data, their naming structure
+        % is different than temporary factors. Model data elements
+        % use TFFactor.get_data_name whereas temporary elements use
+        % TFModel.get_coded_factor_name. This it is possible to
+        % re-use memory structures with same dimensions
+            if isa(index, 'TFFactor')
+                factor = index;
+            elseif isnumeric(index)
+                factor = obj.factors(index);
+            end
+
+            if factor.isTemp
+                name = obj.get_coded_factor_name(factor);
+            else
+                % assume we have model element
+                name = factor.get_data_name();
+            end
+        end
+
+
+        function [code_name] = get_coded_factor_name(obj, index)
+        % returns coded name of the factor at index, used
+        % index may be a factor, in which case factor does not need
+        % to exist in obj.factors
+        % internally for detecting data using same dimensions
+        % used with temporary factors in order to re-use same
+        % dimension data structures
+
+            if isnumeric(index)
+                dims = obj.factors(index).dims;
+            elseif isa(index, 'TFFactor')
+                dims = index.dims;
+            end
+
+            code_name = ['factor_' ...
+                char(obj.order_dims(TFDimensionList2cell(dims)))'];
+        end
+
+
+
         function [] = rand_init_latent_factors(obj, type, imax)
 
             if ~strcmp(type, 'all') && ~strcmp(type, 'nonClamped')
@@ -1383,50 +1513,18 @@ classdef TFModel
                 if strcmp(type, 'all') || ...
                         ( strcmp(type, 'nonClamped') && ...
                           obj.factors(fi).isInput == 0 )
+
+                    data_name = [obj.get_factor_data_name(fi)];
                     
                     if nargin==2
-                        obj.factors(fi).rand_init(obj.dims);
+                        obj.factors(fi).rand_init(obj.dims, 100, data_name);
                     else
-                        obj.factors(fi).rand_init(obj.dims, imax);
+                        obj.factors(fi).rand_init(obj.dims, imax, data_name);
                     end
 
                 end
             end
 
-        end
-
-
-
-
-        function [factor] = intermediate_factor_reuse(obj, factor, key)
-        % Checks global tmp_factors TFFactor list to see if given
-        % factor is already generated. If the factor is found
-        % returned factor has isReUsed variable set to true.
-        % character array key parameter makes sure different
-        % contraction processes do not get each others ways
-
-            storage_name = ['tmp_factors_' key];
-
-            eval([ 'global ' storage_name ';']);
-            storage_length = eval([ 'length(' storage_name ');' ]);
-
-            found = false;
-            for i = 1:storage_length
-                if eval([ storage_name '(i) == factor' ])
-                    factor.isReUsed = 1;
-                    %['reused ' factor.name ' key ' key ...
-                    % ' storage name ' storage_name ]
-                    found = true;
-                    break
-                end
-            end
-
-            if ~found
-                %['stored ' factor.name ' key ' key ...
-                % ' storage name ' storage_name ]
-                eval([ storage_name ...
-                       ' = [ ' storage_name ' factor ];' ]);
-            end
         end
 
 

@@ -87,6 +87,40 @@ classdef TFGraph
         end
 
 
+        function [edge_cost] = check_reuse(obj, parent_node, ...
+                                           child_node)
+
+            edge_cost = obj.get_min_arriving_cost(obj.exists(parent_node)) + ...
+                child_node.cost;
+
+            % if new node was on optimal path in any one of
+            % previous GTM operations it has zero memory
+            % cost
+            global reused_temp_factor_names
+
+            % for each temporary factor of child_node
+            for cnfi = 1:length(child_node.factors)
+                if child_node.factors(cnfi).isTemp
+                    for ri = 1:length(reused_temp_factor_names)
+                        coded_name = child_node.get_coded_factor_name(cnfi);
+
+                        %['coded_name ' coded_name' ' reused ri ' num2str(ri) ...
+                        % ' : ' char(reused_temp_factor_names{ri}') ]
+                        if strcmp(coded_name, ...
+                                  char(reused_temp_factor_names{ri}))
+                            edge_cost = edge_cost - child_node.factors(cnfi).get_element_size();
+                        end
+                    end
+                end
+            end
+
+            % 0 is reserved for 'no edge'
+            if edge_cost == 0
+                edge_cost = 0.000001;
+            end
+        end
+
+
         function [obj] = append_node(obj, parent_node, new_node)
         % adds a new node to the graph object
             obj.node_list = [obj.node_list new_node];
@@ -100,9 +134,9 @@ classdef TFGraph
             end
             obj.edges(parent_index, end) = 1;
 
+
             obj.optimal_edges(parent_index, end) = ...
-                obj.get_min_arriving_cost(parent_index) + ...
-                new_node.cost;
+                obj.check_reuse(parent_node, new_node);
 
             %['append node ' obj.node_list(parent_index).name ' -> ' obj.node_list(length(obj.optimal_edges)).name ' ' ...
             % num2str(obj.get_min_arriving_cost(parent_index)) ' + ' ...
@@ -122,12 +156,95 @@ classdef TFGraph
             obj.edges(pidx, nnidx) = 1;
 
             obj.optimal_edges(pidx, nnidx) = ...
-                obj.get_min_arriving_cost(pidx) + ...
-                child_node.cost;
+                obj.check_reuse( obj.node_list(pidx), child_node);
+
+            %obj.get_min_arriving_cost(pidx) + ...
+            %child_node.cost;
 
             %['update node ' obj.node_list(pidx).name ' -> ' obj.node_list(nnidx).name ' ' ...
             % num2str(obj.get_min_arriving_cost(pidx)) ' + ' ...
             % num2str(child_node.cost) ' = ' num2str(obj.optimal_edges(pidx, nnidx))]
+        end
+
+
+        function [str] = get_current_contraction_dims_string(obj, ...
+                                                             node_list_index)
+            str = '';
+            cont_dims = ...
+                obj.node_list(node_list_index) ...
+                .get_current_contraction_dims;
+
+            for cdi = 1:length(cont_dims)
+                str = [ str ...
+                        char(cont_dims(cdi)) ];
+            end
+        end
+
+
+        function [] = store_reused_temp_factor(obj, ocs_models)
+            % store temporary variables on optimal path
+            global reused_temp_factor_names
+            for i = 1:length(ocs_models)
+                for fi = 1:length(ocs_models(i).factors)
+                    if ocs_models(i).factors(fi).isTemp
+                        coded_name = ocs_models(i).get_coded_factor_name(fi);
+
+                        % store if not already inserted
+                        found = false;
+                        for j = 1:length(reused_temp_factor_names)
+                            if strcmp(char(reused_temp_factor_names{j}), ...
+                                      coded_name)
+                                found = true;
+                                break
+                            end
+                        end
+
+                        if ~found
+                            reused_temp_factor_names = [ ...
+                                reused_temp_factor_names 
+                                {coded_name} ];
+                        end
+                    end
+                end
+            end
+        end
+
+
+        function [ocs_dims] = optimal_sequence_from_graph(obj)
+        % return optimal contraction sequence from a TFGraph
+        % developed as a part of
+        % TFModel.get_optimal_contraction_sequence_dims and then turned
+        % into a helper function for use from other points in the
+        % code
+        % populates reused_temp_factor_names with the temporary
+        % factors on the optimal path since optimal path is
+        % detected at this point
+            t = obj.optimal_edges;
+            t(t==0) = Inf;
+            ocs_models = [];
+            i = length(t);
+            while i ~= 1
+                ocs_models = [ ocs_models obj.node_list(i) ];
+                m = min(t(:, i)); % if same value appears twice
+                                  % pick first
+                i = find( t(:,i) == m(1) );
+                i = i(1); % pick first
+            end
+            ocs_models = [ ocs_models obj.node_list(i) ];
+
+            ocs_dims = [];
+            %for i = (length(ocs_models)):-1:2
+            for i = 1:(length(ocs_models)-1)
+                ocs_dims = [ ocs_dims ...
+                             { setdiff( ...
+                                 ocs_models(i)...
+                                 .get_current_contraction_dims, ...
+                                 ocs_models(i+1) ...
+                                 .get_current_contraction_dims) }; ...
+                           ];
+            end
+
+            obj.store_reused_temp_factor(ocs_models);
         end
 
 
@@ -182,53 +299,6 @@ classdef TFGraph
                     end
 
                 end
-            end
-        end
-
-
-        function [str] = get_current_contraction_dims_string(obj, ...
-                                                             node_list_index)
-            str = '';
-            cont_dims = ...
-                obj.node_list(node_list_index) ...
-                .get_current_contraction_dims;
-
-            for cdi = 1:length(cont_dims)
-                str = [ str ...
-                        char(cont_dims(cdi)) ];
-            end
-        end
-
-
-        function [ocs_dims] = optimal_sequence_from_graph(graph)
-        % return optimal contraction sequence from a TFGraph
-        % developed as a part of
-        % TFModel.get_optimal_contraction_sequence_dims and then turned
-        % into a helper function for use from other points in the
-        % code
-            t = graph.optimal_edges;
-            t(t==0) = Inf;
-            ocs_models = [];
-            i = length(t);
-            while i ~= 1
-                ocs_models = [ ocs_models graph.node_list(i) ];
-                m = min(t(:, i)); % if same value appears twice
-                                  % pick first
-                i = find( t(:,i) == m(1) );
-                i = i(1); % pick first
-            end
-            ocs_models = [ ocs_models graph.node_list(i) ];
-
-            ocs_dims = [];
-            %for i = (length(ocs_models)):-1:2
-            for i = 1:(length(ocs_models)-1)
-                ocs_dims = [ ocs_dims ...
-                             { setdiff( ...
-                                 ocs_models(i)...
-                                 .get_current_contraction_dims, ...
-                                 ocs_models(i+1) ...
-                                 .get_current_contraction_dims) }; ...
-                           ];
             end
         end
 
@@ -295,11 +365,17 @@ classdef TFGraph
                             lbl_color = 'black';
                         end
 
+                        % display 10^-6 as 0
+                        cost = obj.optimal_edges(j,i);
+                        if cost < 0.1
+                            cost = 0;
+                        end
+
                         str = [ str ...
                                 'struct' num2str(j + nid_start) ' ->' ...
                                 'struct' num2str(i + nid_start) ' ' ...
                                 '[ label="' lbl ...
-                                '(' num2str(obj.optimal_edges(j,i))  ...
+                                '(' num2str(cost)  ...
                                 ')" color = ' lbl_color ' ];' char(10) ];
 
                     end
