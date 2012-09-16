@@ -149,12 +149,12 @@ classdef TFModel
 
             % initalize data_mem with memory requirements of the
             % model elements
-            data_mem = obj.get_element_size();
+            data_mem = obj.get_element_size()
 
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
             % hat_X requires extra memory
-            data_mem = data_mem + hat_X.get_element_size();
+            data_mem = data_mem + hat_X.get_element_size()
 
             if strcmp( operation_type, 'compute' )
                 eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor) ...
@@ -166,7 +166,7 @@ classdef TFModel
             mask = obj.observed_factor;
             mask.name = 'mask';
             % mask requires extra memory
-            data_mem = data_mem + mask.get_element_size();
+            data_mem = data_mem + mask.get_element_size()
 
             if strcmp( operation_type, 'compute' )
                 global mask_data;
@@ -199,8 +199,8 @@ classdef TFModel
                                        return_dot_data );
             end
 
-            %'e9'
-            data_mem = data_mem + extra_mem;
+            'e9'
+            data_mem = data_mem + extra_mem
             display([char(10) ...
                      'data elements required: ' num2str(data_mem) ...
                      char(10) ...
@@ -262,8 +262,8 @@ classdef TFModel
                     newmodel.contract_all(contract_type, ...
                                           operation_type, ...
                                           'hat_X_data');
-                %'e1'
-                extra_mem = extra_mem + e_m;
+                'e1 X hat'
+                extra_mem = extra_mem + e_m
 
 
 
@@ -293,9 +293,9 @@ classdef TFModel
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                %'e2'
+                ['e2 D1 Z_' num2str(alpha)]
                 extra_mem = extra_mem + e_m ...
-                    + global_data_size(Z_alpha_name); %('D1_data')
+                    + global_data_size(Z_alpha_name)       %('D1_data')
 
                 % generate D2
                 [ e_m dd ] = obj.delta(alpha, 'D2_data', ...
@@ -306,9 +306,9 @@ classdef TFModel
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                %'e3'
+                ['e2 D2 Z_' num2str(alpha)]
                 extra_mem = extra_mem + e_m ...
-                    + global_data_size(Z_alpha_name);  %('D2_data')
+                    + global_data_size(Z_alpha_name)        %('D2_data')
 
                 % update Z_alpha
                 if strcmp( operation_type, 'compute' )
@@ -423,33 +423,41 @@ classdef TFModel
             
             % generate final state of contraction operation to be
             % used as the initial state of dp search
-            end_node = obj.contract_all('standard', ...   % must not be optimal or infinite loop!
-                                        'mem_analysis' ); % do not waste time computing
+            %end_node = obj.contract_all('standard', ...   % must not be optimal or infinite loop!
+            %                             'mem_analysis' ); % do not waste time computing
 
             graph = TFGraph;
-            process_nodes = [end_node];
+            process_nodes = [obj];
             processing_node = 1;
+
+            % init graph.node_list
+            graph.node_list = obj;
+            graph=graph.clear_edges();
 
             while length(process_nodes) >= processing_node
                 cur_node = process_nodes(processing_node);
                 %cur_node = cur_node.update_cost_from_temp();
 
-                % init graph.node_list
-                if isempty(graph.node_list)
-                    graph.node_list = [cur_node];  % move this block out of while loop?
-                    graph=graph.clear_edges();
-                end
+                contraction_dims = cur_node.get_current_contraction_dims();
+                for udi = 1:length(contraction_dims)
 
-                uncontraction_dims = cur_node.get_uncontraction_dims();
-                for udi = 1:length(uncontraction_dims)
-                    new_node = cur_node.uncontract(obj, ...
-                                                   uncontraction_dims(udi));
+                    new_node = cur_node.contract( contraction_dims(udi), ...
+                                                  'mem_analysis', ...
+                                                  '' );
+
+                    % last operation does not have memory cost data
+                    % is handled outside of pltf_iteration
+                    if ~length(new_node.get_current_contraction_dims())
+                        new_node.cost = 0;
+                    end
 
                     % memoization
                     nnidx = graph.exists(new_node);
                     if nnidx
+                        %['old node ' new_node.name]
                         graph = graph.update_node(cur_node, new_node, nnidx);
                     else
+                        %['new node ' new_node.name]
                         graph = graph.append_node(cur_node, new_node);
                         process_nodes = [ process_nodes new_node ];
                     end
@@ -688,8 +696,8 @@ classdef TFModel
             if strcmp( contract_type, 'full')
                 [ newmodel e_m ] = ...
                     obj.contract_full(operation_type);
-                %['e5' contract_type]
-                extra_mem = extra_mem + e_m;
+                ['e5' contract_type]
+                extra_mem = extra_mem + e_m
             else
                 for i = 1:length(contract_dims)
                     if i == length(contract_dims)
@@ -703,7 +711,7 @@ classdef TFModel
                                           operation_type, ...
                                           on );
 
-                    %['e6 ' contract_type]
+                    %['e6 ' contract_type ' dim ' char(contract_dims{i})]
                     extra_mem = extra_mem + e_m;
                 end
             end
@@ -727,7 +735,6 @@ classdef TFModel
             F.dims = obj.dims;    % full indices
 
 
-            %'e7'
             global full_tensor_data;
             if length(full_tensor_data) == 0
                 extra_mem = F.get_element_size();
@@ -803,6 +810,15 @@ classdef TFModel
         % factor but use global data storage named 'output
         % name'. In this case extra_mem is not incremented and
         % returned model does not contain temporary factor created.
+        %[ 'contract START dim length ' num2str(length(dim))]
+
+            if length(dim) == 0
+                throw(MException('TFModel:NoContractionDimensionSpecified', ...
+                                 ['must specify contraction ' ...
+                                  'dimension']));
+            end
+
+
             extra_mem = 0;
 
             if isa(dim, 'TFDimension')
@@ -870,6 +886,7 @@ classdef TFModel
             names=unique(names);
             for d = 1:length(names)
                 tmp.name = [tmp.name '_' char(names(d))];
+                %tmp.name
             end
             tmp.name = [tmp.name '_minus_' dim];
 
@@ -881,15 +898,18 @@ classdef TFModel
                 % if output if not given store in global variable
                 % with tmp.coded_name
                 on = obj.get_factor_data_name(tmp);
-                eval( [ 'global ' on ';' ])
+                %eval( [ 'global ' on ';' ])
 
                 % if data was not declared before add extra mem
-                eval([ 'on_len = length( ' on ' );' ]);
-                if  on_len == 0
+                %eval([ 'on_len = length( ' on ' );' ]);
+                %if  on_len == 0
                     % assume data has more than 0 length if defined
                     % beforehand
-                    extra_mem = tmp.get_element_size();
-                end
+                    %['e7 ' tmp.name]
+
+                %extra_mem = tmp.get_element_size();
+
+                %end
             else
                 on = output_name;
 
@@ -975,28 +995,29 @@ classdef TFModel
                 % greater than 0 for memory size computation
                 
                 % schedule_dp must not perform memory size calculation
-                stack = dbstack();
-                if ~strcmp(stack(3).name, ...
-                           'TFModel.schedule_dp') 
-                    eval([ on ' = 1; ' ]);
-                end
+                %stack = dbstack();
+                %if ~strcmp(stack(2).name, ...
+                %           'TFModel.schedule_dp') 
+                %    eval([ on ' = 1 ;' ]);
+                %end
             end
 
 
             if isempty(output_name)
                 newmodel.factors = [newmodel.factors tmp];
+
                 %extra_mem = tmp.get_element_size();
             %else
             %    newmodel.factors = [newmodel.factors];
             end
 
             %stack = dbstack();
-            %if ~strcmp(stack(3).name, 'TFModel.schedule_dp')
+            %if ~strcmp(stack(2).name, 'TFModel.schedule_dp')
             %
             %    [ 'on1: ' on '' ]
             %    eval([ 'size( ' on ' )' ]);
             %
-            %    ['e8 tmp.name' tmp.name ' output: .' output_name ' extra mem: ' ...
+            %    ['e8 tmp.name ' tmp.name ' output: .' output_name '. extra mem: ' ...
             %     num2str(extra_mem)]
             %end
 
@@ -1009,11 +1030,23 @@ classdef TFModel
                 removed_num = removed_num + 1;
             end
 
-            %if extra_mem && strcmp(stack(3).name, ...
+            %if extra_mem && strcmp(stack(2).name, ...
             %                       'TFModel.schedule_dp') 
             %    %eval([ on '= [];' ]);
             %    %extra_mem = 0;
             %end
+            %['e8.1 tmp.name ' tmp.name ' output: .' output_name '. extra mem: ' ...
+            % num2str(extra_mem)]
+
+            %'contract END'
+
+            if isempty(output_name)
+                newmodel = newmodel.update_cost_from_temp();
+            %else
+                % cost must be calculated in an outer scope
+                %newmodel.cost = 0;
+                %['newmodel ' newmodel.name ' cost ' num2str(newmodel.cost)]
+            end
         end
 
 
@@ -1057,6 +1090,8 @@ classdef TFModel
             %for a =1:length(ocs_dims)
             %    ocs_dims{a}
             %end
+
+
             ocs_cache = [ ocs_cache TFOCSCache(obj, ocs_dims) ];
         end
 
