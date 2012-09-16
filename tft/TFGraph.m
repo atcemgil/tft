@@ -269,7 +269,7 @@ classdef TFGraph
                         str = [ str ', ' ];
                     end
 
-                    if node_list_index == 1
+                    if node_list_index == 1 || node_list_index == length(obj.node_list)
                         str = [ str '<FONT COLOR="green"' ];
                     else
 
@@ -349,7 +349,7 @@ classdef TFGraph
 
             ocs_dims = obj.optimal_sequence_from_graph();
             % reverse ocs_dims for display
-            ocs_dims = fliplr(ocs_dims);
+            %ocs_dims = fliplr(ocs_dims);
             k = 1;
             next_optimal=0;
             for i = 1:length(obj.edges)

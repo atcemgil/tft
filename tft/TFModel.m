@@ -174,13 +174,10 @@ classdef TFModel
                 KL=zeros(1,iternum);
                 for iter = 1:iternum
                     display(['iteration' char(9) num2str(iter)]);
-                    [ kl e_m ] = obj.pltf_iteration(contract_type, ...
-                                                          hat_X, ...
-                                                          mask, ...
-                                                          operation_type);
-                    if iter == 1
-                        extra_mem = e_m;
-                    end
+                    [ kl ] = obj.pltf_iteration(contract_type, ...
+                                                hat_X, ...
+                                                mask, ...
+                                                operation_type);
                     KL(iter) = kl;
                 end
 
@@ -192,15 +189,15 @@ classdef TFModel
                 ylabel('KL divergence');
 
             elseif strcmp( operation_type, 'mem_analysis' )
-                [ kl extra_mem dot_data ] = ...
+                [ kl dot_data ] = ...
                     obj.pltf_iteration(contract_type, hat_X, ...
                                        mask, ...
                                        operation_type, ...
                                        return_dot_data );
             end
 
-            'e9'
-            data_mem = data_mem + extra_mem
+            %'e9'
+            %data_mem = data_mem + extra_mem
             display([char(10) ...
                      'data elements required: ' num2str(data_mem) ...
                      char(10) ...
@@ -211,7 +208,7 @@ classdef TFModel
 
 
 
-        function [ kl extra_mem dot_data ] = pltf_iteration(obj, ...
+        function [ kl dot_data ] = pltf_iteration(obj, ...
                                                    contract_type, ...
                                                    hat_X, mask, ...
                                                    operation_type, ...
@@ -222,8 +219,7 @@ classdef TFModel
             % computation is requested
             % 
             % returns KL divergence value calculated at the end of
-            % the operations. extra_mem equals to
-            % temporary data usage requirements. dot_data contains
+            % the operations. dot_data contains
             % graphviz data for the generalized tensor
             % multiplication operations if return_dot_data is equal
             % to 'yes'.
@@ -233,7 +229,7 @@ classdef TFModel
             end
             dot_data = '';
 
-            extra_mem = 0;
+            %extra_mem = 0;
             for alpha=1:length(obj.latent_factor_indices)
                 % access global data
                 eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor ) ...
@@ -258,12 +254,12 @@ classdef TFModel
 
                 % perform contraction
                 % store result in hat_X_data
-                [ ~, e_m ] = ...
+                [ ~ ] = ...
                     newmodel.contract_all(contract_type, ...
                                           operation_type, ...
                                           'hat_X_data');
-                'e1 X hat'
-                extra_mem = extra_mem + e_m
+                %'e1 X hat'
+                %extra_mem = extra_mem + e_m
 
 
 
@@ -285,30 +281,30 @@ classdef TFModel
 
 
                 % generate D1
-                [ e_m dd ] = obj.delta(alpha, 'D1_data', ...
-                                       contract_type, ...
-                                       operation_type, ...
-                                       hat_X, ...
-                                       return_dot_data );
+                [ dd ] = obj.delta(alpha, 'D1_data', ...
+                                   contract_type, ...
+                                   operation_type, ...
+                                   hat_X, ...
+                                   return_dot_data );
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                ['e2 D1 Z_' num2str(alpha)]
-                extra_mem = extra_mem + e_m ...
-                    + global_data_size(Z_alpha_name)       %('D1_data')
+                %['e2 D1 Z_' num2str(alpha)]
+                %extra_mem = extra_mem + e_m ...
+                %    + global_data_size(Z_alpha_name)       %('D1_data')
 
                 % generate D2
-                [ e_m dd ] = obj.delta(alpha, 'D2_data', ...
-                                       contract_type, ...
-                                       operation_type, ...
-                                       mask, ...
-                                       return_dot_data);
+                [ dd ] = obj.delta(alpha, 'D2_data', ...
+                                   contract_type, ...
+                                   operation_type, ...
+                                   mask, ...
+                                   return_dot_data);
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                ['e2 D2 Z_' num2str(alpha)]
-                extra_mem = extra_mem + e_m ...
-                    + global_data_size(Z_alpha_name)        %('D2_data')
+                %['e2 D2 Z_' num2str(alpha)]
+                %extra_mem = extra_mem + e_m ...
+                %    + global_data_size(Z_alpha_name)        %('D2_data')
 
                 % update Z_alpha
                 if strcmp( operation_type, 'compute' )
@@ -335,7 +331,7 @@ classdef TFModel
 
 
 
-        function [ extra_mem dot_data ] = delta(obj, alpha, ...
+        function [ dot_data ] = delta(obj, alpha, ...
                                                 output_name, ...
                                                 contract_type, ...
                                                 operation_type, ...
@@ -349,8 +345,6 @@ classdef TFModel
         % A: operand element of delta function assumed all ones if
         % not given
         %
-        % extra_mem contains memory required for temporary tensors
-        % used in contraction operation
         % dot_data contains
         % graphviz data for the generalized tensor
         % multiplication operations if return_dot_data is equal
@@ -361,7 +355,7 @@ classdef TFModel
                 return_dot_data = 'no';
             end
 
-            extra_mem = 0;
+            %extra_mem = 0;
             dot_data = '';
 
             % create new model for delta operation
@@ -391,11 +385,11 @@ classdef TFModel
             end
 
             % perform contraction
-            [ ~, e_m ] = d_model.contract_all(contract_type, ...
+            [ ~ ] = d_model.contract_all(contract_type, ...
                                               operation_type, ...
                                               output_name);
             %'e4'
-            extra_mem = extra_mem + e_m;
+            %extra_mem = extra_mem + e_m;
 
             %if strcmp( operation_type, 'compute' )
             %
@@ -472,159 +466,8 @@ classdef TFModel
 
 
 
-        function [newmodel] = uncontract(obj, orig_model, dim)
-        % returns a new TFModel generated by adding given
-        % TFDimension object dim to the model.
-        % dim: TFDimension object to uncontract
-        % orig_model: provides original non-contracted model data
 
-            newmodel = obj;
-
-            newmodel.name = [ newmodel.name  ...
-                              '_uncontract_' dim.name ];
-
-            uncontract_dims = obj.get_uncontraction_dims();
-            other_dims = []; % already contracted dimensions
-            for i=1:length(uncontract_dims)
-                if uncontract_dims(i) ~= dim
-                    other_dims = [ other_dims ...
-                                   uncontract_dims(i) ];
-                end
-            end
-
-            % reset newmodel's factors
-            newmodel.factors = [];
-
-            % stores factors which will contribute to the temporary
-            % factor
-            tmp_factor_parents = [];
-
-
-            % populate newmode.factors with factors independant
-            % from uncontraction operation
-            for fi = 1:length(orig_model.factors)
-                found = 0;
-                for fdi = 1:length(orig_model.factors(fi).dims)
-                    for odi = 1:length(other_dims)
-                        % if any factor contains any one of the
-                        % other_dims can not use it as it is, must
-                        % create a temporary factor for those
-                        % here we identify factors we will use
-                        % without modification
-
-                        if other_dims(odi) == ...
-                                orig_model.factors(fi).dims(fdi)
-                            found=1;
-                            break
-                        end
-                    end
-                    if found, break; end
-                end
-
-                if ~found
-                    % if other_dims are not found in this factor then
-                    % use this factor as it is in the new node
-
-                    newmodel.factors = [newmodel.factors ...
-                                        orig_model.factors(fi) ];
-                else
-                    % in other case this factor will be inspected
-                    % further to generate temporary factor
-                    tmp_factor_parents = [ tmp_factor_parents ...
-                                        orig_model.factors(fi) ];
-                end
-            end
-
-            % make sure factors are unique
-            %newmodel.factors = unique(newmodel.factors);
-
-            % inspect tmp_factor_parents and generate a temporary
-            % model
-            tmpf = TFFactor;
-            tmpf.isTemp = 1;
-            tmpf.name = 'tmp';
-            names={};
-            tmpf.dims = [];
-
-            % add all dimensions of all parent factors
-            for tfpi = 1:length(tmp_factor_parents)
-                for di = 1:length(tmp_factor_parents(tfpi).dims)
-                    if tmp_factor_parents(tfpi).isLatent
-                        % if dimension is not one of the other_dims
-                        % then add it to the temporary factor
-                        found = 0;
-                        for odi = 1:length(other_dims)
-                            if other_dims(odi) == ...
-                                    tmp_factor_parents(tfpi).dims(di)
-                                found = 1;
-                                break;
-                            end
-                        end
-
-
-                        if ~found
-                            % if not already added
-                            found2 = 0;
-                            for tmpfdind = 1:length(tmpf.dims)
-                                if tmpf.dims(tmpfdind) == ...
-                                        tmp_factor_parents(tfpi).dims(di)
-                                    found2 = 1;
-                                    break;
-                                end
-                            end
-
-                            if ~found2
-
-                                tmpf.dims = [ tmpf.dims ...
-                                              tmp_factor_parents(tfpi) ...
-                                              .dims(di)];
-                                names = [ names ...
-                                          tmp_factor_parents(tfpi) ...
-                                          .dims(di).name];
-                            end
-                        end
-                    end
-                end
-            end
-
-            % if no names are found then there is no temporary
-            % factor added
-            if ~isempty(names)
-                % make sure tmp.factor dims are unique
-                %'önce'
-                %tmpf.dims.name
-                %tmpf.dims = unique(tmpf.dims);
-                %'sonra'
-                %tmpf.dims.name
-                
-                names=obj.order_dims(unique(names));
-                for d = 1:length(names)
-                    tmpf.name = [ tmpf.name '_' char(names(d)) ];
-                end
-                %tmpf.name = [tmpf.name '_minus_' ? ];
-
-                newmodel.factors = [ newmodel.factors tmpf ];
-            end
-
-            % if temporary is reused cost is eliminated, single
-            % temporary factor generation assumed
-            %if tmpf.isReUsed
-            %    newmodel.cost = 0.00000001;
-            %    ['reuse: cost eliminate ' tmpf.name ' for model ' ...
-            %     newmodel.name]
-            %else
-            %    newmodel = newmodel.update_cost_from_temp();
-            %end
-
-            newmodel = newmodel.update_cost_from_temp();
-
-            %[' uncontract newmodel ' newmodel.name ' cost ' num2str(newmodel.cost)]
-        end
-
-
-
-
-        function [newmodel extra_mem] = contract_all(obj, contract_type, ...
+        function [newmodel ] = contract_all(obj, contract_type, ...
                                                      operation_type, ...
                                                      output_name )
         % Performs all necessary contraction operations for the
@@ -690,14 +533,14 @@ classdef TFModel
 
 
 
-            extra_mem = 0;
+            %extra_mem = 0;
             newmodel = obj;
 
             if strcmp( contract_type, 'full')
-                [ newmodel e_m ] = ...
+                [ newmodel ] = ...
                     obj.contract_full(operation_type);
-                ['e5' contract_type]
-                extra_mem = extra_mem + e_m
+                %['e5' contract_type]
+                %extra_mem = extra_mem + e_m
             else
                 for i = 1:length(contract_dims)
                     if i == length(contract_dims)
@@ -706,13 +549,13 @@ classdef TFModel
                         on = '';
                     end
 
-                    [ newmodel e_m ]= ...
+                    [ newmodel ]= ...
                         newmodel.contract(contract_dims(i), ...
                                           operation_type, ...
                                           on );
 
                     %['e6 ' contract_type ' dim ' char(contract_dims{i})]
-                    extra_mem = extra_mem + e_m;
+                    %extra_mem = extra_mem + e_m;
                 end
             end
         end
@@ -720,7 +563,7 @@ classdef TFModel
 
 
 
-        function [newmodel extra_mem] = contract_full(obj, operation_type, ...
+        function [newmodel] = contract_full(obj, operation_type, ...
                                                       output_name)
         % generates a new full (temporary) tensor, multiplies all
         % latent tensors in to the full tensor and then 
@@ -736,11 +579,11 @@ classdef TFModel
 
 
             global full_tensor_data;
-            if length(full_tensor_data) == 0
-                extra_mem = F.get_element_size();
-            else
-                extra_mem = 0;
-            end
+            %if length(full_tensor_data) == 0
+            %    extra_mem = F.get_element_size();
+            %else
+            %    extra_mem = 0;
+            %end
 
             if strcmp( operation_type, 'compute' )
                 % generate global full_tensor_data
@@ -792,15 +635,11 @@ classdef TFModel
 
 
 
-        function [newmodel extra_mem] = contract(obj, dim, operation_type, ...
+        function [newmodel] = contract(obj, dim, operation_type, ...
                                                  output_name)
         % returns a new TFModel generated by contracting obj with
         % dim which may add new temporary factors and mem_delta
-        % integer value. extra_mem will be positive if a temporary
-        % factor is generated and its value will indicate memory
-        % usage of new factor. extra_mem will be zero if no
-        % temporary factors are generated. extra_mem will also be
-        % zero if output_name is specified.
+        % integer value. 
         % dim: TFDimension or char array or cell with the name of
         % the dimension
         % operation_type: if equals to 'compute' contraction is
@@ -808,8 +647,7 @@ classdef TFModel
         % not created.
         % output_name: if has length > 0 do not generate temporary
         % factor but use global data storage named 'output
-        % name'. In this case extra_mem is not incremented and
-        % returned model does not contain temporary factor created.
+        % name'. 
         %[ 'contract START dim length ' num2str(length(dim))]
 
             if length(dim) == 0
@@ -819,7 +657,7 @@ classdef TFModel
             end
 
 
-            extra_mem = 0;
+            %extra_mem = 0;
 
             if isa(dim, 'TFDimension')
                 dim = dim.name;
@@ -1601,37 +1439,9 @@ classdef TFModel
 
 
 
-        function [uncontraction_dims] = get_uncontraction_dims(obj)
-        % returns list of TFDimension objects representing
-        % dimensions which are required to be added to the current
-        % TFModel object in order to reach initial model where
-        % uncontraction_dims = {}
-        % Calculation is performed as follows: 
-        % uncontraction_dims = contraction_dims - current_contraction_dims
-
-            contraction_dims = obj.get_contraction_dims();
-            current_contraction_dims = ...
-                obj.get_current_contraction_dims();
-            uncontraction_dims = [];
-
-            for cdi = 1:length(contraction_dims)
-                found=0;
-                for ccdi = 1:length(current_contraction_dims)
-                    if contraction_dims(cdi) == ...
-                            char(current_contraction_dims(ccdi))
-                        found=1;
-                        break;
-                    end
-                end
-                if ~found
-                    uncontraction_dims = [ uncontraction_dims ...
-                                        contraction_dims(cdi) ];
-                end
-            end
-        end
-
-
     end
+
+
 
 
 end
