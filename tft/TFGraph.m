@@ -11,7 +11,7 @@
 classdef TFGraph
 
     properties
-        node_list = TFModel; % list TFModel objects
+        node_list = [TFModel]; % list TFModel objects
         edges;     % half full binary matrix of node_list relations
 
         optimal_edges; % half full minimal cost node_list edges
@@ -366,10 +366,12 @@ classdef TFGraph
                                 (next_optimal == 0 || ...
                                  next_optimal == j)
                             lbl_color = 'blue';
+                            style = 'dashed';
                             k = k+1;
                             next_optimal = i;
                         else
                             lbl_color = 'black';
+                            style = '';
                         end
 
                         % display 10^-6 as 0
@@ -383,7 +385,8 @@ classdef TFGraph
                                 'struct' num2str(i + nid_start) ' ' ...
                                 '[ label="' lbl ...
                                 '(' num2str(cost)  ...
-                                ')" color = ' lbl_color ' ];' char(10) ];
+                                ')", color = ' lbl_color ...
+                                ', style = "' style '" ];' char(10) ];
 
                     end
                 end

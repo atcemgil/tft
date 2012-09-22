@@ -27,13 +27,13 @@ classdef TFModel
 
 
     properties
-        name='';          % name of the model
-        factors=TFFactor; % array of TFFactor
+        name = '';            % name of the model
+        factors = [TFFactor]; % array of TFFactor
 
-        dims=TFDimension; % array of TFDimension used by factors defines
-                          % order of dimensions on memory
+        dims = TFDimension; % array of TFDimension used by factors defines
+                            % order of dimensions on memory
 
-        cost=0;
+        cost = 0;
 
     end
 
@@ -250,6 +250,11 @@ classdef TFModel
                     [str last_node_id] = g.print_dot(last_node_id, ...
                                                      're-calculate hat_X');
                     dot_data = [ str char(10) dot_data ];
+
+                    global oru_models;
+                    if ~length(oru_models)
+                        oru_models = [ newmodel ];
+                    end
                 end
 
                 % perform contraction
@@ -382,6 +387,9 @@ classdef TFModel
                     g.print_dot(last_node_id, ...
                                 ['alpha ' num2str(alpha) ' ' ...
                                  output_name ] );
+
+                global oru_models;
+                oru_models = [ oru_models d_model ];
             end
 
             % perform contraction
