@@ -383,13 +383,18 @@ classdef TFModel
             if strcmp(return_dot_data, 'yes')
                 g = d_model.schedule_dp();
                 global last_node_id;
+                title = ['alpha ' num2str(alpha) ' ' ...
+                         output_name ];
                 [ dot_data last_node_id ] = ...
                     g.print_dot(last_node_id, ...
-                                ['alpha ' num2str(alpha) ' ' ...
-                                 output_name ] );
+                                title );
 
-                global oru_models;
-                oru_models = [ oru_models d_model ];
+                if strcmp(output_name, 'D1_data')
+                    global oru_models;
+                    oru_model = d_model;
+                    oru_model.name = title;
+                    oru_models = [ oru_models oru_model ];
+                end
             end
 
             % perform contraction
