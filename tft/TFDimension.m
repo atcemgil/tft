@@ -74,6 +74,25 @@ classdef TFDimension
         end
 
 
+        function r = eq_TFDimension(a,b)
+        % written for not callins isa() for performance
+            r=logical(0);
+
+            if a.name == b.name
+                if a.cardinality == b.cardinality
+                    r=logical(1);
+                else
+                    display(['ERROR: inconsistent dimensions! If ' ...
+                             'dimension names are same cardinalities ' ...
+                             'can not be different!']);
+                    r=logical(0);
+                end
+            else
+                r=logical(0);
+            end
+        end
+
+
         function r = ne(a,b)
             r = ~(a==b);
         end
