@@ -19,7 +19,7 @@ G=TFFactor('name', 'G', 'type', 'latent', 'dims', ...
 X=TFFactor('name', 'X', 'type', 'observed', 'dims', ...
            [dim_i, dim_j, dim_k]);
 
-tucker_model = TFModel('name', 'Tucker3', 'factors', [A B C G X], ...
+tucker_model = PLTFModel('name', 'Tucker3', 'factors', [A B C G X], ...
                        'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);
 
 tucker_model.rand_init_latent_factors('nonClamped');
@@ -33,7 +33,7 @@ p_A=TFFactor('name', 'p_A', 'type', 'latent', 'dims', [dim_i dim_r]);
 p_B=TFFactor('name', 'p_B', 'type', 'latent', 'dims', [dim_j dim_r]);
 p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);
 
-parafac_model = TFModel('name', 'Parafac', ...
+parafac_model = PLTFModel('name', 'Parafac', ...
                         'factors', [p_A p_B p_C X], ...
                         'dims', [dim_i dim_j dim_k dim_r]);
 
@@ -44,7 +44,7 @@ parafac_model.rand_init_latent_factors('all');
 
 
 % GCTF model from tucker + parafac
-%gctfmodel=GCTFModel;
+%gctfmodel=GCPLTFModel;
 %gctfmodel.tfmodels=[tucker_model parafac_model];
 
 
@@ -96,7 +96,7 @@ if exist('PROFILE_PLTF')
         X=TFFactor('name', 'X', 'type', 'observed', 'dims', ...
                    [dim_i, dim_j, dim_k]);
 
-        tucker_model = TFModel('name', 'Tucker3', 'factors', [A B C G X], ...
+        tucker_model = PLTFModel('name', 'Tucker3', 'factors', [A B C G X], ...
                                'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);
 
         tucker_model.rand_init_latent_factors('nonClamped');

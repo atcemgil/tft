@@ -1,17 +1,17 @@
-% Represents a graph of TFModel objects. 
+% Represents a graph of PLTFModel objects. 
 %
-%   TFModel.schedule_dp() function generates trees of TFModel
-%   objects. TFGraph object stores generated TFModel objects in its
+%   PLTFModel.schedule_dp() function generates trees of PLTFModel
+%   objects. TFGraph object stores generated PLTFModel objects in its
 %   node_list array and stores connectivity information in its
 %   edges half full binary matrix. Cost of moving along an edge is
 %   stored in the optimal_edges matrix.
 %
-%   See also TFModel
+%   See also PLTFModel
 
 classdef TFGraph
 
     properties
-        node_list = [TFModel]; % list TFModel objects
+        node_list = [PLTFModel]; % list PLTFModel objects
         edges;     % half full binary matrix of node_list relations
 
         optimal_edges; % half full minimal cost node_list edges
@@ -220,7 +220,7 @@ classdef TFGraph
         function [ocs_dims] = optimal_sequence_from_graph(obj)
         % return optimal contraction sequence from a TFGraph
         % developed as a part of
-        % TFModel.get_optimal_contraction_sequence_dims and then turned
+        % PLTFModel.get_optimal_contraction_sequence_dims and then turned
         % into a helper function for use from other points in the
         % code
         % populates reused_temp_factor_names with the temporary

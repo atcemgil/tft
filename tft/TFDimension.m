@@ -6,7 +6,7 @@
 %   dim_i = TFDimension('name', 'i', 'cardinality', 5);
 %   dim_j = TFDimension('cardinality', 6, 'name', 'j'); 
 %
-% See also TFFactor, TFModel
+% See also TFFactor, PLTFModel
 classdef TFDimension
 
     properties

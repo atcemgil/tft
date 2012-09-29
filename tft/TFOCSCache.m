@@ -5,12 +5,12 @@
 %   times. This object stores generated values to be used again in
 %   following operations
 %
-% See also TFModel
+% See also PLTFModel
 
 classdef TFOCSCache
 
     properties
-        model = TFModel;
+        model = PLTFModel;
         ocs_dims = {};
     end
 

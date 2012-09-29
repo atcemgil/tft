@@ -12,7 +12,7 @@
 %   C = TFFactor('name', 'C', 'type', 'latent', 'dims', [dim_k dim_r], 'isClamped', true);
 %   X = TFFactor('name', 'X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);
 %
-%   See also TFDimension, TFModel
+%   See also TFDimension, PLTFModel
 
 classdef TFFactor
 
@@ -107,7 +107,7 @@ classdef TFFactor
             end
 
 
-            % from TFModel.eq:
+            % from PLTFModel.eq:
             % mark matched b factors
             % if there are any unmarked -> inequal
             % problematic case: 
@@ -154,7 +154,7 @@ classdef TFFactor
             end
 
 
-            % from TFModel.eq:
+            % from PLTFModel.eq:
             % mark matched b factors
             % if there are any unmarked -> inequal
             % problematic case: 
