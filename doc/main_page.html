@@ -8,17 +8,17 @@ Matlab Toolbox implementing Probabilistic Latent Tensor Factorization (PLTF)[1] 
 
 <h2>Features</h2>
 <ul>
-<li>PLTF data structures are represented with TFModel, TFFactor and TFDimension classes.</li>
-<li>PLTF update rules: given a PLTF model, PLTF update rules can be performed using TFModel.pltf(iteration_number) function. Function prints and displays a plot of resulting KL divergence values over given number of iterations.</li>
-<li>Model visualization: models can be visualized using TFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
-<li>Contraction scheduling: TFModel.schedule_dp(operation_type) function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences.
+<li>PLTF data structures are represented with PLTFModel, TFFactor and TFDimension classes.</li>
+<li>PLTF update rules: given a PLTF model, PLTF update rules can be performed using PLTFModel.pltf(iteration_number) function. Function prints and displays a plot of resulting KL divergence values over given number of iterations.</li>
+<li>Model visualization: models can be visualized using PLTFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
+<li>Contraction scheduling: PLTFModel.schedule_dp(operation_type) function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences.
 <li>Contraction scheduling visualization: contraction operations required for PLTF update rules can be visualized using <a href="http://www.graphviz.org/">GraphViz</a> with TFGraph.print_dot() function.
 <li>Global data usage: all essential data elements are stored as global variables so that duplicate copies of large data structures are avoided.</li>
 </ul>
 
 <h2>Examples</h2>
 
-PLTF models are composed of factors and factors are composed data in specified dimensions. TFT defines Matlab objects to store each one of these entities. A TFModel object contains an array of TFFactor objects and TFFactor objects contain a single array of TFDimension objects. This way primitive data structures of the framework are properly represented as Matlab objects.
+PLTF models are composed of factors and factors are composed data in specified dimensions. TFT defines Matlab objects to store each one of these entities. A PLTFModel object contains an array of TFFactor objects and TFFactor objects contain a single array of TFDimension objects. This way primitive data structures of the framework are properly represented as Matlab objects.
 
 Following sections describe contents of examples.m file, which contain sample model configurations and operations.
 
@@ -54,22 +54,22 @@ TFFactor objects require specification following paramaters:
 
 All factor data is stored in global workspace of Matlab to avoid duplicate copies of large data structures. Handling global variables requires care with variable naming. To address this issue TFFactor objects contain get_data_name() function, which provides a standardized naming convension.
 
-Once required TFFactor objects are created, we can create a TFModel object to encapsulate these factors:
+Once required TFFactor objects are created, we can create a PLTFModel object to encapsulate these factors:
 
 <pre>
-tucker_model = TFModel('name', 'Tucker3', 'factors', [A B C G X], 'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);
+tucker_model = PLTFModel('name', 'Tucker3', 'factors', [A B C G X], 'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);
 </pre>
 
-TFModel objects contain an extra dims array. This array holds all dimension objects used in the model for two reasons. First is convenience, whenever necessary this array lists all dimension objects readily available. Second is to define the order of dimensions. Ordering of dimensions is crucial when exporting variables to C++ environment.
+PLTFModel objects contain an extra dims array. This array holds all dimension objects used in the model for two reasons. First is convenience, whenever necessary this array lists all dimension objects readily available. Second is to define the order of dimensions. Ordering of dimensions is crucial when exporting variables to C++ environment.
 
-To initialize model data conveniently TFModel objects contain the rand_init function. This function takes in two parameters:
+To initialize model data conveniently PLTFModel objects contain the rand_init function. This function takes in two parameters:
 
 <ul>
 <li>all_dims: all dimension objects array, which is used to generate empty dimensions in Matlab array data in case factor does not have data in any one of available dimensions.</li>
 <li>max_int: maximum range of random integers. If not specified values are initialized to random numbers between 0 and 1.</li>
 </ul>
 
-TFModel.rand_init_latent_factors('type') function conveniently executes rand_init function for all latent factors of the model. 'type' parameter can be specified as 'nonClamped' or 'all' in order to initialize only non clampled factors or all factors repectively.
+PLTFModel.rand_init_latent_factors('type') function conveniently executes rand_init function for all latent factors of the model. 'type' parameter can be specified as 'nonClamped' or 'all' in order to initialize only non clampled factors or all factors repectively.
 
 For Tucker3 model we can use following initalization:
 
@@ -81,21 +81,21 @@ C.rand_init(tucker_model.dims, 100); % init clamped tensor
 
 <h3>PARAFAC Model</h3>
 
-We can use a set of TFDimension objects in any number of models since TFModel objects do not modify dimension objects. For insance we can create a PARAFAC model using dimension objects used in Tucker3 model:
+We can use a set of TFDimension objects in any number of models since PLTFModel objects do not modify dimension objects. For insance we can create a PARAFAC model using dimension objects used in Tucker3 model:
 
 <pre>
 p_A=TFFactor('name', 'p_A', 'type', 'latent', 'dims', [dim_i dim_r]);
 p_B=TFFactor('name', 'p_B', 'type', 'latent', 'dims', [dim_j dim_r]);
 p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);
 
-parafac_model = TFModel('name', 'Parafac', 'factors', [p_A p_B p_C X], 'dims', [dim_i dim_j dim_k dim_r]);
+parafac_model = PLTFModel('name', 'Parafac', 'factors', [p_A p_B p_C X], 'dims', [dim_i dim_j dim_k dim_r]);
 
 parafac_model.rand_init_latent_factors('all');
 </pre>
 
 <h3>PLTF Update Rules</h3>
 
-Automatically generated PLTF update rules can be executed using TFModel.pltf(iteration_number) function. KL divergence values are returned and plotted by the function. Following plot is generated with this command: tucker_model.pltf(300)
+Automatically generated PLTF update rules can be executed using PLTFModel.pltf(iteration_number) function. KL divergence values are returned and plotted by the function. Following plot is generated with this command: tucker_model.pltf(300)
 <br>
 
 <div align="center">
@@ -108,7 +108,7 @@ To utilize contraction scheduling on PLTF update rule calculations second parame
 
 PLTF update equations involve a number of Generalized Tensor Multiplication (GTM) operations. Similar to the case in chain matrix multiplication, due to the associativity property of the operation order of chain GTM operations result in different amount of memory usage.
 <br><br>
-TFModel.schedule_dp(operation_type) function performs a dynamic programming search among all possible contraction sequences and finds the contraction sequence which requires the least amount of memory. Depending on the model specification optimal contraction sequence may improve PLTF operation performance and increase tractable problem size. The function does not manipulate any data. Search operations are conducted on objects which define the required contraction. Once optimal path is discovered, operations on the data are performed only once using the optimal sequence.
+PLTFModel.schedule_dp(operation_type) function performs a dynamic programming search among all possible contraction sequences and finds the contraction sequence which requires the least amount of memory. Depending on the model specification optimal contraction sequence may improve PLTF operation performance and increase tractable problem size. The function does not manipulate any data. Search operations are conducted on objects which define the required contraction. Once optimal path is discovered, operations on the data are performed only once using the optimal sequence.
 <br><br>
 TFGraph object is used to store the dyanmic acyclic graph (DAG) structures produced during the search. TFGraph.print_dot() function can be used to visualize the graph objects. Following graph displays the DAG generated for the first operation of PLTF in Tucker3 model. Top part of each node shows dimensions on which contraction must be applied. Bottom part of each node describes factors required by the node. Some of these factors are latent factors and some are temporary factors. 
 <br><br>
@@ -126,7 +126,7 @@ system([ 'echo " ' graph.print_dot [ ' " | dot -T svg | display' ]]);
 Note: dot comes in GraphViz package, display comes in ImageMagick package both are available in Debian/Ubuntu repositories. Please not that required GraphViz version is 2.29.
 
 <h3>Memory Analysis</h3>
-It is possible to analyse memory usage of models before executing PLTF updates with the third optional parameter of TFModel.pltf(iteration_number, contraction_type, operation_type) function. Full list of possible parameters are listed below for tucker_model:
+It is possible to analyse memory usage of models before executing PLTF updates with the third optional parameter of PLTFModel.pltf(iteration_number, contraction_type, operation_type) function. Full list of possible parameters are listed below for tucker_model:
 
 <pre>
 tucker_model.pltf(10, 'optimal', 'compute')                                                         
@@ -196,7 +196,7 @@ Please note that currently memory values for the full tensor case is a bit misle
 
 <h3>Model Visualization</h3>
 
-TFModel objects can be visualized using <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> utility. Ubigraph must be setup and running on the host system before following visualization can be achieved.
+PLTFModel objects can be visualized using <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> utility. Ubigraph must be setup and running on the host system before following visualization can be achieved.
 
 <pre>
 [dn fn edges] = tucker_model.print();
@@ -224,7 +224,7 @@ system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 <h2>Changelog</h2>
 <h3>v0.02 - 17.08.2012</h3>
 <ul>
-  <li>Memory analysis with TFModel.pltf() parameter</li>
+  <li>Memory analysis with PLTFModel.pltf() parameter</li>
   <li>Full tensor contraction implementation added</li>
 </ul>
 <h3>v0.01 - 16.08.2012</h3>
