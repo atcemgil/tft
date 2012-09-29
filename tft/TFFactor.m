@@ -29,7 +29,7 @@ classdef TFFactor
         isReUsed=0; % true if this tensor is re-used (temporary)
                     % factor
 
-        size = 0;
+        size = -1;
     end
 
     methods
@@ -69,16 +69,19 @@ classdef TFFactor
             end
 
             obj.isInput = p.Results.isClamped;
-
-            obj.size = obj.get_element_size;
         end
 
 
         function [size] = get_element_size(obj)
         % returns number of elements for this factor
-            size=1;
-            for d = 1:length(obj.dims)
-                size = size * obj.dims(d).cardinality;
+            if obj.size ~= -1
+                size = obj.size;
+            else
+                size=1;
+                for d = 1:length(obj.dims)
+                    size = size * obj.dims(d).cardinality;
+                end
+                obj.size = size;
             end
         end
 
