@@ -149,12 +149,16 @@ classdef PLTFModel
 
             % initalize data_mem with memory requirements of the
             % model elements
-            data_mem = obj.get_element_size()
+            %data_mem = obj.get_element_size()
+            obj.cost = obj.get_element_size();
+            display( [ 'obj.cost ' num2str(obj.cost) ] );
 
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
             % hat_X requires extra memory
-            data_mem = data_mem + hat_X.get_element_size()
+            %data_mem = data_mem + hat_X.get_element_size()
+            obj.cost = obj.cost + hat_X.get_element_size();
+            display( [ 'obj.cost ' num2str(obj.cost) ] );
 
             if strcmp( operation_type, 'compute' )
                 eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor) ...
@@ -166,7 +170,9 @@ classdef PLTFModel
             mask = obj.observed_factor;
             mask.name = 'mask';
             % mask requires extra memory
-            data_mem = data_mem + mask.get_element_size()
+            %data_mem = data_mem + mask.get_element_size()
+            obj.cost = obj.cost + mask.get_element_size();
+            display( [ 'obj.cost ' num2str(obj.cost) ] );
 
             if strcmp( operation_type, 'compute' )
                 global mask_data;
@@ -174,10 +180,10 @@ classdef PLTFModel
                 KL=zeros(1,iternum);
                 for iter = 1:iternum
                     display(['iteration' char(9) num2str(iter)]);
-                    [ kl ] = obj.pltf_iteration(contract_type, ...
-                                                hat_X, ...
-                                                mask, ...
-                                                operation_type);
+                    [ kl cost ] = obj.pltf_iteration(contract_type, ...
+                                                     hat_X, ...
+                                                     mask, ...
+                                                     operation_type);
                     KL(iter) = kl;
                 end
 
@@ -189,26 +195,33 @@ classdef PLTFModel
                 ylabel('KL divergence');
 
             elseif strcmp( operation_type, 'mem_analysis' )
-                [ kl dot_data ] = ...
+                [ kl cost dot_data ] = ...
                     obj.pltf_iteration(contract_type, hat_X, ...
                                        mask, ...
                                        operation_type, ...
                                        return_dot_data );
             end
 
-            %'e9'
+
+
+            'e9'
+            obj.cost = obj.cost + cost;
+            obj.cost
             %data_mem = data_mem + extra_mem
+            
+            
+
             display([char(10) ...
-                     'data elements required: ' num2str(data_mem) ...
+                     'data elements required: ' num2str(obj.cost) ...
                      char(10) ...
                      ['memory size with (8 byte) double precision: ' ...
-                      num2str(8 * data_mem / 1000 / 1000) ' MB' ] ] );
+                      num2str(8 * obj.cost / 1000 / 1000) ' MB' ] ] );
         end
 
 
 
 
-        function [ kl dot_data ] = pltf_iteration(obj, ...
+        function [ kl cost dot_data ] = pltf_iteration(obj, ...
                                                    contract_type, ...
                                                    hat_X, mask, ...
                                                    operation_type, ...
@@ -230,6 +243,7 @@ classdef PLTFModel
             dot_data = '';
 
             %extra_mem = 0;
+            cost = 0;
             for alpha=1:length(obj.latent_factor_indices)
                 % access global data
                 eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor ) ...
@@ -244,11 +258,14 @@ classdef PLTFModel
                 % recalculate hat_X
                 newmodel = obj;
 
+
+                % only not used if full, compute, no (so do it
+                % always) was under if below
+                graph = newmodel.schedule_dp();                
                 if strcmp(return_dot_data, 'yes')
-                    g = newmodel.schedule_dp();
                     global last_node_id;
-                    [str last_node_id] = g.print_dot(last_node_id, ...
-                                                     're-calculate hat_X');
+                    [str last_node_id] = graph.print_dot(last_node_id, ...
+                                                         're-calculate hat_X');
                     dot_data = [ str char(10) dot_data ];
 
                     global oru_models;
@@ -262,10 +279,13 @@ classdef PLTFModel
                 [ ~ ] = ...
                     newmodel.contract_all(contract_type, ...
                                           operation_type, ...
-                                          'hat_X_data');
-                %'e1 X hat'
+                                          'hat_X_data', graph);
+                
                 %extra_mem = extra_mem + e_m
-
+                cost = cost + graph.get_optimal_path_cost();
+                display( ['e1 X_hat ' num2str(cost) ' <- ' ...
+                          num2str(graph.get_optimal_path_cost()) ...
+                         ] );
 
 
                 %result_name = ...
@@ -286,17 +306,18 @@ classdef PLTFModel
 
 
                 % generate D1
-                [ dd ] = obj.delta(alpha, 'D1_data', ...
-                                   contract_type, ...
-                                   operation_type, ...
-                                   hat_X, ...
-                                   return_dot_data );
+                [ dd c ] = obj.delta(alpha, 'D1_data', ...
+                                        contract_type, ...
+                                        operation_type, ...
+                                        hat_X, ...
+                                        return_dot_data );
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                %['e2 D1 Z_' num2str(alpha)]
-                %extra_mem = extra_mem + e_m ...
-                %    + global_data_size(Z_alpha_name)       %('D1_data')
+                cost = cost + c + global_data_size(Z_alpha_name);
+                display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' c ' ...
+                          num2str(c) ' ' num2str(global_data_size(Z_alpha_name)) ...
+                         ] );
 
                 % generate D2
                 [ dd ] = obj.delta(alpha, 'D2_data', ...
@@ -307,9 +328,12 @@ classdef PLTFModel
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                %['e2 D2 Z_' num2str(alpha)]
-                %extra_mem = extra_mem + e_m ...
-                %    + global_data_size(Z_alpha_name)        %('D2_data')
+
+                cost = cost + global_data_size(Z_alpha_name);
+                display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' ' ...
+                          num2str(global_data_size(Z_alpha_name)) ...
+                         ] );
+
 
                 % update Z_alpha
                 if strcmp( operation_type, 'compute' )
@@ -331,12 +355,13 @@ classdef PLTFModel
             else
                 kl = 0;
             end
+
         end
 
 
 
 
-        function [ dot_data ] = delta(obj, alpha, ...
+        function [ dot_data cost ] = delta(obj, alpha, ...
                                                 output_name, ...
                                                 contract_type, ...
                                                 operation_type, ...
@@ -380,14 +405,17 @@ classdef PLTFModel
                 d_model.factors = [d_model.factors A];
             end
 
+
+            % only not used if full, compute, no (so do it
+            % always) was under if below
+            graph = d_model.schedule_dp();
             if strcmp(return_dot_data, 'yes')
-                g = d_model.schedule_dp();
                 global last_node_id;
                 title = ['alpha ' num2str(alpha) ' ' ...
                          output_name ];
                 [ dot_data last_node_id ] = ...
-                    g.print_dot(last_node_id, ...
-                                title );
+                    graph.print_dot(last_node_id, ...
+                                    title );
 
                 if strcmp(output_name, 'D1_data')
                     global oru_models;
@@ -400,9 +428,10 @@ classdef PLTFModel
             % perform contraction
             [ ~ ] = d_model.contract_all(contract_type, ...
                                               operation_type, ...
-                                              output_name);
+                                              output_name, graph);
             %'e4'
             %extra_mem = extra_mem + e_m;
+            cost = graph.get_optimal_path_cost();
 
             %if strcmp( operation_type, 'compute' )
             %
@@ -428,11 +457,6 @@ classdef PLTFModel
             output_dims = obj.get_contraction_dims();
             contraction_dims = obj.get_contraction_dims();
             
-            % generate final state of contraction operation to be
-            % used as the initial state of dp search
-            %end_node = obj.contract_all('standard', ...   % must not be optimal or infinite loop!
-            %                             'mem_analysis' ); % do not waste time computing
-
             graph = TFGraph;
             process_nodes = [obj];
             processing_node = 1;
@@ -482,7 +506,7 @@ classdef PLTFModel
 
         function [newmodel ] = contract_all(obj, contract_type, ...
                                                      operation_type, ...
-                                                     output_name )
+                                                     output_name, graph )
         % Performs all necessary contraction operations for the
         % model. If contract_type argument is equal to 'optimal'
         % then schedule_dp() is used to find the optimal (least
@@ -528,8 +552,8 @@ classdef PLTFModel
 
 
             if strcmp( contract_type, 'optimal' )
-                contract_dims = ...
-                    obj.get_optimal_contraction_sequence_dims();
+                [contract_dims] = ...
+                    obj.get_optimal_contraction_sequence_dims(graph);
 
                 %for i=1:length(contract_dims)
                 %    display(['optimal contracting ' ...
@@ -903,7 +927,8 @@ classdef PLTFModel
 
 
 
-        function [ocs_dims] = get_optimal_contraction_sequence_dims(obj)
+        function [ocs_dims] = get_optimal_contraction_sequence_dims(obj, ...
+                                                              graph)
         % Runs schedule_dp function to generate graph with least
         % memory using contraction sequence information in it. Then
         % searches TFGraph.optimal_edges for the optimal path and
@@ -933,15 +958,16 @@ classdef PLTFModel
             end
 
 
-            graph = obj.schedule_dp();
-            ocs_dims = graph.optimal_sequence_from_graph();
+            %graph = obj.schedule_dp();
+            [ocs_dims] = graph.optimal_sequence_from_graph();
+            %cost
+            %obj.cost = obj.cost + cost;
 
 
             %display([ 'cache store' ])
             %for a =1:length(ocs_dims)
             %    ocs_dims{a}
             %end
-
 
             ocs_cache = [ ocs_cache TFOCSCache(obj, ocs_dims) ];
         end

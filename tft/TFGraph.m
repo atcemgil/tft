@@ -135,11 +135,11 @@ classdef TFGraph
             obj.edges(parent_index, end) = 1;
 
 
-            %obj.optimal_edges(parent_index, end) = ...
-            %    obj.check_reuse(parent_node, new_node);
             obj.optimal_edges(parent_index, end) = ...
-                obj.get_min_arriving_cost(parent_index) + ...
-                new_node.cost;
+                obj.check_reuse(parent_node, new_node);
+            %obj.optimal_edges(parent_index, end) = ...
+            %    obj.get_min_arriving_cost(parent_index) + ...
+            %    new_node.cost;
 
 
             %['append node ' obj.node_list(parent_index).name ' -> ' obj.node_list(length(obj.optimal_edges)).name ' ' ...
@@ -159,11 +159,11 @@ classdef TFGraph
             % create link between parent and child
             obj.edges(pidx, nnidx) = 1;
 
-            %obj.optimal_edges(pidx, nnidx) = ...
-            %    obj.check_reuse( obj.node_list(pidx), child_node);
-
             obj.optimal_edges(pidx, nnidx) = ...
-                obj.get_min_arriving_cost(pidx) + child_node.cost;
+                obj.check_reuse( obj.node_list(pidx), child_node);
+
+            %obj.optimal_edges(pidx, nnidx) = ...
+            %    obj.get_min_arriving_cost(pidx) + child_node.cost;
 
             %obj.get_min_arriving_cost(pidx) + ...
             %child_node.cost;
@@ -226,6 +226,7 @@ classdef TFGraph
         % populates reused_temp_factor_names with the temporary
         % factors on the optimal path since optimal path is
         % detected at this point
+
             t = obj.optimal_edges;
             t(t==0) = Inf;
             ocs_models = [];
@@ -237,6 +238,7 @@ classdef TFGraph
                 i = find( t(:,i) == m(1) );
                 i = i(1); % pick first
             end
+
             ocs_models = [ ocs_models obj.node_list(i) ];
 
             ocs_dims = [];
@@ -305,6 +307,38 @@ classdef TFGraph
                         str = [ str '</U>' ];
                     end
 
+                end
+            end
+        end
+
+        function [optimal_cost] = get_optimal_path_cost(obj)
+            optimal_cost = 0;
+            ocs_dims = obj.optimal_sequence_from_graph();
+            % reverse ocs_dims for display
+            %ocs_dims = fliplr(ocs_dims);
+            k = 1;
+            next_optimal=0;
+            for i = 1:length(obj.edges)
+                for j = 1:i
+                    if obj.edges(j,i)
+
+                        lbl = setdiff(obj ...
+                                      .get_current_contraction_dims_string(j), ...
+                                      obj ...
+                                      .get_current_contraction_dims_string(i));
+
+                        if k <= length(ocs_dims) && ...
+                                strcmp(lbl, char(ocs_dims{k})) && ...
+                                (next_optimal == 0 || ...
+                                 next_optimal == j)
+                            k = k+1;
+                            next_optimal = i;
+                            c = obj.optimal_edges(j,i);
+                            if c > 0.1
+                                optimal_cost =  c;
+                            end
+                        end
+                    end
                 end
             end
         end
