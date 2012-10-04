@@ -78,7 +78,6 @@ classdef PLTFModel
 
 
 
-
         function [] = pltf_optimal_dot(obj, filename)
         % Calls PLTF function and collects output of print_dot from
         % each GTM operation and plots in a single graph
@@ -147,16 +146,14 @@ classdef PLTFModel
             global ocs_cache;
             ocs_cache = [];
 
-            % initalize data_mem with memory requirements of the
+            % initalize obj.cost with memory requirements of the
             % model elements
-            %data_mem = obj.get_element_size()
             obj.cost = obj.get_element_size();
             display( [ 'obj.cost ' num2str(obj.cost) ] );
 
             hat_X = obj.observed_factor;
             hat_X.name = 'hat_X';
             % hat_X requires extra memory
-            %data_mem = data_mem + hat_X.get_element_size()
             obj.cost = obj.cost + hat_X.get_element_size();
             display( [ 'obj.cost ' num2str(obj.cost) ] );
 
@@ -170,7 +167,6 @@ classdef PLTFModel
             mask = obj.observed_factor;
             mask.name = 'mask';
             % mask requires extra memory
-            %data_mem = data_mem + mask.get_element_size()
             obj.cost = obj.cost + mask.get_element_size();
             display( [ 'obj.cost ' num2str(obj.cost) ] );
 
@@ -204,12 +200,15 @@ classdef PLTFModel
 
 
 
-            'e9'
             obj.cost = obj.cost + cost;
-            obj.cost
-            %data_mem = data_mem + extra_mem
-            
-            
+            display( ['e9 ' num2str(obj.cost) ' <- ' num2str(cost) ] );
+
+            if strcmp( contract_type, 'full' )
+                global F_size;
+                obj.cost = obj.cost + F_size;
+                display([ 'e10 ' num2str(obj.cost) ' <- ' ...
+                          num2str(F_size) ]);
+            end
 
             display([char(10) ...
                      'data elements required: ' num2str(obj.cost) ...
@@ -242,7 +241,6 @@ classdef PLTFModel
             end
             dot_data = '';
 
-            %extra_mem = 0;
             cost = 0;
             for alpha=1:length(obj.latent_factor_indices)
                 % access global data
@@ -280,9 +278,10 @@ classdef PLTFModel
                     newmodel.contract_all(contract_type, ...
                                           operation_type, ...
                                           'hat_X_data', graph);
-                
-                %extra_mem = extra_mem + e_m
-                cost = cost + graph.get_optimal_path_cost();
+                if strcmp(contract_type, 'optimal')
+                    % does not work on 'full' contraction
+                    cost = cost + graph.get_optimal_path_cost();
+                end
                 display( ['e1 X_hat ' num2str(cost) ' <- ' ...
                           num2str(graph.get_optimal_path_cost()) ...
                          ] );
@@ -314,7 +313,15 @@ classdef PLTFModel
                 if strcmp( return_dot_data, 'yes') 
                     dot_data = [ dd char(10) dot_data ];
                 end
-                cost = cost + c + global_data_size(Z_alpha_name);
+
+                if strcmp(contract_type, 'optimal')
+                    cost = cost + c + ...
+                           global_data_size(Z_alpha_name);
+                else
+                    % for full contraction type
+                    cost = cost + global_data_size(Z_alpha_name);
+                end
+
                 display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' c ' ...
                           num2str(c) ' ' num2str(global_data_size(Z_alpha_name)) ...
                          ] );
@@ -329,6 +336,7 @@ classdef PLTFModel
                     dot_data = [ dd char(10) dot_data ];
                 end
 
+                % works for both optimal and full contraction
                 cost = cost + global_data_size(Z_alpha_name);
                 display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' ' ...
                           num2str(global_data_size(Z_alpha_name)) ...
@@ -385,7 +393,6 @@ classdef PLTFModel
                 return_dot_data = 'no';
             end
 
-            %extra_mem = 0;
             dot_data = '';
 
             % create new model for delta operation
@@ -429,21 +436,14 @@ classdef PLTFModel
             [ ~ ] = d_model.contract_all(contract_type, ...
                                               operation_type, ...
                                               output_name, graph);
-            %'e4'
-            %extra_mem = extra_mem + e_m;
-            cost = graph.get_optimal_path_cost();
 
-            %if strcmp( operation_type, 'compute' )
-            %
-            %    eval( [ 'global ' output_name ';'] );
-            %    eval( [ 'global ' ...
-            %            d_model.get_first_non_observed_factor().get_data_name() ';'...
-            %          ] );
-            %
-            %    eval( [ output_name '=' ...
-            %            d_model.get_first_non_observed_factor().get_data_name() ...
-            %            ';' ]);
-            %end
+            %'e4'
+            if strcmp( contract_type, 'optimal' )
+                cost = graph.get_optimal_path_cost();
+            else
+                % does not work on full contraction type
+                cost = 0;
+            end
         end
 
 
@@ -570,14 +570,12 @@ classdef PLTFModel
 
 
 
-            %extra_mem = 0;
             newmodel = obj;
 
             if strcmp( contract_type, 'full')
                 [ newmodel ] = ...
                     obj.contract_full(operation_type);
                 %['e5' contract_type]
-                %extra_mem = extra_mem + e_m
             else
                 for i = 1:length(contract_dims)
                     if i == length(contract_dims)
@@ -591,8 +589,6 @@ classdef PLTFModel
                                           operation_type, ...
                                           on );
 
-                    %['e6 ' contract_type ' dim ' char(contract_dims{i})]
-                    %extra_mem = extra_mem + e_m;
                 end
             end
         end
@@ -613,14 +609,10 @@ classdef PLTFModel
             F.name = 'full_tensor';
             F.isTemp = 1;
             F.dims = obj.dims;    % full indices
-
+            global F_size;
+            F_size = F.get_element_size();
 
             global full_tensor_data;
-            %if length(full_tensor_data) == 0
-            %    extra_mem = F.get_element_size();
-            %else
-            %    extra_mem = 0;
-            %end
 
             if strcmp( operation_type, 'compute' )
                 % generate global full_tensor_data
@@ -693,8 +685,6 @@ classdef PLTFModel
                                   'dimension']));
             end
 
-
-            %extra_mem = 0;
 
             if isa(dim, 'TFDimension')
                 dim = dim.name;
@@ -774,18 +764,7 @@ classdef PLTFModel
                 % with tmp.coded_name
                 on = obj.get_factor_data_name(tmp);
                 %eval( [ 'global ' on ';' ])
-
-                % if data was not declared before add extra mem
-                %eval([ 'on_len = length( ' on ' );' ]);
-                %if  on_len == 0
-                    % assume data has more than 0 length if defined
-                    % beforehand
-                    %['e7 ' tmp.name]
-
-                %extra_mem = tmp.get_element_size();
-
-                %end
-            else
+           else
                 on = output_name;
 
                 % TODO: make sure output has correct dimensions
@@ -880,21 +859,7 @@ classdef PLTFModel
 
             if isempty(output_name)
                 newmodel.factors = [newmodel.factors tmp];
-
-                %extra_mem = tmp.get_element_size();
-            %else
-            %    newmodel.factors = [newmodel.factors];
             end
-
-            %stack = dbstack();
-            %if ~strcmp(stack(2).name, 'PLTFModel.schedule_dp')
-            %
-            %    [ 'on1: ' on '' ]
-            %    eval([ 'size( ' on ' )' ]);
-            %
-            %    ['e8 tmp.name ' tmp.name ' output: .' output_name '. extra mem: ' ...
-            %     num2str(extra_mem)]
-            %end
 
             % remove contracted factors
             % other dimensions live within the tmp factor
@@ -905,22 +870,9 @@ classdef PLTFModel
                 removed_num = removed_num + 1;
             end
 
-            %if extra_mem && strcmp(stack(2).name, ...
-            %                       'PLTFModel.schedule_dp') 
-            %    %eval([ on '= [];' ]);
-            %    %extra_mem = 0;
-            %end
-            %['e8.1 tmp.name ' tmp.name ' output: .' output_name '. extra mem: ' ...
-            % num2str(extra_mem)]
-
-            %'contract END'
 
             if isempty(output_name)
                 newmodel = newmodel.update_cost_from_temp();
-            %else
-                % cost must be calculated in an outer scope
-                %newmodel.cost = 0;
-                %['newmodel ' newmodel.name ' cost ' num2str(newmodel.cost)]
             end
         end
 
@@ -1473,6 +1425,20 @@ classdef PLTFModel
 
                 r = true;
             end
+        end
+
+
+
+
+        function [] = full_pltf_mem_analysis(obj)
+            obj.pltf(1, 'full', 'mem_analysis');
+        end
+
+
+
+
+        function [] = optimal_pltf_mem_analysis(obj)
+            obj.pltf(1, 'optimal', 'mem_analysis');
         end
 
 

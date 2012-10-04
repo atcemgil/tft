@@ -29,12 +29,15 @@ C.rand_init(tucker_model.dims, 100) % init clamped
 
 % parafac model
 
+p_X=TFFactor('name', 'p_X', 'type', 'observed', 'dims', ...
+             [dim_i, dim_j, dim_k]);
+
 p_A=TFFactor('name', 'p_A', 'type', 'latent', 'dims', [dim_i dim_r]);
 p_B=TFFactor('name', 'p_B', 'type', 'latent', 'dims', [dim_j dim_r]);
-p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);
+%p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);
 
 parafac_model = PLTFModel('name', 'Parafac', ...
-                        'factors', [p_A p_B p_C X], ...
+                        'factors', [p_A p_B C p_X], ...
                         'dims', [dim_i dim_j dim_k dim_r]);
 
 parafac_model.rand_init_latent_factors('all');
@@ -113,3 +116,16 @@ if exist('PROFILE_PLTF')
     ylabel('Seconds');
 
 end
+
+
+
+
+
+
+
+
+tucker_parafac_model = GCTFModel( ...
+    'name', 'tucker3_parafac', ...
+    'dims', [dim_i dim_j dim_k dim_p dim_q dim_r] , ...
+    'observed_factors', [ X p_X ], ...
+    'R', { [A B C G], [p_A p_B C] } );
