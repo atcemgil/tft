@@ -244,11 +244,16 @@ classdef PLTFModel
             cost = 0;
             for alpha=1:length(obj.latent_factor_indices)
                 % access global data
-                eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor ) ...
-                        ';' ] );
-                global hat_X_data mask_data;
                 X_name = obj.get_factor_data_name( obj.observed_factor );
-                eval(['global ' X_name ';']);
+                eval( [ 'global ' X_name ';' ] );
+
+                hat_X_data_name = obj.get_factor_data_name( hat_X );
+                eval( [ 'global '  hat_X_data_name ';'] );
+                
+                mask_name =  obj.get_factor_data_name( mask );
+                eval( [ 'global ' mask_name ';' ] ); 
+
+
                 Z_alpha_name = obj.get_factor_data_name( ...
                     obj.factors(alpha) );
                 eval( [ 'global ' Z_alpha_name ';' ] );
@@ -277,7 +282,7 @@ classdef PLTFModel
                 [ ~ ] = ...
                     newmodel.contract_all(contract_type, ...
                                           operation_type, ...
-                                          'hat_X_data', graph);
+                                          hat_X_data_name, graph);
                 if strcmp(contract_type, 'optimal')
                     % does not work on 'full' contraction
                     cost = cost + graph.get_optimal_path_cost();
@@ -297,10 +302,10 @@ classdef PLTFModel
 
                 % store X / hat_X in hat_X data
                 if strcmp( operation_type, 'compute' )
-                    eval( [ 'hat_X_data  =  ' ...
+                    eval( [ hat_X_data_name '  =  ' ...
                             X_name ...
                             ' ./ ' ...
-                            ' hat_X_data ;' ] );
+                            hat_X_data_name ' ;' ] );
                 end
 
 
@@ -354,10 +359,10 @@ classdef PLTFModel
 
             if strcmp( operation_type, 'compute' )
                 % calculate KL divergence
-                eval ( [ 'kl = sum(sum(sum( (hat_X_data .* ' X_name ') .* ' ...
-                         ' (log( (hat_X_data .* ' X_name ') ) - ' ...
+                eval ( [ 'kl = sum(sum(sum( (' hat_X_data_name ' .* ' X_name ') .* ' ...
+                         ' (log( (' hat_X_data_name ' .* ' X_name ') ) - ' ...
                          'log(' X_name ...
-                         ') ) - (hat_X_data .* ' X_name ')' ...
+                         ') ) - ( ' hat_X_data_name ' .* ' X_name ')' ...
                          '+ ' X_name ...
                          ')));' ]);
             else
@@ -457,7 +462,7 @@ classdef PLTFModel
             output_dims = obj.get_contraction_dims();
             contraction_dims = obj.get_contraction_dims();
             
-            graph = TFGraph;
+            graph = GTMGraph;
             process_nodes = [obj];
             processing_node = 1;
 
@@ -883,7 +888,7 @@ classdef PLTFModel
                                                               graph)
         % Runs schedule_dp function to generate graph with least
         % memory using contraction sequence information in it. Then
-        % searches TFGraph.optimal_edges for the optimal path and
+        % searches GTMGraph.optimal_edges for the optimal path and
         % returns a cell list of contraction dimension names.
 
             global ocs_cache;
@@ -1013,10 +1018,10 @@ classdef PLTFModel
         % returns number of elements for this model
             size=0;
             for f = 1:length(obj.factors)
-                if obj.factors(f).isObserved == 0
-                    size = size + ...
-                           obj.factors(f).get_element_size();
-                end
+                % if obj.factors(f).isObserved == 0
+                size = size + ...
+                       obj.factors(f).get_element_size();
+                %end
             end
         end
 

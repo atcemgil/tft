@@ -1,14 +1,14 @@
 % Represents a graph of PLTFModel objects. 
 %
 %   PLTFModel.schedule_dp() function generates trees of PLTFModel
-%   objects. TFGraph object stores generated PLTFModel objects in its
+%   objects. GTMGraph object stores generated PLTFModel objects in its
 %   node_list array and stores connectivity information in its
 %   edges half full binary matrix. Cost of moving along an edge is
 %   stored in the optimal_edges matrix.
 %
 %   See also PLTFModel
 
-classdef TFGraph
+classdef GTMGraph
 
     properties
         node_list = [PLTFModel]; % list PLTFModel objects
@@ -18,7 +18,7 @@ classdef TFGraph
     end
 
     methods
-        function obj = TFGraph()
+        function obj = GTMGraph()
             obj.node_list = [];
         end
 
@@ -218,7 +218,7 @@ classdef TFGraph
 
 
         function [ocs_dims] = optimal_sequence_from_graph(obj)
-        % return optimal contraction sequence from a TFGraph
+        % return optimal contraction sequence from a GTMGraph
         % developed as a part of
         % PLTFModel.get_optimal_contraction_sequence_dims and then turned
         % into a helper function for use from other points in the
@@ -345,7 +345,7 @@ classdef TFGraph
 
 
         function [str, nid_end] = print_dot(obj, nid_start, subgraph_label)
-        % nid_start: start from number nid, used when multiple TFGraph objects
+        % nid_start: start from number nid, used when multiple GTMGraph objects
         % are plotted in a single graph
         % subgraph_label: can be used to label subgraphs
 
