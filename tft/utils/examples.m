@@ -116,16 +116,3 @@ if exist('PROFILE_PLTF')
     ylabel('Seconds');
 
 end
-
-
-
-
-
-
-
-
-tucker_parafac_model = GCTFModel( ...
-    'name', 'tucker3_parafac', ...
-    'dims', [dim_i dim_j dim_k dim_p dim_q dim_r] , ...
-    'observed_factors', [ X p_X ], ...
-    'R', { [A B C G], [p_A p_B C] } );

@@ -7,14 +7,19 @@
 classdef GCTFModel
     properties
         name = '';
+
         dims = [TFDimension];
+
         observed_factors = [TFFactor];
+
+        % latent factors
         R = { [ TFFactor TFFactor TFFactor] [TFFactor TFFactor] };
+
         cost = 0;
 
         % stores unique factors in a Map structure
         % key is TFFactor.name property
-        unique_factors = containers.Map()
+        unique_latent_factors = containers.Map()
     end
 
     methods
@@ -33,10 +38,10 @@ classdef GCTFModel
             obj.observed_factors = p.Results.observed_factors;
             obj.R = p.Results.R;
 
-            % generate unique_factors
+            % generate unique_latent_factors
             for Ri = 1:length(obj.R)
                 for mi = 1:length(obj.R{Ri})
-                    obj.unique_factors( obj.R{Ri}(mi).name ) = ...
+                    obj.unique_latent_factors( obj.R{Ri}(mi).name ) = ...
                         obj.R{Ri}(mi);
                 end
             end
@@ -77,7 +82,7 @@ classdef GCTFModel
 
                 pltf_models = [ pltf_models PLTFModel('name', ['gctf_' num2str(oi)], ...
                                                       'factors', [ obj.observed_factors(oi) obj.R{oi} ], ...
-                                                      'dims', dims) ];
+                                                      'dims', obj.dims) ];
             end
 
 
@@ -88,21 +93,24 @@ classdef GCTFModel
 
             % initialize hatX_v objects
             hat_X_v = obj.observed_factors;
-            masks = cell(1, length(obj.observed_factors));
+            masks = hat_X_v;
             for v = 1:length(obj.observed_factors)
                 hat_X_v(v).name = ['hat_X_v' num2str(v)];
+                maks(v).name = ['mask' num2str(v)];
+
                 obj.cost = obj.cost + ...
-                    hat_X_v(v).get_element_size();
+                    hat_X_v(v).get_element_size() *2 ; % *2 for mask
                 display( [ 'obj.cost ' num2str(obj.cost) ] );
 
                 if strcmp( operation_type, 'compute' )
                     % -yok- access factor data
                     %eval( [ 'global ' obj.get_factor_data_name(obj.observed_factors) ...
                     %        ';' ] );
-                    eval( [ 'global hat_X_v' num2str(v) '_data'] );
-                    eval( [ 'masks{v} = ones(size( hat_X_v' num2str(v) ...
-                            '_data))' ] );
                     hat_X_v(v).rand_init(obj.dims, 100);
+                    eval( [ 'global hat_X_v' num2str(v) '_data'] );
+                    eval( [ 'global mask' num2str(v) '_data'] );
+                    eval( [ 'mask' num2str(v) '_data = ones(size(hat_X_v' ...
+                          num2str(v) '_data));'] );
                 end
             end
 
@@ -112,9 +120,16 @@ classdef GCTFModel
 
             for i = 1:iternum
                 for p = 1:length(obj.observed_factors)
+                    if p == 1 
+                        update_hat_X = true;
+                    else
+                        update_hat_X = true;
+                    end
+
                     pltf_models(p).pltf_iteration('optimal', hat_X_v(p), ...
-                                                  masks{p}, ...
-                                                  operation_type)
+                                                  masks(p), ...
+                                                  operation_type, ...
+                                                  'no', update_hat_X)
                 end
             end
 
@@ -207,12 +222,6 @@ classdef GCTFModel
 
 
 
-
-        function [] = get_unique_factors(obj)
-        % returns unique factors present in the model
-            
-        end
-
         function [size] = get_element_size(obj)
         % returns number of elements for this model
             size = 0;
@@ -221,10 +230,10 @@ classdef GCTFModel
                        obj.observed_factors(ofi).get_element_size();
             end
 
-            keys = obj.unique_factors.keys();
+            keys = obj.unique_latent_factors.keys();
             for ufi = 1:length(keys)
                 size = size + ...
-                       obj.unique_factors(keys{ufi}) ...
+                       obj.unique_latent_factors(keys{ufi}) ...
                        .get_element_size();
             end
         end
@@ -244,6 +253,69 @@ classdef GCTFModel
                 name = factor.get_data_name();
             end
         end
+
+        function [code_name] = get_coded_factor_name(obj, index)
+        % returns coded name of the factor at index, index must be
+        % a TFFactor object
+        % internally for detecting data using same dimensions
+        % used with temporary factors in order to re-use same
+        % dimension data structures
+
+            dims = index.dims;
+
+            code_name = ['factor_' ...
+                char(obj.order_dims(TFDimensionList2cell(dims)))'];
+        end
+
+%        function [inds] = latent_factor_indices(obj)
+%        % returns a matrix of latent factor indices
+%        % column 1 -> observed factor index
+%        % column 2 -> factor index
+%            inds = [];
+%            for ofi = 1:length(obj.observed_factors)
+%                ind = [];
+%                for offi = 1:length(obj.R{ofi})
+%                    if obj.R{ofi}(offi).isLatent
+%                        ind = [ ofi offi ];
+%                    end
+%                end
+%                if length(ind)
+%                    inds = [ inds ; [ofi offi] ];
+%                end
+%            end
+%        end
+
+
+        function [] = rand_init_latent_factors(obj, type, imax)
+
+            if ~strcmp(type, 'all') && ~strcmp(type, 'nonClamped')
+                throw(MException('PLTFModel:WrongInitType', ...
+                                 ['Supported init type values: all, ' ...
+                                  'nonClamped']));
+            end
+
+            ulfk = obj.unique_latent_factors.keys();
+            for ki = 1:length(ulfk)
+
+                if strcmp(type, 'all') || ...
+                        ( strcmp(type, 'nonClamped') && ...
+                          obj.unique_latent_factors(ulkf(ki)).isInput == 0 )
+
+                    data_name = [obj.get_factor_data_name( ...
+                        obj.unique_latent_factors(char(ulfk(ki))) ) ];
+
+                    factor = obj.unique_latent_factors(char(ulfk(ki)));
+                    if nargin==2
+                        factor.rand_init(obj.dims, 100, data_name);
+                    else
+                        factor.rand_init(obj.dims, imax, data_name);
+                    end
+
+                end
+            end
+
+        end
+
 
 
     end

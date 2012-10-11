@@ -158,8 +158,8 @@ classdef PLTFModel
             display( [ 'obj.cost ' num2str(obj.cost) ] );
 
             if strcmp( operation_type, 'compute' )
-                eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor) ...
-                        ';' ] );
+                %eval( [ 'global ' obj.get_factor_data_name( obj.observed_factor) ...
+                %        ';' ] );
                 global hat_X_data;
                 hat_X.rand_init(obj.dims, 100);
             end
@@ -221,10 +221,11 @@ classdef PLTFModel
 
 
         function [ kl cost dot_data ] = pltf_iteration(obj, ...
-                                                   contract_type, ...
-                                                   hat_X, mask, ...
-                                                   operation_type, ...
-                                                   return_dot_data )
+                                                       contract_type, ...
+                                                       hat_X, mask, ...
+                                                       operation_type, ...
+                                                       return_dot_data, ...
+                                                       update_hat_X)
             % helper function for the pltf inner loop
             % operation_type: 'compute' if actual computation is
             % requested, 'mem_analysis' if only memory usage
@@ -239,23 +240,28 @@ classdef PLTFModel
             if nargin < 6
                 return_dot_data = 'no';
             end
+
+            if nargin < 7
+                update_hat_X = true;
+            end
             dot_data = '';
 
             cost = 0;
-            for alpha=1:length(obj.latent_factor_indices)
+            alphas = obj.latent_factor_indices;
+            for alphai = 1:length(alphas)
                 % access global data
                 X_name = obj.get_factor_data_name( obj.observed_factor );
                 eval( [ 'global ' X_name ';' ] );
 
                 hat_X_data_name = obj.get_factor_data_name( hat_X );
                 eval( [ 'global '  hat_X_data_name ';'] );
-                
-                mask_name =  obj.get_factor_data_name( mask );
-                eval( [ 'global ' mask_name ';' ] ); 
+
+                %mask_name =  obj.get_factor_data_name( mask );
+                %eval( [ 'global ' mask_name ';' ] ); 
 
 
                 Z_alpha_name = obj.get_factor_data_name( ...
-                    obj.factors(alpha) );
+                    obj.factors(alphas(alphai)) );
                 eval( [ 'global ' Z_alpha_name ';' ] );
 
                 % recalculate hat_X
@@ -291,7 +297,6 @@ classdef PLTFModel
                           num2str(graph.get_optimal_path_cost()) ...
                          ] );
 
-
                 %result_name = ...
                 %    newmodel.get_first_non_observed_factor() ...
                 %    .get_data_name();
@@ -301,7 +306,8 @@ classdef PLTFModel
 
 
                 % store X / hat_X in hat_X data
-                if strcmp( operation_type, 'compute' )
+                if strcmp( operation_type, 'compute' ) && ...
+                        update_hat_X
                     eval( [ hat_X_data_name '  =  ' ...
                             X_name ...
                             ' ./ ' ...
@@ -310,7 +316,7 @@ classdef PLTFModel
 
 
                 % generate D1
-                [ dd c ] = obj.delta(alpha, 'D1_data', ...
+                [ dd c ] = obj.delta(alphas(alphai), 'D1_data', ...
                                         contract_type, ...
                                         operation_type, ...
                                         hat_X, ...
@@ -327,12 +333,12 @@ classdef PLTFModel
                     cost = cost + global_data_size(Z_alpha_name);
                 end
 
-                display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' c ' ...
+                display( ['e2 D1 Z_' num2str(alphas(alphai)) ' ' num2str(cost) ' c ' ...
                           num2str(c) ' ' num2str(global_data_size(Z_alpha_name)) ...
                          ] );
 
                 % generate D2
-                [ dd ] = obj.delta(alpha, 'D2_data', ...
+                [ dd ] = obj.delta(alphas(alphai), 'D2_data', ...
                                    contract_type, ...
                                    operation_type, ...
                                    mask, ...
@@ -343,7 +349,7 @@ classdef PLTFModel
 
                 % works for both optimal and full contraction
                 cost = cost + global_data_size(Z_alpha_name);
-                display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' ' ...
+                display( ['e2 D1 Z_' num2str(alphas(alphai)) ' ' num2str(cost) ' ' ...
                           num2str(global_data_size(Z_alpha_name)) ...
                          ] );
 
@@ -404,6 +410,9 @@ classdef PLTFModel
             d_model = obj;
 
             % remove observed factor
+            if alpha > d_model.observed_factor_index
+                alpha = alpha - 1;
+            end
             d_model.factors(d_model.observed_factor_index) = [];
 
             % add Z_alpha as new observed factor
@@ -835,7 +844,7 @@ classdef PLTFModel
                                 ';'] );
                         eval( [ on ' = bsxfun (@times, ' ...
                                 on ','...
-                                ojb.get_factor_data_name( obj.factors(contracted_factor_inds(cfii)) ) ...
+                                obj.get_factor_data_name( obj.factors(contracted_factor_inds(cfii)) ) ...
                                 ');' ] );
                     end
                 end
@@ -844,10 +853,12 @@ classdef PLTFModel
                 % sum contraction dimensions on tmp data
                 
                 con_dim_index = obj.get_dimension_index(dim);
-
+                %['con_dim_index' num2str(con_dim_index)]
+                %eval([ 'size(' on ')' ])
                 eval( [ on ' = sum( ' ...
                         on ', ' ...
                         num2str(con_dim_index) ');'] );
+                %eval([ 'size(' on ')' ])
 
             else
                 % in case of mem_analysis  make length of global data
