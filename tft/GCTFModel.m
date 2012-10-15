@@ -48,133 +48,65 @@ classdef GCTFModel
 
         end
 
-        function [] = gctf(obj, iternum, operation_type, ...
+        function [KL] = gctf(obj, iternum, operation_type, ...
                            return_dot_data)
             dot_data = '';
-
-
-            % build a PLTF for each observed_factor with relevant
-            % latent factors
-            pltf_models = [];
-            for oi = 1:length(obj.observed_factors)
-                dims = [];
-                found = false;
-                for di = 1:length(obj.dims)
-                    % check observed factor
-                    if obj.observed_factors(oi).got_dimension(obj.dims(di))
-                        found = true;
-                    end
-
-                    % check latent factors
-                    for lfi = 1:length(obj.R{oi})
-                        if obj.R{oi}(lfi).got_dimension(obj.dims(di))
-                            found = true;
-                            break;
-                        end
-                    end
-
-                    if found
-                        dims = [ dims obj.dims(di) ];
-                        found = false;
-                    end
-
-                end
-
-                pltf_models = [ pltf_models PLTFModel('name', ['gctf_' num2str(oi)], ...
-                                                      'factors', [ obj.observed_factors(oi) obj.R{oi} ], ...
-                                                      'dims', obj.dims) ];
-            end
-
 
             % initalize obj.cost with memory requirements of the
             % model elements
             obj.cost = obj.get_element_size();
-            display( [ 'obj.cost ' num2str(obj.cost) ] );
+            %display( [ 'obj.cost ' num2str(obj.cost) ] );
 
             % initialize hatX_v objects
             hat_X_v = obj.observed_factors;
             masks = hat_X_v;
             for v = 1:length(obj.observed_factors)
                 hat_X_v(v).name = ['hat_X_v' num2str(v)];
-                maks(v).name = ['mask' num2str(v)];
+                masks(v).name = ['mask' num2str(v)];
 
                 obj.cost = obj.cost + ...
                     hat_X_v(v).get_element_size() *2 ; % *2 for mask
-                display( [ 'obj.cost ' num2str(obj.cost) ] );
+                %display( [ 'obj.cost ' num2str(obj.cost) ] );
 
                 if strcmp( operation_type, 'compute' )
-                    % -yok- access factor data
-                    %eval( [ 'global ' obj.get_factor_data_name(obj.observed_factors) ...
-                    %        ';' ] );
                     hat_X_v(v).rand_init(obj.dims, 100);
-                    eval( [ 'global hat_X_v' num2str(v) '_data'] );
-                    eval( [ 'global mask' num2str(v) '_data'] );
-                    eval( [ 'mask' num2str(v) '_data = ones(size(hat_X_v' ...
-                          num2str(v) '_data));'] );
+                    eval( [ 'global ' hat_X_v(v).get_data_name() ]);
+                    eval( [ 'global ' masks(v).get_data_name() ]);
+                    eval( [ masks(v).get_data_name() ' = ones(size(' ...
+                            hat_X_v(v).get_data_name() '));' ]);
                 end
             end
 
 
+            if strcmp( operation_type, 'compute' )
 
+                KL=zeros(iternum, length(obj.observed_factors));
+                for iter = 1:iternum
+                    display(['iteration' char(9) num2str(iter)]);
+                    [ kls cost ] = obj.gctf_iteration( hat_X_v, ...
+                                                      masks, ...
+                                                      operation_type, ...
+                                                      'no');
 
-
-            for i = 1:iternum
-                for p = 1:length(obj.observed_factors)
-                    if p == 1 
-                        update_hat_X = true;
-                    else
-                        update_hat_X = true;
-                    end
-
-                    pltf_models(p).pltf_iteration('optimal', hat_X_v(p), ...
-                                                  masks(p), ...
-                                                  operation_type, ...
-                                                  'no', update_hat_X)
+                    %, ...
+                    %                                 pltf_models);
+                    KL(iter,:) = kls;
                 end
+
+                display(['KL divergence over iterations: ']);
+                display(KL);
+                plot(KL);
+                title('KL divergence over iterations');
+                xlabel('iteration number');
+                ylabel('KL divergence');
+
+            elseif strcmp( operation_type, 'mem_analysis' )
+                [ kl cost dot_data ] = ...
+                    obj.pltf_iteration(contract_type, hat_X, ...
+                                       mask, ...
+                                       operation_type, ...
+                                       return_dot_data );
             end
-
-
-
-
-
-
-%            if strcmp( operation_type, 'compute' )
-%                %global mask_data;
-%                %mask_data = ones(size(hat_X_data));
-%
-%                KL=zeros(1,iternum);
-%                for iter = 1:iternum
-%                    display(['iteration' char(9) num2str(iter)]);
-%                    [ kl cost ] = obj.gctf_iteration( hat_X_v, ...
-%                                                      operation_type);
-%                    KL(iter) = kl;
-%                end
-%
-%                display(['KL divergence over iterations: ']);
-%                display(KL);
-%                plot(KL);
-%                title('KL divergence over iterations');
-%                xlabel('iteration number');
-%                ylabel('KL divergence');
-%
-%            elseif strcmp( operation_type, 'mem_analysis' )
-%                [ kl cost dot_data ] = ...
-%                    obj.gctf_iteration( hat_X_v, ...
-%                                        operation_type, ...
-%                                        return_dot_data );
-%            end
-%
-%
-%
-%            obj.cost = obj.cost + cost;
-%            display( ['e9 ' num2str(obj.cost) ' <- ' num2str(cost) ] );
-%
-%
-%            display([char(10) ...
-%                     'data elements required: ' num2str(obj.cost) ...
-%                     char(10) ...
-%                     ['memory size with (8 byte) double precision: ' ...
-%                      num2str(8 * obj.cost / 1000 / 1000) ' MB' ] ] );
         end
 
 
@@ -182,8 +114,9 @@ classdef GCTFModel
 
         function [ kl cost dot_data ] = gctf_iteration( obj, ...
                                                         hat_X_v, ...
+                                                        masks, ...
                                                         operation_type, ...
-                                                        return_dot_data );
+                                                        return_dot_data)
 
             if nargin < 4
                 return_dot_data = 'no';
@@ -194,31 +127,222 @@ classdef GCTFModel
 
 
             % access global data
-            %            for v = 1:length(obj.observed_factors)
-            %    hat_X_v(v).name = ['hat_X_v' num2str(v)];
-            %    eval( [ 'global hat_X_v' num2str(v) '_data' ];                
-
-
-            % update each hatX_v
             for v = 1:length(obj.observed_factors)
-                for alpha = 1:length(R)
-                    
-                end
+                eval( [ 'global hat_X_v' num2str(v) '_data' ] );
+                eval( [ 'global ' obj.observed_factors(v).get_data_name() ...
+                        ] );
             end
+
+
+
+
 
             % update each Z_alpha
-            for v = 1:length(obj.observed_factors)
-                for alpha = 1:legnth(R)
-                    
+            ulfk = obj.unique_latent_factors.keys();
+            for alpha = 1:length(ulfk)
+
+
+
+
+
+                % build a PLTF for each observed_factor with relevant
+                % latent factors
+                pltf_models = [];
+                for oi = 1:length(obj.observed_factors)
+
+                    pltf_models = [ pltf_models ...
+                                    PLTFModel('name', ['gctf_' ...
+                                        num2str(oi)], ...
+                                              'factors', [ ...
+                                                  obj.observed_factors(oi) obj.R{oi} ], ...
+                                              'dims', obj.dims) ...
+                                  ];
                 end
+
+
+
+
+
+                % update each hatX_v
+                for v = 1:length(obj.observed_factors)
+                    %display([ 'update hatX_v' num2str(v) ])
+                    hat_X_data_name = hat_X_v(v).get_data_name();
+                    newmodel = pltf_models(v);
+                    % perform contraction
+                    % store result in hat_X_data
+                    [ ~ ] = ...
+                        newmodel.contract_all('standard', ...
+                                              operation_type, ...
+                                              hat_X_data_name);
+
+                    % store X / hat_X in hat_X data
+                    if strcmp( operation_type, 'compute' )
+                        eval( [ hat_X_data_name '  =  ' ...
+                                obj.observed_factors(v).get_data_name() ...
+                                ' ./ ' ...
+                                hat_X_data_name ' ;' ] );
+                    end
+
+                end
+
+
+
+
+
+
+
+
+
+
+
+                d1 = TFFactor('name', ...
+                              ['D1_Z' num2str(alpha)], ...
+                              'type', 'observed', ...
+                              'dims', obj.unique_latent_factors(char(ulfk(alpha))).dims);
+                d1.zero_init(obj.dims);
+
+                d2 = TFFactor('name', ...
+                              ['D2_Z' num2str(alpha)], ...
+                              'type', 'observed', ...
+                              'dims', obj.unique_latent_factors(char(ulfk(alpha))).dims);
+                d2.zero_init(obj.dims);
+
+                Z_name = obj.unique_latent_factors(char(ulfk(alpha))).get_data_name();
+                d1_name = d1.get_data_name();
+                d2_name = d2.get_data_name();
+                eval([ 'global ' Z_name ' ' d1_name ' ' d2_name]);
+
+
+                for v = 1:length(obj.observed_factors)
+                    if ~obj.got_factor(v, obj.unique_latent_factors(char(ulfk(alpha))))
+                        %display(['observed factor ' obj.observed_factors(v).name ...
+                        %         ' does not use latent ' ...
+                        %         'factor ' char(ulfk(alpha)) ]);
+                        continue
+                    end
+
+                    %display(['observed factor ' obj.observed_factors(v).name ...
+                    %         ' uses latent ' ...
+                    %         'factor ' char(ulfk(alpha)) ]);
+
+
+                    d1_x = TFFactor('name', ...
+                                    ['D1_Z' num2str(alpha) '_X' num2str(v)], ...
+                                    'type', 'observed', ...
+                                    'dims', obj.unique_latent_factors(char(ulfk(alpha))).dims);
+                    d2_x = TFFactor('name', ...
+                                    ['D2_Z' num2str(alpha) '_X' num2str(v)], ...
+                                    'type', 'observed', ...
+                                    'dims', obj.unique_latent_factors(char(ulfk(alpha))).dims);
+                    d1_x_name = d1_x.get_data_name();
+                    d2_x_name = d2_x.get_data_name();
+                    eval([ 'global ' d1_x_name ' ' ...
+                           d2_x_name]);
+
+                    other_factors = [];
+                    %display(['other factors for factor ' char(ulfk(alpha)) ...
+                    %         ' in model ' obj.observed_factors(v).name ...
+                    %        ]);
+                    for ofi = 1:length(obj.R{v})
+                        if obj.R{v}(ofi) ~= obj.unique_latent_factors(char(ulfk(alpha)))
+                            other_factors = [ other_factors ...
+                                              obj.R{v}(ofi) ];
+                            %display(obj.R{v}(ofi).name);
+                        end
+                    end
+
+                    tmpmodel = PLTFModel('name',  ...
+                                         ['tmpmodel_Z' num2str(alpha) '_X' num2str(v)], ...
+                                         'factors' ,  ... 
+                                         [hat_X_v(v) other_factors d1_x], ...
+                                         'dims', obj.dims );
+                    tmpmodel.factors(1).isLatent = 1;
+                    tmpmodel.factors(1).isObserved = 0;
+                    tmpmodel.contract_all('standard', operation_type, ...
+                                          d1_x_name);
+                    eval([ d1_name ' = ' d1_name ' + ' d1_x_name ';']);
+
+
+                    tmpmodel = PLTFModel('name',  ...
+                                         ['tmpmodel_Z' num2str(alpha) '_X' num2str(v)], ...
+                                         'factors' ,  ... 
+                                         [masks(v) other_factors d2_x], ...
+                                         'dims', obj.dims );
+                    tmpmodel.factors(1).isLatent = 1;
+                    tmpmodel.factors(1).isObserved = 0;
+                    tmpmodel.contract_all('standard', operation_type, ...
+                                          d2_x_name);
+                    eval([ d2_name ' = ' d2_name ' + ' d2_x_name ';']);
+                end
+
+                % update Z_alpha with d1/d2
+                eval([ Z_name ' = ' Z_name ' .* ' d1_name ' ./ ' ...
+                       d2_name ';' ]);
+            end
+
+
+
+
+
+            cost=0;
+            
+            if strcmp( operation_type, 'compute' )
+                % calculate KL divergence
+                kl = zeros(1, length(obj.observed_factors));
+                for v = 1:length(obj.observed_factors)
+                    hat_X_data_name = hat_X_v(v).get_data_name();
+                    % restore hat_X_data
+                    eval( [ hat_X_data_name '  =  ' ...
+                            obj.observed_factors(v).get_data_name() ...
+                            ' .* ' ...
+                            hat_X_data_name ' ;' ] );
+
+                    X_name = obj.observed_factors(v).get_data_name();
+                    
+                    eval ( [ 't = (' hat_X_data_name ' .* ' X_name ') .* ' ...
+                             ' (log( (' hat_X_data_name ' .* ' X_name ') ) - ' ...
+                             'log(' X_name ...
+                             ') ) - ( ' hat_X_data_name ' .* ' X_name ')' ...
+                             '+ ' X_name ...
+                             ';' ]);
+                    for di = 1:length(obj.observed_factors(v).dims)
+                        t = sum(t);
+                    end
+                    kl(v) = t;
+                end
+            else
+                kl = 0;
             end
 
         end
 
 
-        function [graph] = schedule_dp(obj)
-            
+
+
+
+        function [found] = got_factor(obj, v, alpha)
+        % does model v have latent factor alpha
+            if ~isa(alpha, 'TFFactor')
+                throw(MException('GCTFModel:GotFactor', ...
+                                 'alpha must be a TFFactor instance'));
+            end
+
+            found = false;
+            for mi = 1:length(obj.R{v})
+                if obj.R{v}(mi) == alpha
+                    found = true;
+                    return
+                end
+            end
         end
+
+
+
+
+
+
+
+
 
 
 

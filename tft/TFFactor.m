@@ -253,6 +253,38 @@ classdef TFFactor
         end
 
 
+        function [] = zero_init(obj, all_dims, data_name)
+
+            sz = '';
+            for ad = 1:length(all_dims)
+                if ad ~= 1
+                    sz = [sz ', '];
+                end
+
+                found=0;
+                for od = 1:length(obj.dims)
+                    if all_dims(ad) == obj.dims(od)
+                        found=1;
+                        break
+                    end
+                end
+
+                if found
+                    sz = [sz num2str(all_dims(ad).cardinality) ];
+                else
+                    sz = [sz num2str(1) ];
+                end
+            end
+
+            if nargin < 3
+                data_name = obj.get_data_name();
+            end
+
+            eval( [ 'global ' data_name ';' ] );
+            eval( [ data_name ' = zeros(' sz ');'] );
+        end
+
+
         function [contract_dims] = ...
                 get_contraction_to(obj, sub_dims)
             contract_dims = [];
