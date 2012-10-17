@@ -579,7 +579,7 @@ classdef PLTFModel
 
             if strcmp( contract_type, 'full')
                 [ newmodel ] = ...
-                    obj.contract_full(operation_type);
+                    obj.contract_full(operation_type, output_name);
                 %['e5' contract_type]
             else
                 for i = 1:length(contract_dims)
@@ -619,6 +619,8 @@ classdef PLTFModel
 
             global full_tensor_data;
 
+            eval([ 'global ' output_name ]);
+
             if strcmp( operation_type, 'compute' )
                 % generate global full_tensor_data
 
@@ -656,9 +658,17 @@ classdef PLTFModel
                 % contract necessary dimensions from full_tensor_data
                 contract_dims = obj.get_contraction_dims();
                 for cdi = 1:length(contract_dims)
-                    full_tensor_data = sum( full_tensor_data,        ...
-                                            obj.get_dimension_index( ...
-                                                contract_dims(cdi)) );
+                    if cdi == length(contract_dims)
+                        eval( [ output_name [ ' = sum( full_tensor_data,' ...
+                                            ' obj.get_dimension_index(' ...
+                                            ' contract_dims(cdi)) ' ...
+                                            ');' ] ] );
+                    else
+                        full_tensor_data = sum( full_tensor_data,        ...
+                                                obj.get_dimension_index( ...
+                                                    contract_dims(cdi)) ...
+                                                );
+                    end                        
                 end
             end
 
