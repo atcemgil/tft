@@ -50,6 +50,11 @@ classdef GCTFModel
 
         function [KL] = gctf(obj, iternum, operation_type, ...
                            return_dot_data)
+            if nargin == 2
+                operation_type = 'compute';
+                return_dot_data = 'no';
+            end
+
             dot_data = '';
 
             % initalize obj.cost with memory requirements of the
@@ -102,10 +107,10 @@ classdef GCTFModel
 
             elseif strcmp( operation_type, 'mem_analysis' )
                 [ kl cost dot_data ] = ...
-                    obj.pltf_iteration(contract_type, hat_X, ...
-                                       mask, ...
+                    obj.gctf_iteration(hat_X_v, ...
+                                       masks, ...
                                        operation_type, ...
-                                       return_dot_data );
+                                       'no' );
             end
         end
 
