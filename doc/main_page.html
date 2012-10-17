@@ -1,22 +1,25 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <body>
 
 <h1 style="text-align:center;">Tensor Factorization Toolbox (TFT)</h1>
 
-Matlab Toolbox implementing Probabilistic Latent Tensor Factorization (PLTF)[1] operations. 
+Matlab Toolbox implementing Probabilistic Latent Tensor Factorization (PLTF)[1] and Generalised Coupled Tensor Factorisation (GCTF)[2] operations.
 
 <h2>Features</h2>
 <ul>
 <li>PLTF data structures are represented with PLTFModel, TFFactor and TFDimension classes.</li>
-<li>PLTF update rules: given a PLTF model, PLTF update rules can be performed using PLTFModel.pltf(iteration_number) function. Function prints and displays a plot of resulting KL divergence values over given number of iterations.</li>
-<li>Model visualization: models can be visualized using PLTFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
-<li>Contraction scheduling: PLTFModel.schedule_dp(operation_type) function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences.
-<li>Contraction scheduling visualization: contraction operations required for PLTF update rules can be visualized using <a href="http://www.graphviz.org/">GraphViz</a> with TFGraph.print_dot() function.
-<li>Global data usage: all essential data elements are stored as global variables so that duplicate copies of large data structures are avoided.</li>
+<li>GCTF data structures are represented with GCTFModel with help from PLTFModel class.</li>
+<li>PLTF update rules: given a PLTF model, PLTF update rules available using the PLTFModel.pltf(iteration_number) function. The function displays and plots KL divergence (KL( X, hat_X)) values over PLTF iterations.</li>
+<li>GCTF update rules: given a GCTF model, GCTF update rules are performed using GCTFModel.gctf(iteration_number) function. The function displays and plots KL divergence (KL( X_v, hat_X_v)) values over GCTF iterations for all of the models described in GCTF model.</li>
+<li>Model visualization: models are visualized using PLTFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
+<li>GTM contraction scheduling: PLTFModel.schedule_dp() function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences for a single Generalized Tensor Multiplication (GTM) operation.
+<li>Basic inter-GTM memory re-use: each GTM contraction generates a set of temporary tensors. Minimizing use number of temporary tensors offers memory reduction and performance improvements due to re-used intermediate GTM results. Currently PLTFModel.schedule_dp() function looks up previously generated temporary tensors in optimal contraction paths of previous GTM operations. This is a suboptimal temporary tensor re-use detection method.
+<li>GTM contraction scheduling visualization: contraction operations required for PLTF update rules are visualized using <a href="http://www.graphviz.org/">GraphViz</a> with TFGraph.print_dot() function. PLTFModel.pltf_optimal_dot(svg_file_name) generates a SVG (Scalable Vector Graphics) image file of the basic inter-GTM memory re-use diagram using GraphViz.
+<li>Global data usage: all essential data elements are stored as global variables so that duplicate copies of large data structures are avoided. All other object instances have relatively small memory footprint so that any (reasonable) number of objects can be manipulated without considerable performance issues.</li>
 </ul>
 
-<h2>Examples</h2>
+<h2>PLTF Examples</h2>
 
 PLTF models are composed of factors and factors are composed data in specified dimensions. TFT defines Matlab objects to store each one of these entities. A PLTFModel object contains an array of TFFactor objects and TFFactor objects contain a single array of TFDimension objects. This way primitive data structures of the framework are properly represented as Matlab objects.
 
@@ -108,22 +111,25 @@ To utilize contraction scheduling on PLTF update rule calculations second parame
 
 PLTF update equations involve a number of Generalized Tensor Multiplication (GTM) operations. Similar to the case in chain matrix multiplication, due to the associativity property of the operation order of chain GTM operations result in different amount of memory usage.
 <br><br>
-PLTFModel.schedule_dp(operation_type) function performs a dynamic programming search among all possible contraction sequences and finds the contraction sequence which requires the least amount of memory. Depending on the model specification optimal contraction sequence may improve PLTF operation performance and increase tractable problem size. The function does not manipulate any data. Search operations are conducted on objects which define the required contraction. Once optimal path is discovered, operations on the data are performed only once using the optimal sequence.
+PLTFModel.schedule_dp() function performs a dynamic programming search among all possible contraction sequences of a single GTM and finds the contraction sequence which requires the least amount of memory. Depending on the model specification optimal contraction sequence may improve PLTF operation performance and increase tractable problem size. The function does not manipulate any data. Search operations are conducted on objects which define the required contraction. Once optimal path is discovered, operations on the data are performed only once using the optimal sequence.
 <br><br>
 TFGraph object is used to store the dyanmic acyclic graph (DAG) structures produced during the search. TFGraph.print_dot() function can be used to visualize the graph objects. Following graph displays the DAG generated for the first operation of PLTF in Tucker3 model. Top part of each node shows dimensions on which contraction must be applied. Bottom part of each node describes factors required by the node. Some of these factors are latent factors and some are temporary factors. 
 <br><br>
-Since different contraction sequences utilize different temporary factors, different contraction sequences result in different amounts of memory usage. Numbers in paranthesis display the cumulative memory required for the contraction operation defined by the edge. Edges of the DAG are displayed in the direction of the dynamic programming search. Actual contraction operation is performed in the reverse direction. Once search is complete, selecting the minimal memory using edge suffices to follow the least memory using sequence.
+Since different contraction sequences utilize different temporary factors, different contraction sequences result in different amounts of memory usage. Numbers in paranthesis display the cumulative memory required for the contraction operation defined by the edge. Once search is complete, selecting the minimal memory using edge suffices to follow the least memory using sequence.
 
 <pre>
-graph = tucker_model.schedule_dp('mem_analysis');
-system([ 'echo " ' graph.print_dot [ ' " | dot -T svg | display' ]]);
+graph = tucker_model.schedule_dp();
+system([ 'echo '' ' graph.print_dot [ ' '' | dot -T svg | display' ]]);
 </pre>
 
 <div align="center">
-  <img src="img/tucker3_dp1.png"/>
+  <img src="img/scheduling2.svg"/>
 </div>
 
-Note: dot comes in GraphViz package, display comes in ImageMagick package both are available in Debian/Ubuntu repositories. Please not that required GraphViz version is 2.29.
+<div align="center">Green: input/output tensors, red: temporary tensors. Blue dashed line: optimal contraction path for this GTM. Optimal contraction path for this GTM: pqr.</div>
+<br><br>
+
+Note: dot comes in GraphViz package, display comes in ImageMagick package both are available in Debian/Ubuntu repositories. Please note that required GraphViz version is 2.29.
 
 <h3>Memory Analysis</h3>
 It is possible to analyse memory usage of models before executing PLTF updates with the third optional parameter of PLTFModel.pltf(iteration_number, contraction_type, operation_type) function. Full list of possible parameters are listed below for tucker_model:
@@ -145,8 +151,8 @@ KL =
    1.0e+03 *
     1.7094    1.7007    1.6900    1.6794    1.6688    1.6581    1.6471    1.6357    1.6238    1.6114
 
-data elements required: 14854
-memory size with (8 byte) double precision: 0.11883 MB
+data elements required: 3282
+memory size with (8 byte) double precision: 0.026256 MB
 </pre>
 
 Above command executes PLTF update rules on Tucker3 model defined in previous sections. At the end of the execution amount of data memory employed is listed. This figure includes all model data elements as well as all temporary tensors generated in intermediate contraction operations. Another version of this command lists memory usage without executing the actual data operations:
@@ -154,22 +160,11 @@ Above command executes PLTF update rules on Tucker3 model defined in previous se
 <pre>
 tucker_model.pltf(10, 'optimal', 'mem_analysis')
 
-data elements required: 14854
-memory size with (8 byte) double precision: 0.11883 MB
+data elements required: 3282
+memory size with (8 byte) double precision: 0.026256 MB
 </pre>
 
-For large models it may be wise to first check how much memory will be used before starting to execute PLTF update rules.
-
-Using the memory analyser options it is possible to observe the effects of the optimal contraction sequence on memory requirements. For instance if we did not use the optimal contraction sequence for the same problem as above we would use slightly more memory:
-
-<pre>
-tucker_model.pltf(10, 'standard', 'mem_analysis')
-
-data elements required: 16574
-memory size with (8 byte) double precision: 0.13259 MB
-</pre>
-
-For experimental purposes a third contraction function is also available. This function is expected to be the fastest version of contraction as well as the most memory using. In this mode each contraction operation is performed using a "full tensor", which is the largest possible tensor for a given model. All latent tensors are multiplied into the full tensor and then full tensor is contracted over necessary indices to calculate the output. Following code displays an example:
+For experimental purposes a second contraction function is also available. This function is the most parallelizable version of contraction as well as the most memory using. In this mode each contraction operation is performed using a "full tensor", which is the largest possible tensor for a given model. All latent tensors are multiplied into the full tensor and then full tensor is contracted over necessary indices to calculate the output. Following code displays an example:
 
 <pre>
 tucker_model.pltf(10, 'full', 'compute');
@@ -188,19 +183,58 @@ KL =
    1.0e+03 *
     1.0944    1.0708    1.0467    1.0226    0.9986    0.9748    0.9515    0.9288    0.9067    0.8854
 
-data elements required: 1815704
-memory size with (8 byte) double precision: 14.5256 MB
+data elements required: 154482
+memory size with (8 byte) double precision: 1.2359 MB
 </pre>
 
-Please note that currently memory values for the full tensor case is a bit misleading. Each contraction operation needs a full tensor, thus each operation creates a full tensor and counts its elements as required data size. However in next release with the "intermediate temporary variable re-use" feature, required data size for the full tensor case will be drammatically decreased.
 
-<h3>Model Visualization</h3>
+<h2>GCTF Examples</h2>
+
+Following section describes Tucker3 and Parafac models with a shared C factor.
+<pre>
+% assume dim_i, dim_j, dim_k, dim_p, dim_q, dim_r are defined same as above 
+
+% tucker3 factors
+A=TFFactor('name', 'A', 'type', 'latent', 'dims', [dim_i dim_p]);
+B=TFFactor('name', 'B', 'type', 'latent', 'dims', [dim_j dim_q]);
+C=TFFactor('name', 'C', 'type', 'latent', 'dims', [dim_k dim_r], 'isClamped', true);
+G=TFFactor('name', 'G', 'type', 'latent', 'dims', [dim_p, dim_q, dim_r]);
+X=TFFactor('name', 'X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);
+
+% parafac factors
+p_A=TFFactor('name', 'p_A', 'type', 'latent', 'dims', [dim_i dim_r]);
+p_B=TFFactor('name', 'p_B', 'type', 'latent', 'dims', [dim_j dim_r]);
+p_X=TFFactor('name', 'p_X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);
+
+% gctf model with shared C latent factor
+tucker_parafac_model = GCTFModel( 'name', 'tucker3_parafac', 'dims', [dim_i dim_j dim_k dim_p dim_q dim_r] , ...
+    'observed_factors', [ X p_X ], 'R', { [A B C G], [p_A p_B C] } );
+
+% initialize factors
+tucker_parafac_model.rand_init_latent_factors('all');
+X.rand_init(tucker_parafac_model.dims, 100) % init observation
+p_X.rand_init(tucker_parafac_model.dims, 100) % init observation
+C.rand_init(tucker_parafac_model.dims, 100) % init clamped
+</pre>
+All factors are initialized exactly same as in the PLTF example. Then instead of building separate Tucker3 and Parafac models we build a GCTFModel instance, which contains factors belonging to both models. Dimensions of the GCTF instance contain all of the dimensions used in any of the models.
+<br><br>
+'observed_factors' parameter includes the observed factor of each sub-model. Coupling matrix R is represented with a simpler notation using a cell of TFFactor lists. Each cell element describes latent factors of the corresponding 'observed_factor'. For instance in the above example first observed factor 'X' is calculated using A, B C and G latent factors as in the Tucker3 model. In this GCTF model Tucker3 model is coupled with Parafac model over C latent factor.
+<br><br>
+For a given model GCTFModel.gctf(iteration_number) function runs GCTF update rules on given models. KL divergence values are reported for each model separately. Boths series of values are plotted on the same graph for convenience not for comparison since comparing KL divergence values is not necessarily meaningful.
+
+<div align="center" width="75px">
+  <img src="img/tucker3_parafac_gctf_100.jpg"/>
+</div>
+
+
+
+<h2>PLTF Model Visualization</h2>
 
 PLTFModel objects can be visualized using <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> utility. Ubigraph must be setup and running on the host system before following visualization can be achieved.
 
 <pre>
-[dn fn edges] = tucker_model.print();
-system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+[dn fn edges] = tucker_model.print_ubigraph();
+system(['python utils/visualize/fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 </pre>
 
 Tucker3 model defined above produces the following image:
@@ -212,8 +246,8 @@ Tucker3 model defined above produces the following image:
 Similarly PARAFAC model can be visualized as well:
 
 <pre>
-[dn fn edges] = parafac_model.print();
-system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
+[dn fn edges] = parafac_model.print_ubigraph();
+system(['python utils/visualize/fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 </pre>
 
 <div align="center">
@@ -222,6 +256,12 @@ system(['python fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 
 
 <h2>Changelog</h2>
+<h3>v0.03 - 18.10.2012</h3>
+<ul>
+  <li>GCTF update rules computation</li>
+  <li>Simple inter-GTM memory re-use for optimal contraction path detection</li>
+  <li>Dot output prettify</li>
+</ul>
 <h3>v0.02 - 17.08.2012</h3>
 <ul>
   <li>Memory analysis with PLTFModel.pltf() parameter</li>
