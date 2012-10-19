@@ -242,7 +242,8 @@ classdef PLTFModel
             dot_data = '';
 
             cost = 0;
-            for alpha=1:length(obj.latent_factor_indices)
+            lfi = obj.latent_factor_indices;
+            for alpha=1:length(lfi)
                 % access global data
                 X_name = obj.get_factor_data_name( obj.observed_factor );
                 eval( [ 'global ' X_name ';' ] );
@@ -306,7 +307,7 @@ classdef PLTFModel
 
 
                 % generate D1
-                [ dd c ] = obj.delta(alpha, 'D1_data', ...
+                [ dd c ] = obj.delta(lfi(alpha), 'D1_data', ...
                                         contract_type, ...
                                         operation_type, ...
                                         hat_X, ...
@@ -316,7 +317,7 @@ classdef PLTFModel
                 end
 
                 Z_alpha_name = obj.get_factor_data_name( ...
-                    obj.factors(alpha) );
+                    obj.factors(lfi(alpha)) );
                 eval( [ 'global ' Z_alpha_name ';' ] );
 
                 if strcmp(contract_type, 'optimal')
@@ -327,12 +328,12 @@ classdef PLTFModel
                     cost = cost + global_data_size(Z_alpha_name);
                 end
 
-                display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' c ' ...
+                display( ['e2 D1 Z_' num2str(lfi(alpha)) ' ' num2str(cost) ' c ' ...
                           num2str(c) ' ' num2str(global_data_size(Z_alpha_name)) ...
                          ] );
 
                 % generate D2
-                [ dd ] = obj.delta(alpha, 'D2_data', ...
+                [ dd ] = obj.delta(lfi(alpha), 'D2_data', ...
                                    contract_type, ...
                                    operation_type, ...
                                    mask, ...
@@ -343,7 +344,7 @@ classdef PLTFModel
 
                 % works for both optimal and full contraction
                 cost = cost + global_data_size(Z_alpha_name);
-                display( ['e2 D1 Z_' num2str(alpha) ' ' num2str(cost) ' ' ...
+                display( ['e2 D1 Z_' num2str(lfi(alpha)) ' ' num2str(cost) ' ' ...
                           num2str(global_data_size(Z_alpha_name)) ...
                          ] );
 
@@ -404,7 +405,10 @@ classdef PLTFModel
             d_model = obj;
 
             % remove observed factor
+            tmpf = d_model.factors(alpha);
             d_model.factors(d_model.observed_factor_index) = [];
+            alpha = d_model.get_factor_index(tmpf);
+
 
             % add Z_alpha as new observed factor
             d_model.factors(alpha).isLatent = 0;
@@ -1351,7 +1355,7 @@ classdef PLTFModel
         % if factor does not exist returns 0
             index = 0;
             for f = 1:length(obj.factors)
-                if factor == obj.factor(f)
+                if factor == obj.factors(f)
                     index = f;
                     break;
                 end
