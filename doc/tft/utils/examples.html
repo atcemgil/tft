@@ -63,100 +63,103 @@ This function is called by:
 0019 X=TFFactor(<span class="string">'name'</span>, <span class="string">'X'</span>, <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
 0020            [dim_i, dim_j, dim_k]);
 0021 
-0022 tucker_model = TFModel(<span class="string">'name'</span>, <span class="string">'Tucker3'</span>, <span class="string">'factors'</span>, [A B C G X], <span class="keyword">...</span>
+0022 tucker_model = PLTFModel(<span class="string">'name'</span>, <span class="string">'Tucker3'</span>, <span class="string">'factors'</span>, [A B C G X], <span class="keyword">...</span>
 0023                        <span class="string">'dims'</span>, [dim_i dim_j dim_k dim_p dim_q dim_r]);
 0024 
 0025 tucker_model.rand_init_latent_factors(<span class="string">'nonClamped'</span>);
-0026 X.rand_init(tucker_model.dims, 100) <span class="comment">% init observation</span>
+0026 X.rand_init(tucker_model.dims) <span class="comment">% init observation</span>
 0027 C.rand_init(tucker_model.dims, 100) <span class="comment">% init clamped</span>
 0028 
 0029 
 0030 <span class="comment">% parafac model</span>
 0031 
-0032 p_A=TFFactor(<span class="string">'name'</span>, <span class="string">'p_A'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_i dim_r]);
-0033 p_B=TFFactor(<span class="string">'name'</span>, <span class="string">'p_B'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_j dim_r]);
-0034 p_C=TFFactor(<span class="string">'name'</span>, <span class="string">'p_C'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_k dim_r]);
-0035 
-0036 parafac_model = TFModel(<span class="string">'name'</span>, <span class="string">'Parafac'</span>, <span class="keyword">...</span>
-0037                         <span class="string">'factors'</span>, [p_A p_B p_C X], <span class="keyword">...</span>
-0038                         <span class="string">'dims'</span>, [dim_i dim_j dim_k dim_r]);
-0039 
-0040 parafac_model.rand_init_latent_factors(<span class="string">'all'</span>);
-0041 
+0032 p_X=TFFactor(<span class="string">'name'</span>, <span class="string">'p_X'</span>, <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
+0033              [dim_i, dim_j, dim_k]);
+0034 
+0035 p_A=TFFactor(<span class="string">'name'</span>, <span class="string">'p_A'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_i dim_r]);
+0036 p_B=TFFactor(<span class="string">'name'</span>, <span class="string">'p_B'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_j dim_r]);
+0037 p_C=TFFactor(<span class="string">'name'</span>, <span class="string">'p_C'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_k dim_r]);
+0038 
+0039 parafac_model = PLTFModel(<span class="string">'name'</span>, <span class="string">'Parafac'</span>, <span class="keyword">...</span>
+0040                         <span class="string">'factors'</span>, [p_A p_B p_C p_X], <span class="keyword">...</span>
+0041                         <span class="string">'dims'</span>, [dim_i dim_j dim_k dim_r]);
 0042 
-0043 
+0043 parafac_model.rand_init_latent_factors(<span class="string">'all'</span>);
 0044 
 0045 
-0046 <span class="comment">% GCTF model from tucker + parafac</span>
-0047 <span class="comment">%gctfmodel=GCTFModel;</span>
-0048 <span class="comment">%gctfmodel.tfmodels=[tucker_model parafac_model];</span>
-0049 
-0050 
-0051 
-0052 <span class="comment">% VISUALIZE</span>
+0046 
+0047 
+0048 
+0049 <span class="comment">% GCTF model from tucker + parafac</span>
+0050 <span class="comment">%gctfmodel=GCPLTFModel;</span>
+0051 <span class="comment">%gctfmodel.tfmodels=[tucker_model parafac_model];</span>
+0052 
 0053 
-0054 <span class="keyword">if</span> exist(<span class="string">'VISUALIZE_UBIGRAPH'</span>)
-0055     [dn fn edges] = tucker_model.print_ubigraph();
-0056     system([<span class="string">'python visualize/fgplot.py &quot;'</span> dn <span class="string">'&quot; &quot;'</span> fn <span class="string">'&quot; &quot;'</span> edges <span class="string">'&quot;'</span>  ]);
-0057 
-0058     pause
-0059 
-0060     [dn fn edges] = parafac_model.print();
-0061     system([<span class="string">'python visualize/fgplot.py &quot;'</span> dn <span class="string">'&quot; &quot;'</span> fn <span class="string">'&quot; &quot;'</span> edges <span class="string">'&quot;'</span>  ]);
+0054 
+0055 <span class="comment">% VISUALIZE</span>
+0056 
+0057 <span class="keyword">if</span> exist(<span class="string">'VISUALIZE_UBIGRAPH'</span>)
+0058     [dn fn edges] = tucker_model.print_ubigraph();
+0059     system([<span class="string">'python visualize/fgplot.py &quot;'</span> dn <span class="string">'&quot; &quot;'</span> fn <span class="string">'&quot; &quot;'</span> edges <span class="string">'&quot;'</span>  ]);
+0060 
+0061     pause
 0062 
-0063     <span class="comment">%pause</span>
-0064 
-0065     <span class="comment">% visualize GCTF model</span>
-0066     <span class="comment">%[dn fn edges] = gctfmodel.print();</span>
-0067     <span class="comment">%system(['python fgplot.py &quot;' dn '&quot; &quot;' fn '&quot; &quot;' edges '&quot;'  ]);</span>
-0068 
-0069 <span class="keyword">end</span>
-0070 
+0063     [dn fn edges] = parafac_model.print();
+0064     system([<span class="string">'python visualize/fgplot.py &quot;'</span> dn <span class="string">'&quot; &quot;'</span> fn <span class="string">'&quot; &quot;'</span> edges <span class="string">'&quot;'</span>  ]);
+0065 
+0066     <span class="comment">%pause</span>
+0067 
+0068     <span class="comment">% visualize GCTF model</span>
+0069     <span class="comment">%[dn fn edges] = gctfmodel.print();</span>
+0070     <span class="comment">%system(['python fgplot.py &quot;' dn '&quot; &quot;' fn '&quot; &quot;' edges '&quot;'  ]);</span>
 0071 
-0072 <span class="keyword">if</span> exist(<span class="string">'VISUALIZE_DOT'</span>)
-0073     g = tucker_model.schedule_dp();
-0074     system([ <span class="string">'rm /tmp/img.eps; echo '' '</span> g.print_dot  [<span class="string">' '' |'</span> <span class="keyword">...</span>
-0075                         <span class="string">' dot -o /tmp/img.eps ;  display  /tmp/img.eps; '</span> ] ] );
-0076 <span class="keyword">end</span>
-0077 
-0078 <span class="keyword">if</span> exist(<span class="string">'PROFILE_PLTF'</span>)
-0079     N=10;
-0080     interval=20;
-0081     times=zeros(1,length(1:interval:N*interval));
-0082     j=1;
-0083     <span class="keyword">for</span> i=1:interval:N*interval
-0084         j
-0085         rng(1)
-0086         dim_p=TFDimension(<span class="string">'cardinality'</span>, 8+i, <span class="string">'name'</span>, <span class="string">'p'</span>);
-0087         dim_q=TFDimension(<span class="string">'cardinality'</span>, 9+i, <span class="string">'name'</span>, <span class="string">'q'</span>);
-0088         dim_r=TFDimension(<span class="string">'cardinality'</span>, 10+i, <span class="string">'name'</span>, <span class="string">'r'</span>);
-0089 
-0090         A=TFFactor(<span class="string">'name'</span>, <span class="string">'A'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_i dim_p]);
-0091         B=TFFactor(<span class="string">'name'</span>, <span class="string">'B'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_j dim_q]);
-0092         C=TFFactor(<span class="string">'name'</span>, <span class="string">'C'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_k dim_r], <span class="keyword">...</span>
-0093                    <span class="string">'isClamped'</span>, true);
-0094         G=TFFactor(<span class="string">'name'</span>, <span class="string">'G'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
-0095                    [dim_p, dim_q, dim_r]);
-0096         X=TFFactor(<span class="string">'name'</span>, <span class="string">'X'</span>, <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
-0097                    [dim_i, dim_j, dim_k]);
-0098 
-0099         tucker_model = TFModel(<span class="string">'name'</span>, <span class="string">'Tucker3'</span>, <span class="string">'factors'</span>, [A B C G X], <span class="keyword">...</span>
-0100                                <span class="string">'dims'</span>, [dim_i dim_j dim_k dim_p dim_q dim_r]);
+0072 <span class="keyword">end</span>
+0073 
+0074 
+0075 <span class="keyword">if</span> exist(<span class="string">'VISUALIZE_DOT'</span>)
+0076     g = tucker_model.schedule_dp();
+0077     system([ <span class="string">'rm /tmp/img.eps; echo '' '</span> g.print_dot  [<span class="string">' '' |'</span> <span class="keyword">...</span>
+0078                         <span class="string">' dot -o /tmp/img.eps ;  display  /tmp/img.eps; '</span> ] ] );
+0079 <span class="keyword">end</span>
+0080 
+0081 <span class="keyword">if</span> exist(<span class="string">'PROFILE_PLTF'</span>)
+0082     N=10;
+0083     interval=20;
+0084     times=zeros(1,length(1:interval:N*interval));
+0085     j=1;
+0086     <span class="keyword">for</span> i=1:interval:N*interval
+0087         j
+0088         rng(1)
+0089         dim_p=TFDimension(<span class="string">'cardinality'</span>, 8+i, <span class="string">'name'</span>, <span class="string">'p'</span>);
+0090         dim_q=TFDimension(<span class="string">'cardinality'</span>, 9+i, <span class="string">'name'</span>, <span class="string">'q'</span>);
+0091         dim_r=TFDimension(<span class="string">'cardinality'</span>, 10+i, <span class="string">'name'</span>, <span class="string">'r'</span>);
+0092 
+0093         A=TFFactor(<span class="string">'name'</span>, <span class="string">'A'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_i dim_p]);
+0094         B=TFFactor(<span class="string">'name'</span>, <span class="string">'B'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_j dim_q]);
+0095         C=TFFactor(<span class="string">'name'</span>, <span class="string">'C'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_k dim_r], <span class="keyword">...</span>
+0096                    <span class="string">'isClamped'</span>, true);
+0097         G=TFFactor(<span class="string">'name'</span>, <span class="string">'G'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
+0098                    [dim_p, dim_q, dim_r]);
+0099         X=TFFactor(<span class="string">'name'</span>, <span class="string">'X'</span>, <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
+0100                    [dim_i, dim_j, dim_k]);
 0101 
-0102         tucker_model.rand_init_latent_factors(<span class="string">'nonClamped'</span>);
-0103         X.rand_init(tucker_model.dims, 100) <span class="comment">% init observation</span>
-0104         C.rand_init(tucker_model.dims, 100) <span class="comment">% init clamped</span>
-0105 
-0106 
-0107         tic; tucker_model.pltf(30); times(j)=toc;
-0108         j = j+1;
-0109     <span class="keyword">end</span>
-0110     plot(1:length(1:interval:N*interval), times);
-0111     title(<span class="string">'Tucker3 Model - Increment pqr Dimensions'</span>);
-0112     xlabel(<span class="string">'Increments'</span>);
-0113     ylabel(<span class="string">'Seconds'</span>);
-0114 
-0115 <span class="keyword">end</span></pre></div>
-<hr><address>Generated on Thu 16-Aug-2012 20:47:03 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+0102         tucker_model = PLTFModel(<span class="string">'name'</span>, <span class="string">'Tucker3'</span>, <span class="string">'factors'</span>, [A B C G X], <span class="keyword">...</span>
+0103                                <span class="string">'dims'</span>, [dim_i dim_j dim_k dim_p dim_q dim_r]);
+0104 
+0105         tucker_model.rand_init_latent_factors(<span class="string">'nonClamped'</span>);
+0106         X.rand_init(tucker_model.dims, 100) <span class="comment">% init observation</span>
+0107         C.rand_init(tucker_model.dims, 100) <span class="comment">% init clamped</span>
+0108 
+0109 
+0110         tic; tucker_model.pltf(30); times(j)=toc;
+0111         j = j+1;
+0112     <span class="keyword">end</span>
+0113     plot(1:length(1:interval:N*interval), times);
+0114     title(<span class="string">'Tucker3 Model - Increment pqr Dimensions'</span>);
+0115     xlabel(<span class="string">'Increments'</span>);
+0116     ylabel(<span class="string">'Seconds'</span>);
+0117 
+0118 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Thu 18-Oct-2012 00:58:26 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
 </body>
 </html>

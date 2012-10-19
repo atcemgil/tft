@@ -1,21 +1,26 @@
 /* Created by mdot for Matlab */
 digraph m2html {
+  GCTFModel -> GCTFModel;
+  GCTFModel -> PLTFModel;
+  GCTFModel -> TFDimension;
+  GCTFModel -> TFFactor;
+  GTMGraph -> GTMGraph;
+  GTMGraph -> PLTFModel;
+  PLTFModel -> GTMGraph;
+  PLTFModel -> PLTFModel;
+  PLTFModel -> TFDimension;
+  PLTFModel -> TFFactor;
+  PLTFModel -> TFOCSCache;
   TFDimension -> TFDimension;
   TFFactor -> TFDimension;
   TFFactor -> TFFactor;
-  TFGraph -> TFGraph;
-  TFGraph -> TFModel;
-  TFModel -> TFDimension;
-  TFModel -> TFFactor;
-  TFModel -> TFGraph;
-  TFModel -> TFModel;
-  TFModel -> TFOCSCache;
-  TFOCSCache -> TFModel;
+  TFOCSCache -> PLTFModel;
   TFOCSCache -> TFOCSCache;
 
+  GCTFModel [URL="GCTFModel.html"];
+  GTMGraph [URL="GTMGraph.html"];
+  PLTFModel [URL="PLTFModel.html"];
   TFDimension [URL="TFDimension.html"];
   TFFactor [URL="TFFactor.html"];
-  TFGraph [URL="TFGraph.html"];
-  TFModel [URL="TFModel.html"];
   TFOCSCache [URL="TFOCSCache.html"];
 }

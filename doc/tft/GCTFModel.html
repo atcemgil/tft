@@ -4,7 +4,7 @@
 <head>
   <title>Description of GCTFModel</title>
   <meta name="keywords" content="GCTFModel">
-  <meta name="description" content="">
+  <meta name="description" content="Represents data required to describe a GCTF model">
   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
   <meta name="generator" content="m2html &copy; 2005 Guillaume Flandin">
   <meta name="robots" content="index, follow">
@@ -20,119 +20,480 @@
 </h1>
 
 <h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
-<div class="box"><strong></strong></div>
+<div class="box"><strong>Represents data required to describe a GCTF model</strong></div>
 
 <h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
 <div class="box"><strong>This is a script file. </strong></div>
 
 <h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
-<div class="fragment"><pre class="comment"></pre></div>
+<div class="fragment"><pre class="comment"> Represents data required to describe a GCTF model</pre></div>
 
 <!-- crossreference -->
 <h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
 This function calls:
 <ul style="list-style-image:url(../matlabicon.gif)">
-<li><a href="GCTFModel.html" class="code" title="">GCTFModel</a>	</li></ul>
+<li><a href="GCTFModel.html" class="code" title="">GCTFModel</a>	Represents data required to describe a GCTF model</li><li><a href="PLTFModel.html" class="code" title="">PLTFModel</a>	Represents data required to describe a tensor factorization model</li><li><a href="TFDimension.html" class="code" title="">TFDimension</a>	Represents a single dimension</li><li><a href="TFFactor.html" class="code" title="">TFFactor</a>	Represents a PLTF factor</li></ul>
 This function is called by:
 <ul style="list-style-image:url(../matlabicon.gif)">
-<li><a href="GCTFModel.html" class="code" title="">GCTFModel</a>	</li></ul>
+<li><a href="GCTFModel.html" class="code" title="">GCTFModel</a>	Represents data required to describe a GCTF model</li></ul>
 <!-- crossreference -->
 
 <h2><a name="_subfunctions"></a>SUBFUNCTIONS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
 <ul style="list-style-image:url(../matlabicon.gif)">
-<li><a href="#_sub1" class="code">function [dn fn all_edges] = print(obj)</a></li></ul>
+<li><a href="#_sub1" class="code">function obj = GCTFModel(varargin)</a></li><li><a href="#_sub2" class="code">function [KL] = gctf(obj, iternum, operation_type,</a></li><li><a href="#_sub3" class="code">function [ kl cost dot_data ] = gctf_iteration( obj,</a></li><li><a href="#_sub4" class="code">function [found] = got_factor(obj, v, alpha)</a></li><li><a href="#_sub5" class="code">function [size] = get_element_size(obj)</a></li><li><a href="#_sub6" class="code">function [name] = get_factor_data_name(obj, factor)</a></li><li><a href="#_sub7" class="code">function [code_name] = get_coded_factor_name(obj, index)</a></li><li><a href="#_sub8" class="code">function [] = rand_init_latent_factors(obj, type, imax)</a></li></ul>
 
 <h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
-<div class="fragment"><pre>0001 classdef <a href="GCTFModel.html" class="code" title="">GCTFModel</a>
-0002     properties
-0003         <span class="comment">% array of TFModel objects</span>
-0004         tfmodels=[];
-0005     <span class="keyword">end</span>
+<div class="fragment"><pre>0001 <span class="comment">% Represents data required to describe a GCTF model</span>
+0002 
+0003 <span class="comment">% Take care in naming factors. Shared factors must have the same</span>
+0004 <span class="comment">% TFFactor.name property in R cell. Factors are identified by their</span>
+0005 <span class="comment">% name properties</span>
 0006 
-0007     methods
-0008 
-0009         <span class="comment">% returns a string to be used by fgplot</span>
-0010         <a name="_sub0" href="#_subfunctions" class="code">function [dn fn all_edges] = print(obj)</a>
-0011             dn=[<span class="string">'[ '</span>];
-0012             fn=[<span class="string">'[ '</span>];
-0013             dims={};
-0014             factors={};
-0015 
-0016             <span class="keyword">for</span> m=1:length(obj.tfmodels)
-0017     
-0018                 <span class="keyword">for</span> i =1:length(obj.tfmodels(m).dims)
-0019                     txt = obj.tfmodels(m).dims(i).name;
-0020                     <span class="keyword">if</span> ~length(strfind(dn, [<span class="string">''''</span> txt <span class="string">''''</span>]))
-0021                         <span class="keyword">if</span>  ~(i == 1 &amp;&amp; m == 1)
-0022                             dn = [ dn <span class="string">','</span> ];
-0023                         <span class="keyword">end</span>
+0007 classdef <a href="GCTFModel.html" class="code" title="">GCTFModel</a>
+0008     properties
+0009         name = <span class="string">''</span>;
+0010 
+0011         dims = [<a href="TFDimension.html" class="code" title="">TFDimension</a>];
+0012 
+0013         observed_factors = [<a href="TFFactor.html" class="code" title="">TFFactor</a>];
+0014 
+0015         <span class="comment">% latent factors</span>
+0016         R = { [ <a href="TFFactor.html" class="code" title="">TFFactor</a> <a href="TFFactor.html" class="code" title="">TFFactor</a> <a href="TFFactor.html" class="code" title="">TFFactor</a>] [<a href="TFFactor.html" class="code" title="">TFFactor</a> <a href="TFFactor.html" class="code" title="">TFFactor</a>] };
+0017 
+0018         cost = 0;
+0019 
+0020         <span class="comment">% stores unique factors in a Map structure</span>
+0021         <span class="comment">% key is TFFactor.name property</span>
+0022         unique_latent_factors = containers.Map()
+0023     <span class="keyword">end</span>
 0024 
-0025                         dn = [ dn <span class="string">''''</span> txt <span class="string">''''</span>];
-0026                         dims = [ dims txt ];
-0027                     <span class="keyword">end</span>
-0028                 <span class="keyword">end</span>
-0029     
-0030                 <span class="keyword">for</span> i =1:length(obj.tfmodels(m).factors)
-0031                     txt = obj.tfmodels(m).factors(i).name;
-0032                     <span class="keyword">if</span> ~length(strfind(fn, [<span class="string">''''</span> txt <span class="string">''''</span>]))
-0033                         <span class="keyword">if</span>  ~(i == 1 &amp;&amp; m == 1)
-0034                             fn = [ fn <span class="string">','</span> ];
-0035                         <span class="keyword">end</span>
-0036 
-0037                         fn = [ fn <span class="string">''''</span> txt <span class="string">''''</span> ];
-0038                         factors = [ factors txt ];
-0039                     <span class="keyword">end</span>
-0040                 <span class="keyword">end</span>
-0041             <span class="keyword">end</span>
-0042 
-0043             dn = [ dn <span class="string">' ] '</span> ];
-0044             fn = [ fn <span class="string">' ] '</span> ];
-0045 
-0046 
-0047             all_edges=[<span class="string">'[ '</span>];
-0048             <span class="keyword">for</span> d = 1:length(dims)
-0049                 <span class="keyword">if</span>  ~(d == 1)
-0050                     all_edges = [ all_edges <span class="string">' , '</span> ];
-0051                 <span class="keyword">end</span>
-0052                 
-0053                 edges=[<span class="string">'[ '</span> ];
-0054                 
-0055                 <span class="comment">% include this dimension if a factor uses it</span>
-0056                 <span class="keyword">for</span> m = 1:length(obj.tfmodels)
-0057                     <span class="keyword">for</span> f = 1:length(obj.tfmodels(m).factors)
-0058                         <span class="keyword">for</span> fd = 1:length(obj.tfmodels(m).factors(f).dims)
-0059                             <span class="keyword">if</span> obj.tfmodels(m).factors(f).dims(fd).name == dims{d}
-0060                                 <span class="keyword">if</span> length(edges) ~= 2
-0061                                     edges = [ edges <span class="string">''','''</span> ];
-0062                                 <span class="keyword">else</span>
-0063                                     edges = [ edges <span class="string">''''</span> ];
-0064                                 <span class="keyword">end</span>
-0065                                 edges = [ edges obj.tfmodels(m).factors(f).name ];
-0066                             <span class="keyword">end</span>
-0067                         <span class="keyword">end</span>
-0068                     <span class="keyword">end</span>
-0069                 <span class="keyword">end</span>
-0070                 all_edges = [ all_edges edges <span class="string">''' ]'</span> ];
-0071             <span class="keyword">end</span>
-0072             all_edges = [ all_edges <span class="string">' ]'</span> ];
-0073     
-0074         <span class="keyword">end</span>
-0075     
-0076     <span class="keyword">end</span>
-0077 <span class="keyword">end</span></pre></div>
-<hr><address>Generated on Tue 14-Aug-2012 14:28:36 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
-<script type="text/javascript">
-
-  var _gaq = _gaq || [];
-  _gaq.push(['_setAccount', 'UA-34148766-1']);
-  _gaq.push(['_trackPageview']);
-
-  (function() {
-    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-  })();
-
-</script>
+0025     methods
+0026 
+0027         <a name="_sub0" href="#_subfunctions" class="code">function obj = GCTFModel(varargin)</a>
+0028             p = inputParser;
+0029             addParamValue(p, <span class="string">'name'</span>, <span class="string">''</span>, @isstr);
+0030             addParamValue(p, <span class="string">'dims'</span>, [], @isvector);
+0031             addParamValue(p, <span class="string">'observed_factors'</span>, [], @isvector);
+0032             addParamValue(p, <span class="string">'R'</span>, [], @isvector);
+0033 
+0034             parse(p, varargin{:});
+0035 
+0036             obj.name = p.Results.name;
+0037             obj.dims = p.Results.dims;
+0038             obj.observed_factors = p.Results.observed_factors;
+0039             obj.R = p.Results.R;
+0040 
+0041             <span class="comment">% generate unique_latent_factors</span>
+0042             <span class="keyword">for</span> Ri = 1:length(obj.R)
+0043                 <span class="keyword">for</span> mi = 1:length(obj.R{Ri})
+0044                     obj.unique_latent_factors( obj.R{Ri}(mi).name ) = <span class="keyword">...</span>
+0045                         obj.R{Ri}(mi);
+0046                 <span class="keyword">end</span>
+0047             <span class="keyword">end</span>
+0048 
+0049         <span class="keyword">end</span>
+0050 
+0051         <a name="_sub1" href="#_subfunctions" class="code">function [KL] = gctf(obj, iternum, operation_type, </a><span class="keyword">...</span>
+0052                            return_dot_data)
+0053             <span class="keyword">if</span> nargin == 2
+0054                 operation_type = <span class="string">'compute'</span>;
+0055                 return_dot_data = <span class="string">'no'</span>;
+0056             <span class="keyword">end</span>
+0057 
+0058             dot_data = <span class="string">''</span>;
+0059 
+0060             <span class="comment">% initalize obj.cost with memory requirements of the</span>
+0061             <span class="comment">% model elements</span>
+0062             obj.cost = obj.get_element_size();
+0063             <span class="comment">%display( [ 'obj.cost ' num2str(obj.cost) ] );</span>
+0064 
+0065             <span class="comment">% initialize hatX_v objects</span>
+0066             hat_X_v = obj.observed_factors;
+0067             masks = hat_X_v;
+0068             <span class="keyword">for</span> v = 1:length(obj.observed_factors)
+0069                 hat_X_v(v).name = [<span class="string">'hat_X_v'</span> num2str(v)];
+0070                 masks(v).name = [<span class="string">'mask'</span> num2str(v)];
+0071 
+0072                 obj.cost = obj.cost + <span class="keyword">...</span>
+0073                     hat_X_v(v).get_element_size() *2 ; <span class="comment">% *2 for mask</span>
+0074                 <span class="comment">%display( [ 'obj.cost ' num2str(obj.cost) ] );</span>
+0075 
+0076                 <span class="keyword">if</span> strcmp( operation_type, <span class="string">'compute'</span> )
+0077                     hat_X_v(v).rand_init(obj.dims, 100);
+0078                     eval( [ <span class="string">'global '</span> hat_X_v(v).get_data_name() ]);
+0079                     eval( [ <span class="string">'global '</span> masks(v).get_data_name() ]);
+0080                     eval( [ masks(v).get_data_name() <span class="string">' = ones(size('</span> <span class="keyword">...</span>
+0081                             hat_X_v(v).get_data_name() <span class="string">'));'</span> ]);
+0082                 <span class="keyword">end</span>
+0083             <span class="keyword">end</span>
+0084 
+0085 
+0086             <span class="keyword">if</span> strcmp( operation_type, <span class="string">'compute'</span> )
+0087 
+0088                 KL=zeros(iternum, length(obj.observed_factors));
+0089                 <span class="keyword">for</span> iter = 1:iternum
+0090                     display([<span class="string">'iteration'</span> char(9) num2str(iter)]);
+0091                     [ kls cost ] = obj.gctf_iteration( hat_X_v, <span class="keyword">...</span>
+0092                                                       masks, <span class="keyword">...</span>
+0093                                                       operation_type, <span class="keyword">...</span>
+0094                                                       <span class="string">'no'</span>);
+0095 
+0096                     <span class="comment">%, ...</span>
+0097                     <span class="comment">%                                 pltf_models);</span>
+0098                     KL(iter,:) = kls;
+0099                 <span class="keyword">end</span>
+0100 
+0101                 display([<span class="string">'KL divergence over iterations: '</span>]);
+0102                 display(KL);
+0103                 plot(KL);
+0104                 title(<span class="string">'KL divergence over iterations'</span>);
+0105                 xlabel(<span class="string">'iteration number'</span>);
+0106                 ylabel(<span class="string">'KL divergence'</span>);
+0107 
+0108             <span class="keyword">elseif</span> strcmp( operation_type, <span class="string">'mem_analysis'</span> )
+0109                 [ kl cost dot_data ] = <span class="keyword">...</span>
+0110                     obj.gctf_iteration(hat_X_v, <span class="keyword">...</span>
+0111                                        masks, <span class="keyword">...</span>
+0112                                        operation_type, <span class="keyword">...</span>
+0113                                        <span class="string">'no'</span> );
+0114             <span class="keyword">end</span>
+0115         <span class="keyword">end</span>
+0116 
+0117 
+0118 
+0119 
+0120         <a name="_sub2" href="#_subfunctions" class="code">function [ kl cost dot_data ] = gctf_iteration( obj, </a><span class="keyword">...</span>
+0121                                                         hat_X_v, <span class="keyword">...</span>
+0122                                                         masks, <span class="keyword">...</span>
+0123                                                         operation_type, <span class="keyword">...</span>
+0124                                                         return_dot_data)
+0125 
+0126             <span class="keyword">if</span> nargin &lt; 4
+0127                 return_dot_data = <span class="string">'no'</span>;
+0128             <span class="keyword">end</span>
+0129 
+0130             dot_data = <span class="string">''</span>;
+0131             cost = 0;
+0132 
+0133 
+0134             <span class="comment">% access global data</span>
+0135             <span class="keyword">for</span> v = 1:length(obj.observed_factors)
+0136                 eval( [ <span class="string">'global hat_X_v'</span> num2str(v) <span class="string">'_data'</span> ] );
+0137                 eval( [ <span class="string">'global '</span> obj.observed_factors(v).get_data_name() <span class="keyword">...</span>
+0138                         ] );
+0139             <span class="keyword">end</span>
+0140 
+0141 
+0142 
+0143 
+0144 
+0145             <span class="comment">% update each Z_alpha</span>
+0146             ulfk = obj.unique_latent_factors.keys();
+0147             <span class="keyword">for</span> alpha = 1:length(ulfk)
+0148 
+0149 
+0150 
+0151 
+0152 
+0153                 <span class="comment">% build a PLTF for each observed_factor with relevant</span>
+0154                 <span class="comment">% latent factors</span>
+0155                 pltf_models = [];
+0156                 <span class="keyword">for</span> oi = 1:length(obj.observed_factors)
+0157 
+0158                     pltf_models = [ pltf_models <span class="keyword">...</span>
+0159                                     <a href="PLTFModel.html" class="code" title="">PLTFModel</a>(<span class="string">'name'</span>, [<span class="string">'gctf_'</span> <span class="keyword">...</span>
+0160                                         num2str(oi)], <span class="keyword">...</span>
+0161                                               <span class="string">'factors'</span>, [ <span class="keyword">...</span>
+0162                                                   obj.observed_factors(oi) obj.R{oi} ], <span class="keyword">...</span>
+0163                                               <span class="string">'dims'</span>, obj.dims) <span class="keyword">...</span>
+0164                                   ];
+0165                 <span class="keyword">end</span>
+0166 
+0167 
+0168 
+0169 
+0170 
+0171                 <span class="comment">% update each hatX_v</span>
+0172                 <span class="keyword">for</span> v = 1:length(obj.observed_factors)
+0173                     <span class="comment">%display([ 'update hatX_v' num2str(v) ])</span>
+0174                     hat_X_data_name = hat_X_v(v).get_data_name();
+0175                     newmodel = pltf_models(v);
+0176                     <span class="comment">% perform contraction</span>
+0177                     <span class="comment">% store result in hat_X_data</span>
+0178                     [ ~ ] = <span class="keyword">...</span>
+0179                         newmodel.contract_all(<span class="string">'standard'</span>, <span class="keyword">...</span>
+0180                                               operation_type, <span class="keyword">...</span>
+0181                                               hat_X_data_name);
+0182 
+0183                     <span class="comment">% store X / hat_X in hat_X data</span>
+0184                     <span class="keyword">if</span> strcmp( operation_type, <span class="string">'compute'</span> )
+0185                         eval( [ hat_X_data_name <span class="string">'  =  '</span> <span class="keyword">...</span>
+0186                                 obj.observed_factors(v).get_data_name() <span class="keyword">...</span>
+0187                                 <span class="string">' ./ '</span> <span class="keyword">...</span>
+0188                                 hat_X_data_name <span class="string">' ;'</span> ] );
+0189                     <span class="keyword">end</span>
+0190 
+0191                 <span class="keyword">end</span>
+0192 
+0193 
+0194 
+0195 
+0196 
+0197 
+0198 
+0199 
+0200 
+0201 
+0202 
+0203                 d1 = <a href="TFFactor.html" class="code" title="">TFFactor</a>(<span class="string">'name'</span>, <span class="keyword">...</span>
+0204                               [<span class="string">'D1_Z'</span> num2str(alpha)], <span class="keyword">...</span>
+0205                               <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="keyword">...</span>
+0206                               <span class="string">'dims'</span>, obj.unique_latent_factors(char(ulfk(alpha))).dims);
+0207                 d1.zero_init(obj.dims);
+0208 
+0209                 d2 = <a href="TFFactor.html" class="code" title="">TFFactor</a>(<span class="string">'name'</span>, <span class="keyword">...</span>
+0210                               [<span class="string">'D2_Z'</span> num2str(alpha)], <span class="keyword">...</span>
+0211                               <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="keyword">...</span>
+0212                               <span class="string">'dims'</span>, obj.unique_latent_factors(char(ulfk(alpha))).dims);
+0213                 d2.zero_init(obj.dims);
+0214 
+0215                 Z_name = obj.unique_latent_factors(char(ulfk(alpha))).get_data_name();
+0216                 d1_name = d1.get_data_name();
+0217                 d2_name = d2.get_data_name();
+0218                 eval([ <span class="string">'global '</span> Z_name <span class="string">' '</span> d1_name <span class="string">' '</span> d2_name]);
+0219 
+0220 
+0221                 <span class="keyword">for</span> v = 1:length(obj.observed_factors)
+0222                     <span class="keyword">if</span> ~obj.got_factor(v, obj.unique_latent_factors(char(ulfk(alpha))))
+0223                         <span class="comment">%display(['observed factor ' obj.observed_factors(v).name ...</span>
+0224                         <span class="comment">%         ' does not use latent ' ...</span>
+0225                         <span class="comment">%         'factor ' char(ulfk(alpha)) ]);</span>
+0226                         <span class="keyword">continue</span>
+0227                     <span class="keyword">end</span>
+0228 
+0229                     <span class="comment">%display(['observed factor ' obj.observed_factors(v).name ...</span>
+0230                     <span class="comment">%         ' uses latent ' ...</span>
+0231                     <span class="comment">%         'factor ' char(ulfk(alpha)) ]);</span>
+0232 
+0233 
+0234                     d1_x = <a href="TFFactor.html" class="code" title="">TFFactor</a>(<span class="string">'name'</span>, <span class="keyword">...</span>
+0235                                     [<span class="string">'D1_Z'</span> num2str(alpha) <span class="string">'_X'</span> num2str(v)], <span class="keyword">...</span>
+0236                                     <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="keyword">...</span>
+0237                                     <span class="string">'dims'</span>, obj.unique_latent_factors(char(ulfk(alpha))).dims);
+0238                     d2_x = <a href="TFFactor.html" class="code" title="">TFFactor</a>(<span class="string">'name'</span>, <span class="keyword">...</span>
+0239                                     [<span class="string">'D2_Z'</span> num2str(alpha) <span class="string">'_X'</span> num2str(v)], <span class="keyword">...</span>
+0240                                     <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="keyword">...</span>
+0241                                     <span class="string">'dims'</span>, obj.unique_latent_factors(char(ulfk(alpha))).dims);
+0242                     d1_x_name = d1_x.get_data_name();
+0243                     d2_x_name = d2_x.get_data_name();
+0244                     eval([ <span class="string">'global '</span> d1_x_name <span class="string">' '</span> <span class="keyword">...</span>
+0245                            d2_x_name]);
+0246 
+0247                     other_factors = [];
+0248                     <span class="comment">%display(['other factors for factor ' char(ulfk(alpha)) ...</span>
+0249                     <span class="comment">%         ' in model ' obj.observed_factors(v).name ...</span>
+0250                     <span class="comment">%        ]);</span>
+0251                     <span class="keyword">for</span> ofi = 1:length(obj.R{v})
+0252                         <span class="keyword">if</span> obj.R{v}(ofi) ~= obj.unique_latent_factors(char(ulfk(alpha)))
+0253                             other_factors = [ other_factors <span class="keyword">...</span>
+0254                                               obj.R{v}(ofi) ];
+0255                             <span class="comment">%display(obj.R{v}(ofi).name);</span>
+0256                         <span class="keyword">end</span>
+0257                     <span class="keyword">end</span>
+0258 
+0259                     tmpmodel = <a href="PLTFModel.html" class="code" title="">PLTFModel</a>(<span class="string">'name'</span>,  <span class="keyword">...</span>
+0260                                          [<span class="string">'tmpmodel_Z'</span> num2str(alpha) <span class="string">'_X'</span> num2str(v)], <span class="keyword">...</span>
+0261                                          <span class="string">'factors'</span> ,  <span class="keyword">...</span><span class="comment"> </span>
+0262                                          [hat_X_v(v) other_factors d1_x], <span class="keyword">...</span>
+0263                                          <span class="string">'dims'</span>, obj.dims );
+0264                     tmpmodel.factors(1).isLatent = 1;
+0265                     tmpmodel.factors(1).isObserved = 0;
+0266                     tmpmodel.contract_all(<span class="string">'standard'</span>, operation_type, <span class="keyword">...</span>
+0267                                           d1_x_name);
+0268                     eval([ d1_name <span class="string">' = '</span> d1_name <span class="string">' + '</span> d1_x_name <span class="string">';'</span>]);
+0269 
+0270 
+0271                     tmpmodel = <a href="PLTFModel.html" class="code" title="">PLTFModel</a>(<span class="string">'name'</span>,  <span class="keyword">...</span>
+0272                                          [<span class="string">'tmpmodel_Z'</span> num2str(alpha) <span class="string">'_X'</span> num2str(v)], <span class="keyword">...</span>
+0273                                          <span class="string">'factors'</span> ,  <span class="keyword">...</span><span class="comment"> </span>
+0274                                          [masks(v) other_factors d2_x], <span class="keyword">...</span>
+0275                                          <span class="string">'dims'</span>, obj.dims );
+0276                     tmpmodel.factors(1).isLatent = 1;
+0277                     tmpmodel.factors(1).isObserved = 0;
+0278                     tmpmodel.contract_all(<span class="string">'standard'</span>, operation_type, <span class="keyword">...</span>
+0279                                           d2_x_name);
+0280                     eval([ d2_name <span class="string">' = '</span> d2_name <span class="string">' + '</span> d2_x_name <span class="string">';'</span>]);
+0281                 <span class="keyword">end</span>
+0282 
+0283                 <span class="comment">% update Z_alpha with d1/d2</span>
+0284                 eval([ Z_name <span class="string">' = '</span> Z_name <span class="string">' .* '</span> d1_name <span class="string">' ./ '</span> <span class="keyword">...</span>
+0285                        d2_name <span class="string">';'</span> ]);
+0286             <span class="keyword">end</span>
+0287 
+0288 
+0289 
+0290 
+0291 
+0292             cost=0;
+0293             
+0294             <span class="keyword">if</span> strcmp( operation_type, <span class="string">'compute'</span> )
+0295                 <span class="comment">% calculate KL divergence</span>
+0296                 kl = zeros(1, length(obj.observed_factors));
+0297                 <span class="keyword">for</span> v = 1:length(obj.observed_factors)
+0298                     hat_X_data_name = hat_X_v(v).get_data_name();
+0299                     <span class="comment">% restore hat_X_data</span>
+0300                     eval( [ hat_X_data_name <span class="string">'  =  '</span> <span class="keyword">...</span>
+0301                             obj.observed_factors(v).get_data_name() <span class="keyword">...</span>
+0302                             <span class="string">' .* '</span> <span class="keyword">...</span>
+0303                             hat_X_data_name <span class="string">' ;'</span> ] );
+0304 
+0305                     X_name = obj.observed_factors(v).get_data_name();
+0306                     
+0307                     eval ( [ <span class="string">'t = ('</span> hat_X_data_name <span class="string">' .* '</span> X_name <span class="string">') .* '</span> <span class="keyword">...</span>
+0308                              <span class="string">' (log( ('</span> hat_X_data_name <span class="string">' .* '</span> X_name <span class="string">') ) - '</span> <span class="keyword">...</span>
+0309                              <span class="string">'log('</span> X_name <span class="keyword">...</span>
+0310                              <span class="string">') ) - ( '</span> hat_X_data_name <span class="string">' .* '</span> X_name <span class="string">')'</span> <span class="keyword">...</span>
+0311                              <span class="string">'+ '</span> X_name <span class="keyword">...</span>
+0312                              <span class="string">';'</span> ]);
+0313                     <span class="keyword">for</span> di = 1:length(obj.observed_factors(v).dims)
+0314                         t = sum(t);
+0315                     <span class="keyword">end</span>
+0316                     kl(v) = t;
+0317                 <span class="keyword">end</span>
+0318             <span class="keyword">else</span>
+0319                 kl = 0;
+0320             <span class="keyword">end</span>
+0321 
+0322         <span class="keyword">end</span>
+0323 
+0324 
+0325 
+0326 
+0327 
+0328         <a name="_sub3" href="#_subfunctions" class="code">function [found] = got_factor(obj, v, alpha)</a>
+0329         <span class="comment">% does model v have latent factor alpha</span>
+0330             <span class="keyword">if</span> ~isa(alpha, <span class="string">'TFFactor'</span>)
+0331                 throw(MException(<span class="string">'GCTFModel:GotFactor'</span>, <span class="keyword">...</span>
+0332                                  <span class="string">'alpha must be a TFFactor instance'</span>));
+0333             <span class="keyword">end</span>
+0334 
+0335             found = false;
+0336             <span class="keyword">for</span> mi = 1:length(obj.R{v})
+0337                 <span class="keyword">if</span> obj.R{v}(mi) == alpha
+0338                     found = true;
+0339                     <span class="keyword">return</span>
+0340                 <span class="keyword">end</span>
+0341             <span class="keyword">end</span>
+0342         <span class="keyword">end</span>
+0343 
+0344 
+0345 
+0346 
+0347 
+0348 
+0349 
+0350 
+0351 
+0352 
+0353 
+0354         <a name="_sub4" href="#_subfunctions" class="code">function [size] = get_element_size(obj)</a>
+0355         <span class="comment">% returns number of elements for this model</span>
+0356             size = 0;
+0357             <span class="keyword">for</span> ofi = 1:length(obj.observed_factors)
+0358                 size = size + <span class="keyword">...</span>
+0359                        obj.observed_factors(ofi).get_element_size();
+0360             <span class="keyword">end</span>
+0361 
+0362             keys = obj.unique_latent_factors.keys();
+0363             <span class="keyword">for</span> ufi = 1:length(keys)
+0364                 size = size + <span class="keyword">...</span>
+0365                        obj.unique_latent_factors(keys{ufi}) <span class="keyword">...</span>
+0366                        .get_element_size();
+0367             <span class="keyword">end</span>
+0368         <span class="keyword">end</span>
+0369 
+0370         <a name="_sub5" href="#_subfunctions" class="code">function [name] = get_factor_data_name(obj, factor)</a>
+0371         <span class="comment">% returns global data name of the factor</span>
+0372         <span class="comment">%</span>
+0373         <span class="comment">% To preserve model elements' data, their naming structure</span>
+0374         <span class="comment">% is different than temporary factors. Model data elements</span>
+0375         <span class="comment">% use TFFactor.get_data_name whereas temporary elements use</span>
+0376         <span class="comment">% PLTFModel.get_coded_factor_name. This it is possible to</span>
+0377         <span class="comment">% re-use memory structures with same dimensions</span>
+0378             <span class="keyword">if</span> factor.isTemp
+0379                 name = obj.get_coded_factor_name(factor);
+0380             <span class="keyword">else</span>
+0381                 <span class="comment">% assume we have model element</span>
+0382                 name = factor.get_data_name();
+0383             <span class="keyword">end</span>
+0384         <span class="keyword">end</span>
+0385 
+0386         <a name="_sub6" href="#_subfunctions" class="code">function [code_name] = get_coded_factor_name(obj, index)</a>
+0387         <span class="comment">% returns coded name of the factor at index, index must be</span>
+0388         <span class="comment">% a TFFactor object</span>
+0389         <span class="comment">% internally for detecting data using same dimensions</span>
+0390         <span class="comment">% used with temporary factors in order to re-use same</span>
+0391         <span class="comment">% dimension data structures</span>
+0392 
+0393             dims = index.dims;
+0394 
+0395             code_name = [<span class="string">'factor_'</span> <span class="keyword">...</span>
+0396                 char(obj.order_dims(TFDimensionList2cell(dims)))'];
+0397         <span class="keyword">end</span>
+0398 
+0399 <span class="comment">%        function [inds] = latent_factor_indices(obj)</span>
+0400 <span class="comment">%        % returns a matrix of latent factor indices</span>
+0401 <span class="comment">%        % column 1 -&gt; observed factor index</span>
+0402 <span class="comment">%        % column 2 -&gt; factor index</span>
+0403 <span class="comment">%            inds = [];</span>
+0404 <span class="comment">%            for ofi = 1:length(obj.observed_factors)</span>
+0405 <span class="comment">%                ind = [];</span>
+0406 <span class="comment">%                for offi = 1:length(obj.R{ofi})</span>
+0407 <span class="comment">%                    if obj.R{ofi}(offi).isLatent</span>
+0408 <span class="comment">%                        ind = [ ofi offi ];</span>
+0409 <span class="comment">%                    end</span>
+0410 <span class="comment">%                end</span>
+0411 <span class="comment">%                if length(ind)</span>
+0412 <span class="comment">%                    inds = [ inds ; [ofi offi] ];</span>
+0413 <span class="comment">%                end</span>
+0414 <span class="comment">%            end</span>
+0415 <span class="comment">%        end</span>
+0416 
+0417 
+0418         <a name="_sub7" href="#_subfunctions" class="code">function [] = rand_init_latent_factors(obj, type, imax)</a>
+0419 
+0420             <span class="keyword">if</span> ~strcmp(type, <span class="string">'all'</span>) &amp;&amp; ~strcmp(type, <span class="string">'nonClamped'</span>)
+0421                 throw(MException(<span class="string">'PLTFModel:WrongInitType'</span>, <span class="keyword">...</span>
+0422                                  [<span class="string">'Supported init type values: all, '</span> <span class="keyword">...</span>
+0423                                   <span class="string">'nonClamped'</span>]));
+0424             <span class="keyword">end</span>
+0425 
+0426             ulfk = obj.unique_latent_factors.keys();
+0427             <span class="keyword">for</span> ki = 1:length(ulfk)
+0428 
+0429                 <span class="keyword">if</span> strcmp(type, <span class="string">'all'</span>) || <span class="keyword">...</span>
+0430                         ( strcmp(type, <span class="string">'nonClamped'</span>) &amp;&amp; <span class="keyword">...</span>
+0431                           obj.unique_latent_factors(ulkf(ki)).isInput == 0 )
+0432 
+0433                     data_name = [obj.get_factor_data_name( <span class="keyword">...</span>
+0434                         obj.unique_latent_factors(char(ulfk(ki))) ) ];
+0435 
+0436                     factor = obj.unique_latent_factors(char(ulfk(ki)));
+0437                     <span class="keyword">if</span> nargin==2
+0438                         factor.rand_init(obj.dims, 100, data_name);
+0439                     <span class="keyword">else</span>
+0440                         factor.rand_init(obj.dims, imax, data_name);
+0441                     <span class="keyword">end</span>
+0442 
+0443                 <span class="keyword">end</span>
+0444             <span class="keyword">end</span>
+0445 
+0446         <span class="keyword">end</span>
+0447 
+0448 
+0449 
+0450     <span class="keyword">end</span>
+0451 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Thu 18-Oct-2012 00:58:26 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
 </body>
 </html>

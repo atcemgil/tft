@@ -1413,18 +1413,18 @@ classdef PLTFModel
                                   'nonClamped']));
             end
 
-            for fi=1:length(obj.latent_factor_indices)
-
+            lfi = obj.latent_factor_indices;
+            for fi=1:length(lfi)
                 if strcmp(type, 'all') || ...
                         ( strcmp(type, 'nonClamped') && ...
-                          obj.factors(fi).isInput == 0 )
+                          obj.factors(lfi(fi)).isInput == 0 )
 
-                    data_name = [obj.get_factor_data_name(fi)];
+                    data_name = [obj.get_factor_data_name(lfi(fi))];
                     
                     if nargin==2
-                        obj.factors(fi).rand_init(obj.dims, 100, data_name);
+                        obj.factors(lfi(fi)).rand_init(obj.dims, 100, data_name);
                     else
-                        obj.factors(fi).rand_init(obj.dims, imax, data_name);
+                        obj.factors(lfi(fi)).rand_init(obj.dims, imax, data_name);
                     end
 
                 end

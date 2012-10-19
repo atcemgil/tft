@@ -3,4 +3,6 @@ digraph m2html {
 
   TFDimensionList2cell [URL="TFDimensionList2cell.html"];
   examples [URL="examples.html"];
+  examples_gctf [URL="examples_gctf.html"];
+  global_data_size [URL="global_data_size.html"];
 }
