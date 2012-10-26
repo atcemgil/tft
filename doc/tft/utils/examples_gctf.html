@@ -1,0 +1,97 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of examples_gctf</title>
+  <meta name="keywords" content="examples_gctf">
+  <meta name="description" content="Examples for Tensor Factorization Toolbox">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html &copy; 2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../../m2html.css">
+  <script type="text/javascript">
+    if (top.frames.length == 0) { top.location = "../../index.html"; };
+  </script>
+</head>
+<body>
+<a name="_top"></a>
+<!-- ../menu.html tft --><!-- menu.html utils -->
+<h1>examples_gctf
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="box"><strong>Examples for Tensor Factorization Toolbox</strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="box"><strong>This is a script file. </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="fragment"><pre class="comment"> Examples for Tensor Factorization Toolbox
+ for details see index.html page</pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../../matlabicon.gif)">
+</ul>
+This function is called by:
+<ul style="list-style-image:url(../../matlabicon.gif)">
+</ul>
+<!-- crossreference -->
+
+
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="fragment"><pre>0001 <span class="comment">% Examples for Tensor Factorization Toolbox</span>
+0002 <span class="comment">% for details see index.html page</span>
+0003 
+0004 <span class="comment">% tucker_model</span>
+0005 
+0006 dim_i=TFDimension(<span class="string">'name'</span>, <span class="string">'i'</span>, <span class="string">'cardinality'</span>, 5);
+0007 dim_j=TFDimension(<span class="string">'cardinality'</span>, 6, <span class="string">'name'</span>, <span class="string">'j'</span>);
+0008 dim_k=TFDimension(<span class="string">'cardinality'</span>, 7, <span class="string">'name'</span>, <span class="string">'k'</span>);
+0009 dim_p=TFDimension(<span class="string">'cardinality'</span>, 8, <span class="string">'name'</span>, <span class="string">'p'</span>);
+0010 dim_q=TFDimension(<span class="string">'cardinality'</span>, 9, <span class="string">'name'</span>, <span class="string">'q'</span>);
+0011 dim_r=TFDimension(<span class="string">'cardinality'</span>, 10, <span class="string">'name'</span>, <span class="string">'r'</span>);
+0012 
+0013 A=TFFactor(<span class="string">'name'</span>, <span class="string">'A'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_i dim_p]);
+0014 B=TFFactor(<span class="string">'name'</span>, <span class="string">'B'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_j dim_q]);
+0015 C=TFFactor(<span class="string">'name'</span>, <span class="string">'C'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_k dim_r], <span class="keyword">...</span>
+0016            <span class="string">'isClamped'</span>, true);
+0017 G=TFFactor(<span class="string">'name'</span>, <span class="string">'G'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
+0018            [dim_p, dim_q, dim_r]);
+0019 X=TFFactor(<span class="string">'name'</span>, <span class="string">'X'</span>, <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
+0020            [dim_i, dim_j, dim_k]);
+0021 
+0022 <span class="comment">%tucker_model = PLTFModel('name', 'Tucker3', 'factors', [A B C G X], ...</span>
+0023 <span class="comment">%                       'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);</span>
+0024 
+0025 
+0026 <span class="comment">% parafac model</span>
+0027 
+0028 p_X=TFFactor(<span class="string">'name'</span>, <span class="string">'p_X'</span>, <span class="string">'type'</span>, <span class="string">'observed'</span>, <span class="string">'dims'</span>, <span class="keyword">...</span>
+0029              [dim_i, dim_j, dim_k]);
+0030 
+0031 p_A=TFFactor(<span class="string">'name'</span>, <span class="string">'p_A'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_i dim_r]);
+0032 p_B=TFFactor(<span class="string">'name'</span>, <span class="string">'p_B'</span>, <span class="string">'type'</span>, <span class="string">'latent'</span>, <span class="string">'dims'</span>, [dim_j dim_r]);
+0033 <span class="comment">%p_C=TFFactor('name', 'p_C', 'type', 'latent', 'dims', [dim_k dim_r]);</span>
+0034 
+0035 <span class="comment">%parafac_model = PLTFModel('name', 'Parafac', ...</span>
+0036 <span class="comment">%                        'factors', [p_A p_B C p_X], ...</span>
+0037 <span class="comment">%                        'dims', [dim_i dim_j dim_k dim_r]);</span>
+0038 
+0039 
+0040 tucker_parafac_model = GCTFModel( <span class="keyword">...</span>
+0041     <span class="string">'name'</span>, <span class="string">'tucker3_parafac'</span>, <span class="keyword">...</span>
+0042     <span class="string">'dims'</span>, [dim_i dim_j dim_k dim_p dim_q dim_r] , <span class="keyword">...</span>
+0043     <span class="string">'observed_factors'</span>, [ X p_X ], <span class="keyword">...</span>
+0044     <span class="string">'R'</span>, { [A B C G], [p_A p_B C] } );
+0045 
+0046 tucker_parafac_model.rand_init_latent_factors(<span class="string">'all'</span>);
+0047 
+0048 X.rand_init(tucker_parafac_model.dims, 100) <span class="comment">% init observation</span>
+0049 p_X.rand_init(tucker_parafac_model.dims, 100) <span class="comment">% init observation</span>
+0050 C.rand_init(tucker_parafac_model.dims, 100) <span class="comment">% init clamped</span></pre></div>
+<hr><address>Generated on Thu 18-Oct-2012 00:58:26 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>

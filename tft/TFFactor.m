@@ -76,12 +76,15 @@ classdef TFFactor
         % returns number of elements for this factor
             if obj.size ~= -1
                 size = obj.size;
+            elseif length(obj.dims) == 0
+                err = MException( ...
+                    ['TFFactor:Dimension list size 0!'] );
+                throw(err);
             else
                 size=1;
                 for d = 1:length(obj.dims)
                     size = size * obj.dims(d).cardinality;
                 end
-                obj.size = size;
             end
         end
 

@@ -1,0 +1,492 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of GTMGraph</title>
+  <meta name="keywords" content="GTMGraph">
+  <meta name="description" content="Represents a graph of PLTFModel objects.">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html &copy; 2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../m2html.css">
+  <script type="text/javascript">
+    if (top.frames.length == 0) { top.location = "../index.html"; };
+  </script>
+</head>
+<body>
+<a name="_top"></a>
+<!-- menu.html tft -->
+<h1>GTMGraph
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>Represents a graph of PLTFModel objects.</strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>This is a script file. </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre class="comment"> Represents a graph of PLTFModel objects. 
+
+   PLTFModel.schedule_dp() function generates trees of PLTFModel
+   objects. GTMGraph object stores generated PLTFModel objects in its
+   node_list array and stores connectivity information in its
+   edges half full binary matrix. Cost of moving along an edge is
+   stored in the optimal_edges matrix.
+
+   See also <a href="PLTFModel.html" class="code" title="">PLTFModel</a></pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="GTMGraph.html" class="code" title="">GTMGraph</a>	Represents a graph of PLTFModel objects.</li><li><a href="PLTFModel.html" class="code" title="">PLTFModel</a>	Represents data required to describe a tensor factorization model</li></ul>
+This function is called by:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="GTMGraph.html" class="code" title="">GTMGraph</a>	Represents a graph of PLTFModel objects.</li><li><a href="PLTFModel.html" class="code" title="">PLTFModel</a>	Represents data required to describe a tensor factorization model</li></ul>
+<!-- crossreference -->
+
+<h2><a name="_subfunctions"></a>SUBFUNCTIONS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="#_sub1" class="code">function obj = GTMGraph()</a></li><li><a href="#_sub2" class="code">function [r] = exists(obj, tfmodel)</a></li><li><a href="#_sub3" class="code">function [obj] = clear_edges(obj)</a></li><li><a href="#_sub4" class="code">function [obj] = increment_edges(obj)</a></li><li><a href="#_sub5" class="code">function [m] = get_min_arriving_cost(obj, node_index)</a></li><li><a href="#_sub6" class="code">function [edge_cost] = check_reuse(obj, parent_node,</a></li><li><a href="#_sub7" class="code">function [obj] = append_node(obj, parent_node, new_node)</a></li><li><a href="#_sub8" class="code">function [obj] = update_node(obj, parent_node, child_node,</a></li><li><a href="#_sub9" class="code">function [str] = get_current_contraction_dims_string(obj,</a></li><li><a href="#_sub10" class="code">function [] = store_reused_temp_factor(obj, ocs_models)</a></li><li><a href="#_sub11" class="code">function [ocs_dims] = optimal_sequence_from_graph(obj)</a></li><li><a href="#_sub12" class="code">function [str] = get_factor_dim_string(obj,</a></li><li><a href="#_sub13" class="code">function [optimal_cost] = get_optimal_path_cost(obj)</a></li><li><a href="#_sub14" class="code">function [str, nid_end] = print_dot(obj, nid_start, subgraph_label)</a></li></ul>
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre>0001 <span class="comment">% Represents a graph of PLTFModel objects.</span>
+0002 <span class="comment">%</span>
+0003 <span class="comment">%   PLTFModel.schedule_dp() function generates trees of PLTFModel</span>
+0004 <span class="comment">%   objects. GTMGraph object stores generated PLTFModel objects in its</span>
+0005 <span class="comment">%   node_list array and stores connectivity information in its</span>
+0006 <span class="comment">%   edges half full binary matrix. Cost of moving along an edge is</span>
+0007 <span class="comment">%   stored in the optimal_edges matrix.</span>
+0008 <span class="comment">%</span>
+0009 <span class="comment">%   See also PLTFModel</span>
+0010 
+0011 classdef <a href="GTMGraph.html" class="code" title="">GTMGraph</a>
+0012 
+0013     properties
+0014         node_list = [<a href="PLTFModel.html" class="code" title="">PLTFModel</a>]; <span class="comment">% list PLTFModel objects</span>
+0015         edges;     <span class="comment">% half full binary matrix of node_list relations</span>
+0016 
+0017         optimal_edges; <span class="comment">% half full minimal cost node_list edges</span>
+0018     <span class="keyword">end</span>
+0019 
+0020     methods
+0021         <a name="_sub0" href="#_subfunctions" class="code">function obj = GTMGraph()</a>
+0022             obj.node_list = [];
+0023         <span class="keyword">end</span>
+0024 
+0025 <span class="comment">%        function [r] = eq(a,b)</span>
+0026 <span class="comment">%            r = false;</span>
+0027 <span class="comment">%            if length(a.node_list) == length(b.node_list)</span>
+0028 <span class="comment">%                for i_a = 1:length(a.node_list)</span>
+0029 <span class="comment">%                    found = false;</span>
+0030 <span class="comment">%                    for i_b = 1:length(b.node_list)</span>
+0031 <span class="comment">%                        if a.node_list(a_i) == b.node_list(b_i)</span>
+0032 <span class="comment">%                            found = true;</span>
+0033 <span class="comment">%                            break</span>
+0034 <span class="comment">%                        end</span>
+0035 <span class="comment">%                    end</span>
+0036 <span class="comment">%</span>
+0037 <span class="comment">%                    if ~found</span>
+0038 <span class="comment">%                        return</span>
+0039 <span class="comment">%                    end</span>
+0040 <span class="comment">%                end</span>
+0041 <span class="comment">%</span>
+0042 <span class="comment">%                r = true;</span>
+0043 <span class="comment">%            end</span>
+0044 <span class="comment">%        end</span>
+0045 
+0046 
+0047         <a name="_sub1" href="#_subfunctions" class="code">function [r] = exists(obj, tfmodel)</a>
+0048         <span class="comment">% returns index of given node</span>
+0049         <span class="comment">% returns 0 if node does not exist</span>
+0050             r = 0;
+0051             <span class="keyword">for</span> nli = 1:length(obj.node_list)
+0052                 <span class="keyword">if</span> obj.node_list(nli) == tfmodel
+0053                     r = nli;
+0054                     <span class="keyword">return</span>
+0055                 <span class="keyword">end</span>
+0056             <span class="keyword">end</span>
+0057         <span class="keyword">end</span>
+0058 
+0059 
+0060         <a name="_sub2" href="#_subfunctions" class="code">function [obj] = clear_edges(obj)</a>
+0061             obj.edges = zeros(length(obj.node_list));
+0062             obj.optimal_edges = zeros(length(obj.node_list));
+0063         <span class="keyword">end</span>
+0064 
+0065         <a name="_sub3" href="#_subfunctions" class="code">function [obj] = increment_edges(obj)</a>
+0066         <span class="comment">% extend relationship matrices</span>
+0067             obj.edges = [ obj.edges ; <span class="keyword">...</span>
+0068                           zeros(1,size(obj.edges, 2))];
+0069             obj.edges = [ obj.edges <span class="keyword">...</span>
+0070                           zeros(length(obj.node_list),1)];
+0071 
+0072             obj.optimal_edges = [ obj.optimal_edges ; <span class="keyword">...</span>
+0073                                 zeros(1, <span class="keyword">...</span>
+0074                                       size(obj.optimal_edges,2 ))];
+0075             obj.optimal_edges = [ obj.optimal_edges <span class="keyword">...</span>
+0076                                 zeros(length(obj.node_list),1)];
+0077         <span class="keyword">end</span>
+0078 
+0079 
+0080         <a name="_sub4" href="#_subfunctions" class="code">function [m] = get_min_arriving_cost(obj, node_index)</a>
+0081             A = obj.optimal_edges(:, node_index);
+0082             A(~A) = inf;
+0083             m = min(A);
+0084             <span class="keyword">if</span> isinf(m)
+0085                 m = 0;
+0086             <span class="keyword">end</span>
+0087         <span class="keyword">end</span>
+0088 
+0089 
+0090         <a name="_sub5" href="#_subfunctions" class="code">function [edge_cost] = check_reuse(obj, parent_node, </a><span class="keyword">...</span>
+0091                                            child_node)
+0092 
+0093             edge_cost = obj.get_min_arriving_cost(obj.exists(parent_node)) + <span class="keyword">...</span>
+0094                 child_node.cost;
+0095 
+0096             <span class="comment">% if new node was on optimal path in any one of</span>
+0097             <span class="comment">% previous GTM operations it has zero memory</span>
+0098             <span class="comment">% cost</span>
+0099             <span class="keyword">global</span> reused_temp_factor_names
+0100 
+0101             <span class="comment">% for each temporary factor of child_node</span>
+0102             <span class="keyword">for</span> cnfi = 1:length(child_node.factors)
+0103                 <span class="keyword">if</span> child_node.factors(cnfi).isTemp
+0104                     <span class="keyword">for</span> ri = 1:length(reused_temp_factor_names)
+0105                         coded_name = child_node.get_coded_factor_name(cnfi);
+0106 
+0107                         <span class="comment">%['coded_name ' coded_name' ' reused ri ' num2str(ri) ...</span>
+0108                         <span class="comment">% ' : ' char(reused_temp_factor_names{ri}') ]</span>
+0109                         <span class="keyword">if</span> strcmp(coded_name, <span class="keyword">...</span>
+0110                                   char(reused_temp_factor_names{ri}))
+0111                             edge_cost = edge_cost - child_node.factors(cnfi).get_element_size();
+0112                         <span class="keyword">end</span>
+0113                     <span class="keyword">end</span>
+0114                 <span class="keyword">end</span>
+0115             <span class="keyword">end</span>
+0116 
+0117             <span class="comment">% 0 is reserved for 'no edge'</span>
+0118             <span class="keyword">if</span> edge_cost == 0
+0119                 edge_cost = 0.000001;
+0120             <span class="keyword">end</span>
+0121         <span class="keyword">end</span>
+0122 
+0123 
+0124         <a name="_sub6" href="#_subfunctions" class="code">function [obj] = append_node(obj, parent_node, new_node)</a>
+0125         <span class="comment">% adds a new node to the graph object</span>
+0126             obj.node_list = [obj.node_list new_node];
+0127 
+0128             obj = obj.increment_edges();
+0129 
+0130             <span class="comment">% update relation matrices</span>
+0131             parent_index = obj.exists(parent_node);
+0132             <span class="keyword">if</span> ~parent_index
+0133                 display(<span class="string">'ERROR: parent is not in the node_list'</span>)
+0134             <span class="keyword">end</span>
+0135             obj.edges(parent_index, end) = 1;
+0136 
+0137 
+0138             obj.optimal_edges(parent_index, end) = <span class="keyword">...</span>
+0139                 obj.check_reuse(parent_node, new_node);
+0140             <span class="comment">%obj.optimal_edges(parent_index, end) = ...</span>
+0141             <span class="comment">%    obj.get_min_arriving_cost(parent_index) + ...</span>
+0142             <span class="comment">%    new_node.cost;</span>
+0143 
+0144 
+0145             <span class="comment">%['append node ' obj.node_list(parent_index).name ' -&gt; ' obj.node_list(length(obj.optimal_edges)).name ' ' ...</span>
+0146             <span class="comment">% num2str(obj.get_min_arriving_cost(parent_index)) ' + ' ...</span>
+0147             <span class="comment">% num2str(new_node.cost) ' = ' ...</span>
+0148             <span class="comment">% num2str(obj.optimal_edges(parent_index, end))]</span>
+0149 
+0150         <span class="keyword">end</span>
+0151 
+0152 
+0153         <a name="_sub7" href="#_subfunctions" class="code">function [obj] = update_node(obj, parent_node, child_node, </a><span class="keyword">...</span>
+0154                                      nnidx)
+0155         <span class="comment">% updates relation of parent_node and child_node</span>
+0156 
+0157             pidx = obj.exists(parent_node);
+0158 
+0159             <span class="comment">% create link between parent and child</span>
+0160             obj.edges(pidx, nnidx) = 1;
+0161 
+0162             obj.optimal_edges(pidx, nnidx) = <span class="keyword">...</span>
+0163                 obj.check_reuse( obj.node_list(pidx), child_node);
+0164 
+0165             <span class="comment">%obj.optimal_edges(pidx, nnidx) = ...</span>
+0166             <span class="comment">%    obj.get_min_arriving_cost(pidx) + child_node.cost;</span>
+0167 
+0168             <span class="comment">%obj.get_min_arriving_cost(pidx) + ...</span>
+0169             <span class="comment">%child_node.cost;</span>
+0170 
+0171             <span class="comment">%['update node ' obj.node_list(pidx).name ' -&gt; ' obj.node_list(nnidx).name ' ' ...</span>
+0172             <span class="comment">% num2str(obj.get_min_arriving_cost(pidx)) ' + ' ...</span>
+0173             <span class="comment">% num2str(child_node.cost) ' = ' num2str(obj.optimal_edges(pidx, nnidx))]</span>
+0174         <span class="keyword">end</span>
+0175 
+0176 
+0177         <a name="_sub8" href="#_subfunctions" class="code">function [str] = get_current_contraction_dims_string(obj, </a><span class="keyword">...</span>
+0178                                                              node_list_index)
+0179             str = <span class="string">''</span>;
+0180             cont_dims = <span class="keyword">...</span>
+0181                 obj.node_list(node_list_index) <span class="keyword">...</span>
+0182                 .get_current_contraction_dims;
+0183 
+0184             <span class="keyword">for</span> cdi = 1:length(cont_dims)
+0185                 str = [ str <span class="keyword">...</span>
+0186                         char(cont_dims(cdi)) ];
+0187             <span class="keyword">end</span>
+0188         <span class="keyword">end</span>
+0189 
+0190 
+0191         <a name="_sub9" href="#_subfunctions" class="code">function [] = store_reused_temp_factor(obj, ocs_models)</a>
+0192             <span class="comment">% store temporary variables on optimal path</span>
+0193             <span class="keyword">global</span> reused_temp_factor_names
+0194             <span class="keyword">for</span> i = 1:length(ocs_models)
+0195                 <span class="keyword">for</span> fi = 1:length(ocs_models(i).factors)
+0196                     <span class="keyword">if</span> ocs_models(i).factors(fi).isTemp
+0197                         coded_name = ocs_models(i).get_coded_factor_name(fi);
+0198 
+0199                         <span class="comment">% store if not already inserted</span>
+0200                         found = false;
+0201                         <span class="keyword">for</span> j = 1:length(reused_temp_factor_names)
+0202                             <span class="keyword">if</span> strcmp(char(reused_temp_factor_names{j}), <span class="keyword">...</span>
+0203                                       coded_name)
+0204                                 found = true;
+0205                                 <span class="keyword">break</span>
+0206                             <span class="keyword">end</span>
+0207                         <span class="keyword">end</span>
+0208 
+0209                         <span class="keyword">if</span> ~found
+0210                             reused_temp_factor_names = [ <span class="keyword">...</span>
+0211                                 reused_temp_factor_names 
+0212                                 {coded_name} ];
+0213                         <span class="keyword">end</span>
+0214                     <span class="keyword">end</span>
+0215                 <span class="keyword">end</span>
+0216             <span class="keyword">end</span>
+0217         <span class="keyword">end</span>
+0218 
+0219 
+0220         <a name="_sub10" href="#_subfunctions" class="code">function [ocs_dims] = optimal_sequence_from_graph(obj)</a>
+0221         <span class="comment">% return optimal contraction sequence from a GTMGraph</span>
+0222         <span class="comment">% developed as a part of</span>
+0223         <span class="comment">% PLTFModel.get_optimal_contraction_sequence_dims and then turned</span>
+0224         <span class="comment">% into a helper function for use from other points in the</span>
+0225         <span class="comment">% code</span>
+0226         <span class="comment">% populates reused_temp_factor_names with the temporary</span>
+0227         <span class="comment">% factors on the optimal path since optimal path is</span>
+0228         <span class="comment">% detected at this point</span>
+0229 
+0230             t = obj.optimal_edges;
+0231             t(t==0) = Inf;
+0232             ocs_models = [];
+0233             i = length(t);
+0234             <span class="keyword">while</span> i ~= 1
+0235                 ocs_models = [ ocs_models obj.node_list(i) ];
+0236                 m = min(t(:, i)); <span class="comment">% if same value appears twice</span>
+0237                                   <span class="comment">% pick first</span>
+0238                 i = find( t(:,i) == m(1) );
+0239                 i = i(1); <span class="comment">% pick first</span>
+0240             <span class="keyword">end</span>
+0241 
+0242             ocs_models = [ ocs_models obj.node_list(i) ];
+0243 
+0244             ocs_dims = [];
+0245             <span class="keyword">for</span> i = (length(ocs_models)):-1:2
+0246             <span class="comment">%for i = 1:(length(ocs_models)-1)</span>
+0247                 ocs_dims = [ ocs_dims <span class="keyword">...</span>
+0248                              { setdiff( <span class="keyword">...</span>
+0249                                  ocs_models(i)<span class="keyword">...</span>
+0250                                  .get_current_contraction_dims, <span class="keyword">...</span>
+0251                                  ocs_models(i-1) <span class="keyword">...</span>
+0252                                  .get_current_contraction_dims) }; <span class="keyword">...</span>
+0253                            ];
+0254             <span class="keyword">end</span>
+0255 
+0256             obj.store_reused_temp_factor(ocs_models);
+0257         <span class="keyword">end</span>
+0258 
+0259 
+0260         <a name="_sub11" href="#_subfunctions" class="code">function [str] = get_factor_dim_string(obj, </a><span class="keyword">...</span>
+0261                                                node_list_index)
+0262             str = <span class="string">''</span>;
+0263             first=1;
+0264             <span class="keyword">for</span> find = 1: <span class="keyword">...</span>
+0265                        length(obj.node_list(node_list_index) <span class="keyword">...</span>
+0266                               .factors)
+0267                 <span class="keyword">if</span> obj.node_list(node_list_index).factors(find).isLatent
+0268                     <span class="keyword">if</span> first
+0269                         first=0;
+0270                     <span class="keyword">else</span>
+0271                         str = [ str <span class="string">', '</span> ];
+0272                     <span class="keyword">end</span>
+0273 
+0274                     <span class="keyword">if</span> node_list_index == 1 || node_list_index == length(obj.node_list)
+0275                         str = [ str <span class="string">'&lt;FONT COLOR=&quot;green&quot;'</span> ];
+0276                     <span class="keyword">else</span>
+0277 
+0278                         <span class="keyword">if</span> obj.node_list(node_list_index)<span class="keyword">...</span>
+0279                                 .factors(find).isReUsed
+0280                             str = [ str <span class="string">'&lt;U&gt;'</span> ];
+0281                         <span class="keyword">end</span>
+0282 
+0283                         str = [ str <span class="string">'&lt;FONT '</span> ];
+0284                         <span class="keyword">if</span> obj.node_list(node_list_index)<span class="keyword">...</span>
+0285                                 .factors(find).isTemp
+0286                             str = [ str <span class="string">'COLOR=&quot;red&quot;'</span> ];
+0287                         <span class="keyword">end</span>
+0288                     <span class="keyword">end</span>
+0289                     str = [ str <span class="string">'&gt;'</span> ];
+0290 
+0291 
+0292                     nstr = {};
+0293                     <span class="keyword">for</span> dind = length(<span class="keyword">...</span>
+0294                         obj.node_list(node_list_index).factors(find) <span class="keyword">...</span>
+0295                         .dims):-1:1
+0296                         nstr = [ nstr <span class="keyword">...</span>
+0297                                  {char(obj.node_list(node_list_index) <span class="keyword">...</span>
+0298                                       .factors(find).dims(dind).name)} ];
+0299                     <span class="keyword">end</span>
+0300 
+0301                     nstr = char(obj.node_list(1).order_dims(nstr))';
+0302 
+0303                     str = [ str nstr <span class="string">'&lt;/FONT&gt;'</span> ];
+0304                     <span class="keyword">if</span> obj.node_list(node_list_index)<span class="keyword">...</span>
+0305                             .factors(find).isReUsed &amp;&amp; <span class="keyword">...</span>
+0306                             node_list_index ~= 1 <span class="keyword">...</span>
+0307                         str = [ str <span class="string">'&lt;/U&gt;'</span> ];
+0308                     <span class="keyword">end</span>
+0309 
+0310                 <span class="keyword">end</span>
+0311             <span class="keyword">end</span>
+0312         <span class="keyword">end</span>
+0313 
+0314         <a name="_sub12" href="#_subfunctions" class="code">function [optimal_cost] = get_optimal_path_cost(obj)</a>
+0315             optimal_cost = 0;
+0316             ocs_dims = obj.optimal_sequence_from_graph();
+0317             <span class="comment">% reverse ocs_dims for display</span>
+0318             <span class="comment">%ocs_dims = fliplr(ocs_dims);</span>
+0319             k = 1;
+0320             next_optimal=0;
+0321             <span class="keyword">for</span> i = 1:length(obj.edges)
+0322                 <span class="keyword">for</span> j = 1:i
+0323                     <span class="keyword">if</span> obj.edges(j,i)
+0324 
+0325                         lbl = setdiff(obj <span class="keyword">...</span>
+0326                                       .get_current_contraction_dims_string(j), <span class="keyword">...</span>
+0327                                       obj <span class="keyword">...</span>
+0328                                       .get_current_contraction_dims_string(i));
+0329 
+0330                         <span class="keyword">if</span> k &lt;= length(ocs_dims) &amp;&amp; <span class="keyword">...</span>
+0331                                 strcmp(lbl, char(ocs_dims{k})) &amp;&amp; <span class="keyword">...</span>
+0332                                 (next_optimal == 0 || <span class="keyword">...</span>
+0333                                  next_optimal == j)
+0334                             k = k+1;
+0335                             next_optimal = i;
+0336                             c = obj.optimal_edges(j,i);
+0337                             <span class="keyword">if</span> c &gt; 0.1
+0338                                 optimal_cost =  c;
+0339                             <span class="keyword">end</span>
+0340                         <span class="keyword">end</span>
+0341                     <span class="keyword">end</span>
+0342                 <span class="keyword">end</span>
+0343             <span class="keyword">end</span>
+0344         <span class="keyword">end</span>
+0345 
+0346 
+0347         <a name="_sub13" href="#_subfunctions" class="code">function [str, nid_end] = print_dot(obj, nid_start, subgraph_label)</a>
+0348         <span class="comment">% nid_start: start from number nid, used when multiple GTMGraph objects</span>
+0349         <span class="comment">% are plotted in a single graph</span>
+0350         <span class="comment">% subgraph_label: can be used to label subgraphs</span>
+0351 
+0352             <span class="keyword">if</span> nargin == 1
+0353                 nid_start = 0;
+0354 
+0355                 <span class="comment">% put header only if drawing single graph</span>
+0356                 str = [ <span class="string">'digraph structs{'</span> char(10) <span class="keyword">...</span>
+0357                         <span class="string">'rankdir=LR;'</span> char(10) <span class="keyword">...</span>
+0358                         <span class="string">'node [shape=plaintext];'</span> char(10) <span class="keyword">...</span>
+0359                         <span class="string">'splines=false; '</span> char(10)];
+0360             <span class="keyword">else</span>
+0361                 str = [ <span class="string">'subgraph cluster_'</span> num2str(nid_start) <span class="string">' {'</span> <span class="keyword">...</span>
+0362                       ];
+0363                 <span class="keyword">if</span> nargin == 3 
+0364                     str = [str char(10) <span class="string">'label = &quot;'</span> <span class="keyword">...</span>
+0365                            char(subgraph_label) <span class="string">'&quot;'</span> ];
+0366                 <span class="keyword">end</span>
+0367             <span class="keyword">end</span>
+0368 
+0369 
+0370             <span class="keyword">for</span> nid = 1:length(obj.node_list)
+0371                 top = obj.get_current_contraction_dims_string(nid);
+0372                 <span class="keyword">if</span> ~length(top)
+0373                     top = <span class="string">'&amp;empty;'</span>;
+0374                 <span class="keyword">end</span>
+0375 
+0376                 str = [ str <span class="string">'struct'</span> num2str(nid+nid_start) <span class="string">' [label=&lt; &lt;TABLE FIXEDSIZE=&quot;FALSE&quot; CELLBORDER=&quot;0&quot; STYLE=&quot;ROUNDED&quot;&gt;&lt;TR&gt;&lt;TD&gt;'</span> <span class="keyword">...</span>
+0377                         top <span class="keyword">...</span>
+0378                         char(10) <span class="string">'&lt;/TD&gt;&lt;/TR&gt; &lt;HR/&gt; &lt;TR&gt;&lt;TD FIXEDSIZE=&quot;FALSE&quot;&gt;'</span> <span class="keyword">...</span>
+0379                         obj.get_factor_dim_string(nid) <span class="string">'&lt;/TD&gt;&lt;/TR&gt; &lt;TR&gt;&lt;TD FIXEDSIZE=&quot;FALSE&quot;&gt;&lt;/TD&gt;&lt;/TR&gt;&lt;/TABLE&gt; &gt;];'</span> <span class="keyword">...</span>
+0380                         char(10) 
+0381                       ];
+0382             <span class="keyword">end</span>
+0383 
+0384             ocs_dims = obj.optimal_sequence_from_graph();
+0385             <span class="comment">% reverse ocs_dims for display</span>
+0386             <span class="comment">%ocs_dims = fliplr(ocs_dims);</span>
+0387             k = 1;
+0388             next_optimal=0;
+0389             <span class="keyword">for</span> i = 1:length(obj.edges)
+0390                 <span class="keyword">for</span> j = 1:i
+0391                     <span class="keyword">if</span> obj.edges(j,i)
+0392 
+0393                         lbl = setdiff(obj <span class="keyword">...</span>
+0394                                       .get_current_contraction_dims_string(j), <span class="keyword">...</span>
+0395                                       obj <span class="keyword">...</span>
+0396                                       .get_current_contraction_dims_string(i));
+0397 
+0398                         <span class="keyword">if</span> k &lt;= length(ocs_dims) &amp;&amp; <span class="keyword">...</span>
+0399                                 strcmp(lbl, char(ocs_dims{k})) &amp;&amp; <span class="keyword">...</span>
+0400                                 (next_optimal == 0 || <span class="keyword">...</span>
+0401                                  next_optimal == j)
+0402                             lbl_color = <span class="string">'blue'</span>;
+0403                             style = <span class="string">'dashed'</span>;
+0404                             k = k+1;
+0405                             next_optimal = i;
+0406                         <span class="keyword">else</span>
+0407                             lbl_color = <span class="string">'black'</span>;
+0408                             style = <span class="string">''</span>;
+0409                         <span class="keyword">end</span>
+0410 
+0411                         <span class="comment">% display 10^-6 as 0</span>
+0412                         cost = obj.optimal_edges(j,i);
+0413                         <span class="keyword">if</span> cost &lt; 0.1
+0414                             cost = 0;
+0415                         <span class="keyword">end</span>
+0416 
+0417                         str = [ str <span class="keyword">...</span>
+0418                                 <span class="string">'struct'</span> num2str(j + nid_start) <span class="string">' -&gt;'</span> <span class="keyword">...</span>
+0419                                 <span class="string">'struct'</span> num2str(i + nid_start) <span class="string">' '</span> <span class="keyword">...</span>
+0420                                 <span class="string">'[ label=&quot;'</span> lbl <span class="keyword">...</span>
+0421                                 <span class="string">'('</span> num2str(cost)  <span class="keyword">...</span>
+0422                                 <span class="string">')&quot;, color = '</span> lbl_color <span class="keyword">...</span>
+0423                                 <span class="string">', style = &quot;'</span> style <span class="string">'&quot; ];'</span> char(10) ];
+0424 
+0425                     <span class="keyword">end</span>
+0426                 <span class="keyword">end</span>
+0427             <span class="keyword">end</span>
+0428 
+0429 
+0430             str = [ str char(10) <span class="string">'}'</span> ];
+0431             nid_end = nid_start + nid;
+0432         <span class="keyword">end</span>
+0433 
+0434 
+0435     <span class="keyword">end</span>
+0436 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Thu 18-Oct-2012 00:58:26 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" target="_parent">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>
