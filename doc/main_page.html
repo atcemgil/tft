@@ -11,7 +11,7 @@ Matlab Toolbox implementing Probabilistic Latent Tensor Factorization (PLTF)[1] 
 <li>PLTF data structures are represented with PLTFModel, TFFactor and TFDimension classes.</li>
 <li>GCTF data structures are represented with GCTFModel with help from PLTFModel class.</li>
 <li>PLTF update rules: given a PLTF model, PLTF update rules available using the PLTFModel.pltf(iteration_number) function. The function displays and plots KL divergence (KL( X, hat_X)) values over PLTF iterations.</li>
-<li>GCTF update rules: given a GCTF model, GCTF update rules are performed using GCTFModel.gctf(iteration_number) function. The function displays and plots KL divergence (KL( X_v, hat_X_v)) values over GCTF iterations for all of the models described in GCTF model.</li>
+<li>GCTF update rules: given a GCTF model, GCTF update rules are performed using GCTFModel.gctf(iteration_number, contract_type) function. The function displays and plots KL divergence (KL( X_v, hat_X_v)) values over GCTF iterations for all of the models described in GCTF model.</li>
 <li>Model visualization: models are visualized using PLTFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
 <li>GTM contraction scheduling: PLTFModel.schedule_dp() function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences for a single Generalized Tensor Multiplication (GTM) operation.
 <li>Basic inter-GTM memory re-use: each GTM contraction generates a set of temporary tensors. Minimizing use number of temporary tensors offers memory reduction and performance improvements due to re-used intermediate GTM results. Currently PLTFModel.schedule_dp() function looks up previously generated temporary tensors in optimal contraction paths of previous GTM operations. This is a suboptimal temporary tensor re-use detection method.
@@ -220,7 +220,7 @@ All factors are initialized exactly same as in the PLTF example. Then instead of
 <br><br>
 'observed_factors' parameter includes the observed factor of each sub-model. Coupling matrix R is represented with a simpler notation using a cell of TFFactor lists. Each cell element describes latent factors of the corresponding 'observed_factor'. For instance in the above example first observed factor 'X' is calculated using A, B C and G latent factors as in the Tucker3 model. In this GCTF model Tucker3 model is coupled with Parafac model over C latent factor.
 <br><br>
-For a given model GCTFModel.gctf(iteration_number) function runs GCTF update rules on given models. KL divergence values are reported for each model separately. Boths series of values are plotted on the same graph for convenience not for comparison since comparing KL divergence values is not necessarily meaningful.
+For a given model GCTFModel.gctf(iteration_number, contract_type) function runs GCTF update rules on given models. KL divergence values are reported for each model separately. Boths series of values are plotted on the same graph for convenience not for comparison since comparing KL divergence values is not necessarily meaningful. contract_type may be one of the following 'optimal', 'standard'. In standard mode contraction order is used as it is given in the model. In optimal mode schedule_dp() is run in the first iteration for each GTM operation and stored in a global data structure and re-used in following iterations.
 
 <div align="center" width="75px">
   <img src="img/tucker3_parafac_gctf_100.jpg"/>
@@ -256,6 +256,10 @@ system(['python utils/visualize/fgplot.py "' dn '" "' fn '" "' edges '"'  ]);
 
 
 <h2>Changelog</h2>
+<h3>v0.05 - 01.11.2012</h3>
+<ul>
+  <li>GCTF contract type support added.</li>
+</ul>
 <h3>v0.04 - 18.10.2012</h3>
 <ul>
   <li>Latent factor addressing indices bug fix. Thanks to <a href="http://onur-gungor.com">Onur Güngör</a> for testing.</li>
