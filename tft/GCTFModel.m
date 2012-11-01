@@ -48,9 +48,9 @@ classdef GCTFModel
 
         end
 
-        function [KL] = gctf(obj, iternum, operation_type, ...
+        function [KL] = gctf(obj, iternum, contract_type, operation_type, ...
                            return_dot_data)
-            if nargin == 2
+            if nargin == 3
                 operation_type = 'compute';
                 return_dot_data = 'no';
             end
@@ -89,9 +89,10 @@ classdef GCTFModel
                 for iter = 1:iternum
                     display(['iteration' char(9) num2str(iter)]);
                     [ kls cost ] = obj.gctf_iteration( hat_X_v, ...
-                                                      masks, ...
-                                                      operation_type, ...
-                                                      'no');
+                                                       masks, ...
+                                                       operation_type, ...
+                                                       'no', ...
+                                                       contract_type);
 
                     %, ...
                     %                                 pltf_models);
@@ -110,7 +111,8 @@ classdef GCTFModel
                     obj.gctf_iteration(hat_X_v, ...
                                        masks, ...
                                        operation_type, ...
-                                       'no' );
+                                       'no', ...
+                                       contract_type);
             end
         end
 
@@ -121,8 +123,21 @@ classdef GCTFModel
                                                         hat_X_v, ...
                                                         masks, ...
                                                         operation_type, ...
-                                                        return_dot_data)
+                                                        return_dot_data, ...
+                                                        contract_type)
 
+            global graphs;
+            if length(graphs) == 0
+                create = true;
+            else
+                create = false;
+            end
+
+
+            if create
+                graphs = containers.Map();
+            end
+                
             if nargin < 4
                 return_dot_data = 'no';
             end
@@ -139,7 +154,8 @@ classdef GCTFModel
             end
 
 
-
+            %contract_type = 'standard';
+            %contract_type = 'optimal';
 
 
             % update each Z_alpha
@@ -175,10 +191,21 @@ classdef GCTFModel
                     newmodel = pltf_models(v);
                     % perform contraction
                     % store result in hat_X_data
+                    if strcmp(contract_type, 'optimal')
+                        key = ['alpha' num2str(alpha) '_v' num2str(v)];
+                        % avoid run in following iterations
+                        if create
+                            %['create1 ' key]
+                            graphs(key) = newmodel.schedule_dp();
+                        end
+                        n_graph = graphs(key);
+                    else
+                        n_graph = '';
+                    end
                     [ ~ ] = ...
-                        newmodel.contract_all('standard', ...
+                        newmodel.contract_all(contract_type, ...
                                               operation_type, ...
-                                              hat_X_data_name);
+                                              hat_X_data_name, n_graph);
 
                     % store X / hat_X in hat_X data
                     if strcmp( operation_type, 'compute' )
@@ -263,8 +290,19 @@ classdef GCTFModel
                                          'dims', obj.dims );
                     tmpmodel.factors(1).isLatent = 1;
                     tmpmodel.factors(1).isObserved = 0;
-                    tmpmodel.contract_all('standard', operation_type, ...
-                                          d1_x_name);
+                    if strcmp(contract_type, 'optimal')
+                        key = d1_x_name;
+                        % avoid run in following iterations
+                        if create
+                            %['create2 ' key]
+                            graphs(key) = tmpmodel.schedule_dp();
+                        end
+                        d_graph = graphs(key);
+                    else
+                        d_graph = '';
+                    end
+                    tmpmodel.contract_all(contract_type, operation_type, ...
+                                          d1_x_name, d_graph);
                     eval([ d1_name ' = ' d1_name ' + ' d1_x_name ';']);
 
 
@@ -275,8 +313,19 @@ classdef GCTFModel
                                          'dims', obj.dims );
                     tmpmodel.factors(1).isLatent = 1;
                     tmpmodel.factors(1).isObserved = 0;
-                    tmpmodel.contract_all('standard', operation_type, ...
-                                          d2_x_name);
+                    if strcmp(contract_type, 'optimal')
+                        key = d2_x_name;
+                        % avoid run in following iterations
+                        if create
+                            %['create3 ' key]
+                            graphs(key) = tmpmodel.schedule_dp();
+                        end
+                        d_graph = graphs(key);
+                    else
+                        d_graph = '';
+                    end
+                    tmpmodel.contract_all(contract_type, operation_type, ...
+                                          d2_x_name, d_graph);
                     eval([ d2_name ' = ' d2_name ' + ' d2_x_name ';']);
                 end
 

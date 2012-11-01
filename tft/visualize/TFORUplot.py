@@ -31,12 +31,14 @@ node_list=[]
 for ind, label in enumerate(vertices):
     if ind % 1000 == 0:
         print "vertex index:", ind
+        #time.sleep(1)
     v = G.new_vertex()
     if not '_data' in label:
         G.set_vertex_attribute(v, "label", label  )
     G.set_vertex_attribute(v, "fontsize", "10")
     G.set_vertex_attribute(v, "color", "#00FF00")
     node_list.append(v)
+    #
     #print 'append',label
 
 print len(node_list)

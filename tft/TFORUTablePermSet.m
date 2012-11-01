@@ -30,7 +30,8 @@ classdef TFORUTablePermSet
                 for i = 1:size(obj.contraction_sequence_perms, 1)
                     at = [];
                     model = orig_model;
-                    for j = 1:length(obj.contraction_sequence_perms(i,:))
+                    % -1 for last contraction will output to non-temporary
+                    for j = 1:(length(obj.contraction_sequence_perms(i,:))-1)
                         model = model.contract(obj.contraction_sequence_perms(i, j), ...
                                                'mem_analysis', ...
                                                '');

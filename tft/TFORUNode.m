@@ -6,7 +6,7 @@ classdef TFORUNode
 
     properties
         % model this node represents
-        model = TFModel; 
+        model = PLTFModel; 
 
         % selected order of contraction
         contraction_dims = [TFDimension]
