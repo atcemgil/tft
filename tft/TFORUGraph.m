@@ -74,7 +74,7 @@ classdef TFORUGraph
                 costs{i} = obj.contraction_perms(1).costs{i};
             end
             bestsofar = Inf;
-
+            best_solution = {};
 
             node_num = 0;
             %j=0;
@@ -160,7 +160,8 @@ classdef TFORUGraph
                     if sum( p_new == 0 ) == 0
                         % leaf siblings arrive here at the same iteration so must check
                         if bestsofar > p_new_cost
-                            bestsofar = p_new_cost
+                            bestsofar = p_new_cost;
+                            best_solution = p_new;
                         end
                     elseif p_new_cost < bestsofar
                         %display(['add for inspection ' num2str(p_new_cost)]);
@@ -173,6 +174,7 @@ classdef TFORUGraph
 
             display(['considered ' num2str(node_num) ' number of nodes'])
             bestsofar
+            best_solution
         end
 
         
