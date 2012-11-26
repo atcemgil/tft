@@ -47,11 +47,7 @@ classdef TFORUGraph
             % must update with correct setting for each level
             latent_cumulative_card = 0;
             for li = 1:latent_num
-                if li == 1
-                    latent_cumulative_cards(li+1) = size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
-                else
-                    latent_cumulative_cards(li+1) = latent_cumulative_cards(li) + size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
-                end
+                latent_cumulative_cards(li+1) = latent_cumulative_cards(li) + size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
 
                 latent_cumulative_card = latent_cumulative_card + size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
             end
@@ -81,26 +77,18 @@ classdef TFORUGraph
 
 
             node_num = 0;
+            %j=0;
             while length( S )
+                %j=j+1;
+                %if j == 10
+                %    break;
+                %end
+
                 % remove a subproblem from tail of S
                 p = S{end};
                 S = S(1:end-1);
                 p_cost = costs{end};
                 costs = costs(1:end-1);
-
-                %ind = 1;
-                %p_cost = costs{ind};
-                %while p_cost == -1
-                %    ind = ind+1;
-                %    p_cost = costs{ind};
-                %end
-                %costs{ind} = -1;
-                %p = S{ind};
-                %S{ind} = [];
-                
-                %S = S(2:end);
-                %costs = costs(2:end);
-
 
 
                 % expand p into smaller subproblems
@@ -110,66 +98,50 @@ classdef TFORUGraph
 
                 % add subproblems by incrementing in first zero child GTM
 
-                
-                for i = 1:latent_cumulative_card
-                    node_num = node_num + 1;                    
-                    if mod(node_num, 10000) == 0
-                        display([num2str(node_num) ' ' num2str(length(S)) ' ' num2str(S{end}) ])
-                    end
 
-
-
-                    % break if in Xhat path, i > max_xhat_path_num
-                    if mod(first_zero_child_index, 2) == 1 && i > max_xhat_path_num
-                        break
-                    end
-
-                    % continue: if in latent update path and if one of this latent factor's paths were selected in parent nodes
-                    if mod(first_zero_child_index, 2) == 0
-                        % identify factor of this index
-                        for lfi = 1:latent_num
-                            if i > latent_cumulative_cards(lfi) && ...
-                               i < latent_cumulative_cards(lfi+1)
-                                i_factor_ind = lfi;
-                                break;
-                            end
-                        end
-
-                        prev_even_inds = (first_zero_child_index-2):-2:2;
+                % calculate child_indices
+                if mod(first_zero_child_index, 2) == 1
+                    child_indices = 1:max_xhat_path_num;
+                else
+                    % must not include indices of factors which are selected in previous paths
+                    child_indices = [];
+                    prev_even_inds = (first_zero_child_index-2):-2:2;
+                    % search for each latent factor in previous indices
+                    % if not found insert to child_indices
+                    for lfi = 1:latent_num
                         found = false;
                         for peii = 1:length(prev_even_inds)
-                            % check if path in prev_even_ind belongs to the same latent factor as i
-
                             % identify factor used in this previous path
-                            for lfi = 1:latent_num
-                                if p(prev_even_inds(peii)) > latent_cumulative_cards(lfi) && ...
-                                   p(prev_even_inds(peii)) <= latent_cumulative_cards(lfi+1)
-                                    prev_path_factor_ind = lfi;
-                                    break;
-                                end
-                            end
-
-                            if prev_path_factor_ind == i_factor_ind
+                            if p(prev_even_inds(peii)) > latent_cumulative_cards(lfi) && ...
+                               p(prev_even_inds(peii)) <= latent_cumulative_cards(lfi+1)
                                 found = true;
                                 break;
                             end
                         end
 
-                        if found
-                            % a path belonging to this path's factor was used
-                            continue
+                        if found == false
+                            child_indices = [child_indices ...
+                                             [(latent_cumulative_cards(lfi)+1):latent_cumulative_cards(lfi+1) ] ];
                         end
                     end
+                end
+
+                %display(['child_indices ' num2str(child_indices)]);
 
 
-
+                for i = child_indices
+                    node_num = node_num + 1;
+                    %if mod(node_num, 100000) == 0
+                    %    display([num2str(node_num) ' ' num2str(length(S)) ' ' num2str(S{end}) ])
+                    %end
 
 
                     p_new = p;
                     p_new(first_zero_child_index) = i;
 
 
-                    % cost calculation: looking for max mem along all paths
+                    % cost calculation: looking for minimum mem usage
+                    % mem usage calculation: max mem usage for each operation on complete path
                     if mod(first_zero_child_index, 2) == 0
                         % latent update path
                         p_new_cost = latent_path_costs(i);
@@ -186,23 +158,20 @@ classdef TFORUGraph
 
                     % if p_new is a complete solution update bestsofar
                     if sum( p_new == 0 ) == 0
-                        bestsofar = p_new_cost;
+                        % leaf siblings arrive here at the same iteration so must check
+                        if bestsofar > p_new_cost
+                            bestsofar = p_new_cost
+                        end
                     elseif p_new_cost < bestsofar
+                        %display(['add for inspection ' num2str(p_new_cost)]);
                         % else if p_new is still viable add to S for further inspection
                         S{end+1} = p_new;
                         costs{end+1} = p_new_cost;
-
-                        %if costs{1} == -1
-                        %    S{1} = p_new;
-                        %    costs{1} = p_new_cost;
-                        %else
-                        %    S{end+1} = p_new;
-                        %    costs{end+1} = p_new_cost;
-                        %end
                     end
                 end
             end
 
+            display(['considered ' num2str(node_num) ' number of nodes'])
             bestsofar
         end
 
