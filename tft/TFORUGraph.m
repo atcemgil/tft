@@ -20,165 +20,205 @@ classdef TFORUGraph
         % store edge costs
         edge_costs = [];
 
+
+        contraction_perms;
     end
 
     methods
+
         function obj = TFORUGraph(model_list)
-        % generate a TFORUGraph from a list of TFModel objects
+        % assume first model is Xhat update
+        % rest are latent factor updates
 
-        %        function [] = oldconstructor(model_list)
+            obj.contraction_perms = repmat(TFORUContractionSequence, 1, length(model_list));
+            for mind = length(model_list):-1:1
+                obj.contraction_perms(mind) = TFORUContractionSequence( model_list(mind) );
+            end
 
-            % generate tree
-            parent_temp_count = 0;
-            for mind = 1:length(model_list)
-                % for each model
-                mind
-
-                contraction_perms = ...
-                    perms(model_list(mind) ...
-                          .get_contraction_dims());
-
-                % nodes created with new model
-                new_level = [];
-                for cpind = 1:size(contraction_perms,1)
-                    % for each contraction sequence generate a node
-                    new_level = [ new_level ...
-                                  TFORUNode( model_list(mind), ...
-                                             contraction_perms(cpind,:), ...
-                                             parent_temp_count)];
-                    %length(new_level(1).temp_factors)
-                end
-                new_level_node_num = length(new_level);
+            latent_num = length(obj.contraction_perms)-1;
+            max_level = latent_num*2;
+            max_xhat_path_num = size(obj.contraction_perms(1).contraction_sequence_perms,1);
 
 
-
-
-
-                % connect previous level to new_level groups
-                if mind == 1
-                    % init TFORUGraph
-                    obj.nodes = new_level;
-                    obj.edges = sparse( 1, 1 );
-                    new_level_indices = [0];
+            global latent_cumulative_card latent_cumulative_cards
+            % make an array of number of paths for latent factors
+            latent_cumulative_cards = zeros(1, latent_num+1);
+            % for now every latent update node will expand with latent_cumulative_card
+            % must update with correct setting for each level
+            latent_cumulative_card = 0;
+            for li = 1:latent_num
+                if li == 1
+                    latent_cumulative_cards(li+1) = size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
                 else
-                    % insert new nodes for all parents
-                    new_level_indices = [ (length(obj.nodes)) : ...
-                                        new_level_node_num : ...
-                                        ( length(obj.nodes) + ...
-                                        ( new_level_node_num * ...
-                                          (prev_level_node_num) * ...
-                                          (length(prev_level_indices))-1) ...
-                                          ) ];
-                    obj.nodes = [ obj.nodes ...
-                                  repmat(new_level, 1, ...
-                                         ( prev_level_node_num * ...
-                                           length(prev_level_indices)) ) ...
-                                ];
+                    latent_cumulative_cards(li+1) = latent_cumulative_cards(li) + size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
+                end
 
-                    c = 1;
-                    for plii = 1:length(prev_level_indices)
-                        for pln = 1:(prev_level_node_num)
-                            for nln = 1:new_level_node_num
-                                % connect parent level to new nodes
-                                pind = prev_level_indices(plii) + pln;
-                                cind = new_level_indices( c ) + nln;
-                                obj.edges( pind , cind ) = 1;
-                                %obj.update_child_cost(pind, cind);
+                latent_cumulative_card = latent_cumulative_card + size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
+            end
 
-                                %obj.nodes(cind).update_cost( ...
-                                %    obj.nodes(pind).temp_factors, ...
-                                %    obj.nodes(pind).own_temp_index, ...
-                                %    mind == length(model_list));
+
+            % convinience cost array
+            global latent_path_costs;
+            latent_path_costs = ones(1, latent_cumulative_card) * Inf;
+            i=1;
+            for li = 1:latent_num
+                for ci = 1:size(obj.contraction_perms(li+1).contraction_sequence_perms,1)
+                    latent_path_costs(i) = obj.contraction_perms(li+1).costs{ci};
+                    i = i+1;
+                end
+            end
+
+
+            global S costs;
+            S = {};
+            costs = {};
+            % insert first level elements
+            for i = 1:size(obj.contraction_perms(1).contraction_sequence_perms,1)
+                S{i} = [i zeros(1, max_level-1) ];
+                costs{i} = obj.contraction_perms(1).costs{i};
+            end
+            bestsofar = Inf;
+
+
+            node_num = 0;
+            while length( S )
+                % remove a subproblem from tail of S
+                p = S{end};
+                S = S(1:end-1);
+                p_cost = costs{end};
+                costs = costs(1:end-1);
+
+                %ind = 1;
+                %p_cost = costs{ind};
+                %while p_cost == -1
+                %    ind = ind+1;
+                %    p_cost = costs{ind};
+                %end
+                %costs{ind} = -1;
+                %p = S{ind};
+                %S{ind} = [];
+                
+                %S = S(2:end);
+                %costs = costs(2:end);
+
+
+
+                % expand p into smaller subproblems
+                % generate children of p
+                zero_childs = find( p == 0 );
+                first_zero_child_index = zero_childs(1);
+
+                % add subproblems by incrementing in first zero child GTM
+
+                
+                for i = 1:latent_cumulative_card
+                    node_num = node_num + 1;                    
+                    if mod(node_num, 10000) == 0
+                        display([num2str(node_num) ' ' num2str(length(S)) ' ' num2str(S{end}) ])
+                    end
+
+
+
+                    % break if in Xhat path, i > max_xhat_path_num
+                    if mod(first_zero_child_index, 2) == 1 && i > max_xhat_path_num
+                        break
+                    end
+
+                    % continue: if in latent update path and if one of this latent factor's paths were selected in parent nodes
+                    if mod(first_zero_child_index, 2) == 0
+                        % identify factor of this index
+                        for lfi = 1:latent_num
+                            if i > latent_cumulative_cards(lfi) && ...
+                               i < latent_cumulative_cards(lfi+1)
+                                i_factor_ind = lfi;
+                                break;
                             end
-                            c = c+1;
+                        end
+
+                        prev_even_inds = (first_zero_child_index-2):-2:2;
+                        found = false;
+                        for peii = 1:length(prev_even_inds)
+                            % check if path in prev_even_ind belongs to the same latent factor as i
+
+                            % identify factor used in this previous path
+                            for lfi = 1:latent_num
+                                if p(prev_even_inds(peii)) > latent_cumulative_cards(lfi) && ...
+                                   p(prev_even_inds(peii)) <= latent_cumulative_cards(lfi+1)
+                                    prev_path_factor_ind = lfi;
+                                    break;
+                                end
+                            end
+
+                            if prev_path_factor_ind == i_factor_ind
+                                found = true;
+                                break;
+                            end
+                        end
+
+                        if found
+                            % a path belonging to this path's factor was used
+                            continue
                         end
                     end
-                end
-
-                prev_level_node_num = new_level_node_num;
-                prev_level_indices = new_level_indices;
-                max_temp_factor_count = 0;
-                for i = 1:length(new_level)
-                    if length(new_level(i).temp_factors) > ...
-                            max_temp_factor_count
-                        max_temp_factor_count = ...
-                            length(new_level(i).temp_factors);
-                    end
-                end
-                parent_temp_count = parent_temp_count + ...
-                    max_temp_factor_count;
-            end
-        end
 
 
-        function [] = update_child_cost(obj, pind, cind)
-        % store parent temps in child
-        % update cost for recurring temps
 
-            %parent = pind;
-            %while length(parent)
-                
-            for ptfi = 1:length(obj.nodes(pind).temp_factors)
-                if obj.nodes(cind).temp_exists( ...
-                    obj.nodes(pind).temp_factors(ptfi) )
-                    % this temp was created
-                    % before -> reduce cost
-                    obj.nodes(cind).cost =  ...
-                        obj.nodes(cind).cost - ...
-                        obj.nodes(pind).temp_factors(ptfi).size;
 
-                    % cost 0 is reserved for no link
-                    if obj.nodes(cind).cost == 0
-                        obj.nodes(cind).cost ...
-                            = 0.000001;
+
+                    p_new = p;
+                    p_new(first_zero_child_index) = i;
+
+
+                    % cost calculation: looking for max mem along all paths
+                    if mod(first_zero_child_index, 2) == 0
+                        % latent update path
+                        p_new_cost = latent_path_costs(i);
+                    else
+                        % Xhat update path
+                        p_new_cost = obj.contraction_perms(1).costs{i};
                     end
 
-                else
-                    % copy this temp to child
-                    % for use of children of
-                    % child node
-                    %obj.nodes(cind).temp_factors(obj.nodes(cind) ...
-                    %                             .own_temp_index) ...
-                    %    = obj.nodes(pind).temp_factors(ptfi);
-                    %obj.nodes(cind).own_temp_index = ...
-                    %    obj.nodes(cind).own_temp_index + 1;
+                    if p_cost > p_new_cost
+                        p_new_cost = p_cost;
+                    end
 
-                    obj.nodes(cind).update_cost(obj.nodes(pind).temp_factors);
+
+
+                    % if p_new is a complete solution update bestsofar
+                    if sum( p_new == 0 ) == 0
+                        bestsofar = p_new_cost;
+                    elseif p_new_cost < bestsofar
+                        % else if p_new is still viable add to S for further inspection
+                        S{end+1} = p_new;
+                        costs{end+1} = p_new_cost;
+
+                        %if costs{1} == -1
+                        %    S{1} = p_new;
+                        %    costs{1} = p_new_cost;
+                        %else
+                        %    S{end+1} = p_new;
+                        %    costs{end+1} = p_new_cost;
+                        %end
+                    end
                 end
             end
 
-            % % continue with parent's parent
-            %    parent = find(obj.edges(:, parent) == 1);
-            %end
+            bestsofar
         end
 
+        
 
-        function [cost] = get_node_cost(obj, child_index)
-        % calculates memory cost for an attached child node
-            % find all predecessors' temporary usage
-            parent_list = [];
-            ci = child_index;
-            parent = find(obj.edges(:, ci) == 1);
-            while length(parent)
-                if length(parent) ~= 1
-                    throw(MException('TFORUGraph:MultipleParents', ...
-                                     ['>1 indegree! Tree construction ' ...
-                                      'error ']));
-                end
 
-                % contract parent
-                node_list(parent).find_temps();
 
-                % store temporary factor dimensions
-                parent = find(obj.edges(:, ci) == 1);
-            end
 
-            % contract child
-            % cost = size of all temp factors not in parent temp
-            % factors
 
-        end
-            
+
+
+
+
+
+
+
 
 
         function [str] = print_dot(obj, filename)
