@@ -774,6 +774,14 @@ classdef PLTFModel
             end
             tmp.name = [tmp.name '_minus_' dim];
 
+            for cfii = 1:length(contracted_factor_inds)
+                if obj.factors(contracted_factor_inds(cfii)).isTemp
+                    tmp.source_factor_names{end+1} = [ '(' char(newmodel.factors(contracted_factor_inds(cfii)).get_short_name()) ')' ];
+                else
+                    tmp.source_factor_names{end+1} = newmodel.factors(contracted_factor_inds(cfii)).name;
+                end
+            end
+            tmp.contracted_index_names{end+1} = dim;
 
 
 

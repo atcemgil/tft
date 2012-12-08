@@ -18,7 +18,7 @@ classdef TFFactor
 
     properties
         name = '';
- 
+
         dims = TFDimension;  % array of TFDimension
         %data;  % contains data of this factor
 
@@ -30,6 +30,11 @@ classdef TFFactor
                     % factor
 
         size = -1;
+
+        % used for temporary tensors
+        % stores names of source factors
+        source_factor_names = {};
+        contracted_index_names = {};
     end
 
     methods
@@ -69,6 +74,23 @@ classdef TFFactor
             end
 
             obj.isInput = p.Results.isClamped;
+        end
+
+
+        function [sn] = get_short_name(obj)
+            if obj.isTemp
+                sn = '';
+                for i=1:length(obj.source_factor_names)
+                    sn = [ sn obj.source_factor_names{i} ];
+                end
+
+                sn = [ sn '_' ];
+                for i=1:length(obj.contracted_index_names)
+                    sn = [ sn char(obj.contracted_index_names(i)) ];
+                end
+            else
+                sn = obj.name;
+            end
         end
 
 

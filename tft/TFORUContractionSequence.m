@@ -10,13 +10,23 @@ classdef TFORUContractionSequence
         % contraction permutation
         all_temps;
 
-        % cost of each path for each GTM
-        costs;
+        % cost of each path for each path in this GTM
+        mem_costs;
+
+        % computational cost for each path in this GTM
+        cmt_output_names = {};
+        % indexed by output_names
+        cmt_input_names = {};
+
+        % stores cost of cmt s
+        cmt_computation_costs;
     end
 
     methods
         function obj = TFORUContractionSequence(model)
             if nargin ~= 0
+                obj.cmt_computation_costs = containers.Map(); % amazing! if initialized as property appears to be globally accessible!
+
                 obj.contraction_sequence_perms = perms(model.get_contraction_dims());
 
                 obj.all_temps = {};
@@ -51,9 +61,47 @@ classdef TFORUContractionSequence
                     end
                     obj.all_temps{i} = at;
                     %display(['atc ' num2str(atc)]);
-                    obj.costs{i} = atc;
+                    obj.mem_costs{i} = atc;
                 end
 
+
+
+                % store cmt i/o names for each contraction
+                for i = 1:size(obj.contraction_sequence_perms, 1)
+                    model = orig_model;
+                    on = {};
+                    in = {};
+                    jlimit = length(obj.contraction_sequence_perms(i,:));
+                    for j = 1:jlimit
+                        model = model.contract(obj.contraction_sequence_perms(i, j), ...
+                                               'mem_analysis', ...
+                                               '');
+                        % intermediate contractions are stored in temporary tensors
+                        tfs = model.temp_factors();
+                        for ti=1:length(tfs)
+                            % last contraction is stored to first observed (non-latent) factor
+                            if j == jlimit
+                                on{end+1} = model.observed_factor().name;
+                                obj.cmt_computation_costs( char(on{end}) ) = model.observed_factor().get_element_size();
+
+                                %on{end}
+                                %model.observed_factor()
+                                %model.observed_factor().get_element_size()
+                            else
+                                on{end+1} = tfs(ti).get_short_name();
+                                obj.cmt_computation_costs( char(on{end}) ) = tfs(ti).get_element_size();
+
+                                %on{end}
+                                %tfs(ti)
+                                %tfs(ti).get_element_size()
+                            end
+
+                            in{end+1} = { tfs(ti).source_factor_names };
+                        end
+                    end
+                    obj.cmt_output_names{i} = on;
+                    obj.cmt_input_names{i} = in;
+                end
             end
         end
     end
