@@ -79,12 +79,12 @@ classdef TFORUGraph_mem_only
 
             node_num = 0;            % nodes added to S as subproblem
             pruned_node_num = 0; % nodes not added to S as subprobelm
-            %j=0;
+            j=0;
             while length( S )
-                %j=j+1;
-                %if j == 10
-                %    break;
-                %end
+                j=j+1;
+                if j == 2
+                    break;
+                end
 
                 % remove a subproblem from tail of S
                 p = S{end};
@@ -139,7 +139,7 @@ classdef TFORUGraph_mem_only
 
 
                     p_new = p;
-                    p_new(first_zero_child_index) = i;
+                    p_new(first_zero_child_index) = i
 
 
                     % cost calculation: looking for minimum mem usage

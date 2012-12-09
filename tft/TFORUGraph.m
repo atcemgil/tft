@@ -20,73 +20,70 @@ classdef TFORUGraph
         % assume first model is Xhat update
         % rest are latent factor updates
 
+
+            % model list -> augmented model list
+            % ( hatX, Z_1, Z_2, Z_3 ) -> ( hatX, Z_1, hatX, Z2, hatX, Z_3 )
+            orig_model_list = model_list
+            model_list = [];
+            for i = 2:length(orig_model_list)
+                model_list = [ model_list orig_model_list(1) ];
+                model_list = [ model_list orig_model_list(i) ];
+            end
+                
+
+
             obj.contraction_perms = repmat(TFORUContractionSequence, 1, length(model_list));
-            for mind = 1:length(model_list) %:-1:1
+            for mind = 1:length(model_list)
                 obj.contraction_perms(mind) = TFORUContractionSequence( model_list(mind) );
             end
 
-            latent_num = length(obj.contraction_perms)-1;
-            max_level = latent_num*2;
+
+            %latent_num = length(obj.contraction_perms)-1;
+            %max_level = latent_num*2;
             max_xhat_path_num = size(obj.contraction_perms(1).contraction_sequence_perms,1);
+            model_num = length(obj.contraction_perms);
 
-            global latent_cumulative_card latent_cumulative_cards
-            % make an array of number of paths for latent factors
-            latent_cumulative_cards = zeros(1, latent_num+1);
-            % for now every latent update node will expand with latent_cumulative_card
-            % must update with correct setting for each level
-            latent_cumulative_card = 0;
-            for li = 1:latent_num
-                latent_cumulative_cards(li+1) = latent_cumulative_cards(li) + size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
+            global cumulative_card cumulative_cards
+            % make an array of number of paths for factors
+            cumulative_cards = zeros(1, model_num);
 
-                latent_cumulative_card = latent_cumulative_card + size(obj.contraction_perms(li+1).contraction_sequence_perms,1);
+            cumulative_card = 0;
+            for m = 1:model_num
+                if m == 1
+                    cumulative_cards(m) = size(obj.contraction_perms(m).contraction_sequence_perms, 1);
+                else
+                    cumulative_cards(m) = cumulative_cards(m-1) + size(obj.contraction_perms(m).contraction_sequence_perms, 1);
+                end
+
+                cumulative_card = cumulative_card + size(obj.contraction_perms(m).contraction_sequence_perms, 1);
             end
 
 
             % convinience memory cost array
-            global latent_path_mem_costs latent_path_output_names latent_path_input_names
-            latent_path_mem_costs = ones(1, latent_cumulative_card) * Inf;
-            latent_path_output_names = {};
-            latent_path_input_names = {};
+            global path_mem_costs path_output_names path_input_names
+            path_mem_costs = ones(1, cumulative_card) * Inf;
+            path_output_names = {};
+            path_input_names = {};
             i=1;
-            for li = 1:latent_num
-                for ci = 1:size(obj.contraction_perms(li+1).contraction_sequence_perms,1)
-                    %latent_path_mem_costs(i) = obj.contraction_perms(li+1).mem_costs{ci};
-
+            for li = 1:model_num
+                for ci = 1:size(obj.contraction_perms(li).contraction_sequence_perms,1)
                     cost = 0;
-                    for cj = 1:size(obj.contraction_perms(li+1).contraction_sequence_perms,2)
-                        output_name = obj.contraction_perms(li+1).cmt_output_names{ci}{cj};
-                        cost = cost + obj.contraction_perms(li+1).cmt_computation_costs( output_name );
+                    for cj = 1:size(obj.contraction_perms(li).contraction_sequence_perms,2)
+                        output_name = obj.contraction_perms(li).cmt_output_names{ci}{cj};
+                        cost = cost + obj.contraction_perms(li).cmt_computation_costs( output_name );
                     end
-                    latent_path_mem_costs(i) = cost;
+                    path_mem_costs(i) = cost;
 
-                    latent_path_output_names{i} = obj.contraction_perms(li+1).cmt_output_names{ci};
-                    latent_path_input_names{i} = obj.contraction_perms(li+1).cmt_input_names{ci};
+                    path_output_names{i} = obj.contraction_perms(li).cmt_output_names{ci};
+                    path_input_names{i} = obj.contraction_perms(li).cmt_input_names{ci};
                     i = i+1;
                 end
             end
 
-            latent_path_mem_costs
-            latent_path_output_names
-            latent_path_input_names
+            path_mem_costs
+            path_output_names
+            path_input_names
 
-            global observed_path_mem_costs observed_path_output_names observed_path_input_names
-            observed_path_mem_costs = ones(1, size(obj.contraction_perms(1).contraction_sequence_perms,1)) * Inf;
-            observed_path_output_names = {};
-            observed_path_input_names = {};
-            for ci = 1:size(obj.contraction_perms(1).contraction_sequence_perms,1)
-                cost = 0;
-                for cj = 1:size(obj.contraction_perms(1).contraction_sequence_perms,2)
-                    output_name = obj.contraction_perms(1).cmt_output_names{ci}{cj};
-                    cost = cost + obj.contraction_perms(1).cmt_computation_costs( output_name );
-                end
-                observed_path_mem_costs(ci) = cost;
-                observed_path_output_names{ci} = obj.contraction_perms(1).cmt_output_names{ci};
-                observed_path_input_names{ci} = obj.contraction_perms(1).cmt_input_names{ci};
-            end
-
-            observed_path_mem_costs
-            observed_path_output_names
-            observed_path_input_names
 
 
 
@@ -105,8 +102,8 @@ classdef TFORUGraph
             costs = {};
             % insert first level elements
             for i = 1:size(obj.contraction_perms(1).contraction_sequence_perms,1)
-                S{i} = [i zeros(1, max_level-1) ];
-                costs{i} = observed_path_mem_costs(i);
+                S{i} = [i zeros(1, model_num) ];
+                costs{i} = path_mem_costs(i);
             end
             bestsofar = Inf;
             best_solution = {};
@@ -114,7 +111,7 @@ classdef TFORUGraph
             node_num = 0;            % nodes added to S as subproblem
             pruned_node_num = 0; % nodes not added to S as subprobelm
             while length( S )
-                % remove a subproblem from tail of S
+                % remove a subproblem from tail of S, tail seems to be more efficient
                 p = S{end};
                 S = S(1:end-1);
 
@@ -137,17 +134,17 @@ classdef TFORUGraph
                 if mod(first_zero_child_index, 2) == 1
                     child_index_range = 1:max_xhat_path_num;
                 else
-                    % must not include indices of factors which are selected in previous paths
+                    % must not include indices of latent factors which are selected in previous paths
                     child_index_range = [];
-                    prev_even_inds = (first_zero_child_index-2):-2:2;
-                    % search for each latent factor in previous indices
+                    prev_latent_inds = (first_zero_child_index-2):-2:2;
+                    % search for each factor in previous indices
                     % if not found insert to child_index_range
-                    for lfi = 1:latent_num
+                    for mi = 2:2:model_num % even ones are latent indices
                         found = false;
-                        for peii = 1:length(prev_even_inds)
+                        for peii = 1:length(prev_latent_inds)
                             % identify factor used in this previous path
-                            if p(prev_even_inds(peii)) > latent_cumulative_cards(lfi) && ...
-                               p(prev_even_inds(peii)) <= latent_cumulative_cards(lfi+1)
+                            if p(prev_latent_inds(peii)) > cumulative_cards(mi) && ...
+                                    p(prev_latent_inds(peii)) <= cumulative_cards(mi+1)
                                 found = true;
                                 break;
                             end
@@ -155,13 +152,13 @@ classdef TFORUGraph
 
                         if found == false
                             child_index_range = [child_index_range ...
-                                             [(latent_cumulative_cards(lfi)+1):latent_cumulative_cards(lfi+1) ] ];
+                                                [(cumulative_cards(mi-1)):cumulative_cards(mi) ] ];
+                        
                         end
                     end
                 end
 
                 %display(['child_index_range ' num2str(child_index_range)]);
-
 
 
 
@@ -177,56 +174,52 @@ classdef TFORUGraph
 
 
                     % calcuate p_new_cost
-                    if mod(first_zero_child_index, 2) == 0
-                        % latent update plath
-                        p_new_cost = p_cost + latent_path_mem_costs(cind);
+                    p_new_cost = p_cost + path_mem_costs(cind);
 
 
-                        % for each output factor of this path
-                        for lpoind = 1:length(latent_path_output_names{cind})
-                            % check all previous paths
-                            for pi = 1:(first_zero_child_index-1)
-                                poutput_names = latent_path_output_names{ p_new(pi) };
-                                pinput_names = latent_path_input_names{ p_new(pi) };
-                                for pki = 1:length(poutput_names)
-                                    % if this previous path has this output factor
-                                    if strcmp(poutput_names(pki), latent_path_output_names{cind}{lpoind})
-                                        %display(['possible reuse ' char(poutput_names(pki))]);
-                                        found = false;
-                                        % check if input of previous calculation are clean
+                    % for each output factor of this path
+                    for lpoind = 1:length(path_output_names{cind})
+                        % check all previous paths
+                        for pi = 1:(first_zero_child_index-1)
+                            poutput_names = path_output_names{ p_new(pi) };
+                            pinput_names = path_input_names{ p_new(pi) };
+                            for pki = 1:length(poutput_names)
+                                % if this previous path has this output factor
+                                if strcmp(poutput_names(pki), path_output_names{cind}{lpoind})
+                                    %display(['possible reuse ' char(poutput_names(pki))]);
+                                    found = false;
+                                    % check if input of previous calculation are clean
 
-                                        % ASSUME inputs cannot be updated in path pi
-                                        % IF sub-contraction is considered this may not be valid!
+                                    % ASSUME inputs cannot be updated in path pi (they originate from)
+                                    % IF sub-contraction is considered this may not be valid!
 
-                                        clean = true;
-                                        for check_prange = (pi+1):(first_zero_child_index-1) % for each following path
-                                            next_poutput_names = latent_path_output_names{ p_new(check_prange) };
-                                            next_pinput_names = latent_path_input_names{ p_new(check_prange) };
-                                            for npoutni = 1:length(next_poutput_names) % for each output of this path
-                                                for npinni = 1:length(next_pinput_names{npoutni}) % for each input of this output
-                                                    for pini = 1:length(pinput_names{pki}) % for each input of possible reuse calculation
-                                                        if strcmp( pinput_names{pini}, pinput_names{pki}{pini})
-                                                            display(['reuse abort']);
-                                                            clean = false;
-                                                        end
+                                    clean = true;
+                                    for check_prange = (pi+1):(first_zero_child_index-1) % for each following path
+                                        next_poutput_names = path_output_names{ p_new(check_prange) };
+                                        next_pinput_names = path_input_names{ p_new(check_prange) };
+                                        for npoutni = 1:length(next_poutput_names) % for each output of this path
+                                            for npinni = 1:length(next_pinput_names{npoutni}) % for each input of this output
+                                                for pini = 1:length(pinput_names{pki}) % for each input of possible reuse calculation
+                                                    if strcmp( pinput_names{pini}, pinput_names{pki}{pini})
+                                                        display(['reuse abort']);
+                                                        clean = false;
                                                     end
                                                 end
                                             end
                                         end
-                                        if clean
-                                            p_new
-                                            display(['reuse detected ' char(poutput_names(pki))]);
-                                            return
-                                        end
+                                    end
+                                    if clean
+                                        %p_new
+                                        %display(['reuse detected ' char(poutput_names(pki))]);
+                                    else
+                                        display(['dirty reuse aborted ' char(poutput_names(pki))]);
                                     end
                                 end
                             end
                         end
-
-                    else
-                        % Xhat update path
-                        p_new_cost = p_cost + observed_path_mem_costs(cind);
                     end
+
+
 
 
 
