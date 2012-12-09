@@ -45,34 +45,36 @@ classdef TFORUGraph
 
             global cumulative_card cumulative_cards
             % make an array of number of paths for factors
-            cumulative_cards = zeros(1, model_num);
 
             cumulative_card = 0;
             for m = 1:model_num
-                if m == 1
-                    cumulative_cards(m) = size(obj.contraction_perms(m).contraction_sequence_perms, 1);
-                else
-                    cumulative_cards(m) = cumulative_cards(m-1) + size(obj.contraction_perms(m).contraction_sequence_perms, 1);
-                end
-
                 cumulative_card = cumulative_card + size(obj.contraction_perms(m).contraction_sequence_perms, 1);
             end
 
+            cumulative_cards = zeros(1, model_num+1);
+            for m = 2:model_num+1
+                cumulative_cards(m) = cumulative_cards(m-1) + size(obj.contraction_perms(m-1).contraction_sequence_perms, 1);
+            end
+
+
+
 
             % convinience memory cost array
-            global path_mem_costs path_output_names path_input_names
+            global path_mem_costs path_output_names path_input_names output_costs;
             path_mem_costs = ones(1, cumulative_card) * Inf;
             path_output_names = {};
             path_input_names = {};
+            output_costs = containers.Map();
             i=1;
             for li = 1:model_num
                 for ci = 1:size(obj.contraction_perms(li).contraction_sequence_perms,1)
-                    cost = 0;
+                    path_cost = 0;
                     for cj = 1:size(obj.contraction_perms(li).contraction_sequence_perms,2)
                         output_name = obj.contraction_perms(li).cmt_output_names{ci}{cj};
-                        cost = cost + obj.contraction_perms(li).cmt_computation_costs( output_name );
+                        path_cost = path_cost + obj.contraction_perms(li).cmt_computation_costs( output_name );
+                        output_costs(output_name) = obj.contraction_perms(li).cmt_computation_costs( output_name );
                     end
-                    path_mem_costs(i) = cost;
+                    path_mem_costs(i) = path_cost;
 
                     path_output_names{i} = obj.contraction_perms(li).cmt_output_names{ci};
                     path_input_names{i} = obj.contraction_perms(li).cmt_input_names{ci};
@@ -103,20 +105,26 @@ classdef TFORUGraph
             % insert first level elements
             for i = 1:size(obj.contraction_perms(1).contraction_sequence_perms,1)
                 S{i} = [i zeros(1, model_num) ];
-                costs{i} = path_mem_costs(i);
+                S_costs{i} = path_mem_costs(i);
             end
             bestsofar = Inf;
             best_solution = {};
 
-            node_num = 0;            % nodes added to S as subproblem
-            pruned_node_num = 0; % nodes not added to S as subprobelm
+            node_num = 0;         % nodes added to S as subproblem
+            pruned_node_num = 0;  % nodes not added to S as subproblem
+            %counter=1;
             while length( S )
+                %counter=counter+1;
+                %if counter > 10
+                %    break;
+                %end
+
                 % remove a subproblem from tail of S, tail seems to be more efficient
                 p = S{end};
                 S = S(1:end-1);
 
-                p_cost = costs{end};
-                costs = costs(1:end-1);
+                p_cost = S_costs{end};
+                S_costs = S_costs(1:end-1);
 
 
 
@@ -143,8 +151,8 @@ classdef TFORUGraph
                         found = false;
                         for peii = 1:length(prev_latent_inds)
                             % identify factor used in this previous path
-                            if p(prev_latent_inds(peii)) > cumulative_cards(mi) && ...
-                                    p(prev_latent_inds(peii)) <= cumulative_cards(mi+1)
+                            if p(prev_latent_inds(peii)) >  cumulative_cards(mi) && ...
+                               p(prev_latent_inds(peii)) <= cumulative_cards(mi+1)
                                 found = true;
                                 break;
                             end
@@ -152,7 +160,7 @@ classdef TFORUGraph
 
                         if found == false
                             child_index_range = [child_index_range ...
-                                                [(cumulative_cards(mi-1)):cumulative_cards(mi) ] ];
+                                                [(cumulative_cards(mi)+1):cumulative_cards(mi+1) ] ];
                         
                         end
                     end
@@ -172,50 +180,60 @@ classdef TFORUGraph
                     p_new = p;
                     p_new(first_zero_child_index) = cind;
 
-
                     % calcuate p_new_cost
-                    p_new_cost = p_cost + path_mem_costs(cind);
+                    p_new_cost = p_cost; % + path_mem_costs(cind);
 
 
-                    % for each output factor of this path
-                    for lpoind = 1:length(path_output_names{cind})
+                    % GOAL: calculate computation cost of this child path
+                    % Must check existance of a clean copy for each output factor of this path
+                    % if a clean copy exists can reuse computed value
+                    for childout_ind = 1:length(path_output_names{cind})
+                        clean = true;
                         % check all previous paths
                         for pi = 1:(first_zero_child_index-1)
                             poutput_names = path_output_names{ p_new(pi) };
                             pinput_names = path_input_names{ p_new(pi) };
-                            for pki = 1:length(poutput_names)
-                                % if this previous path has this output factor
-                                if strcmp(poutput_names(pki), path_output_names{cind}{lpoind})
-                                    %display(['possible reuse ' char(poutput_names(pki))]);
+                            for pout_ind = 1:length(poutput_names)
+                                % if this previous path calculates this child path output factor
+                                if strcmp(poutput_names(pout_ind), path_output_names{cind}{childout_ind})
+                                    %display(['possible reuse ' char(poutput_names(pout_ind))]);
                                     found = false;
                                     % check if input of previous calculation are clean
 
                                     % ASSUME inputs cannot be updated in path pi (they originate from)
                                     % IF sub-contraction is considered this may not be valid!
 
-                                    clean = true;
                                     for check_prange = (pi+1):(first_zero_child_index-1) % for each following path
                                         next_poutput_names = path_output_names{ p_new(check_prange) };
                                         next_pinput_names = path_input_names{ p_new(check_prange) };
-                                        for npoutni = 1:length(next_poutput_names) % for each output of this path
-                                            for npinni = 1:length(next_pinput_names{npoutni}) % for each input of this output
-                                                for pini = 1:length(pinput_names{pki}) % for each input of possible reuse calculation
-                                                    if strcmp( pinput_names{pini}, pinput_names{pki}{pini})
-                                                        display(['reuse abort']);
+                                        for npoutn_ind = 1:length(next_poutput_names) % for each output of this path
+                                            for npinni = 1:length(next_pinput_names{npoutn_ind}) % for each input of this output
+                                                for pini = 1:length(pinput_names{pout_ind}) % for each input of possible reuse calculation
+                                                    if strcmp( pinput_names{pout_ind}{pini}, next_pinput_names{npoutn_ind}{npinni} )
+                                                        %display(['reuse abort']);
                                                         clean = false;
                                                     end
                                                 end
                                             end
                                         end
                                     end
-                                    if clean
-                                        %p_new
-                                        %display(['reuse detected ' char(poutput_names(pki))]);
-                                    else
-                                        display(['dirty reuse aborted ' char(poutput_names(pki))]);
-                                    end
+                                    %if clean
+                                    %    %p_new
+                                    %    display(['reuse detected ' char(poutput_names(pout_ind))]);
+                                    %    break;
+                                    %else
+                                    %    display(['dirty reuse aborted ' char(poutput_names(pout_ind))]);
+                                    %end
                                 end
                             end
+                        end
+
+                        if clean
+                            %display(['reuse detected ' path_output_names{cind}{childout_ind} ]);
+                            
+                        else
+                            %display(['dirty reuse aborted ' path_output_names{cind}{childout_ind} ]);
+                            p_new_cost = p_new_cost + output_costs(  path_output_names{cind}{childout_ind} );
                         end
                     end
 
@@ -235,7 +253,7 @@ classdef TFORUGraph
                         %display(['add for inspection ' num2str(p_new_cost)]);
                         % else if p_new is still viable add to S for further inspection
                         S{end+1} = p_new;
-                        costs{end+1} = p_new_cost;
+                        S_costs{end+1} = p_new_cost;
                     else
                         pruned_node_num = pruned_node_num + 1;
                         %p_new
