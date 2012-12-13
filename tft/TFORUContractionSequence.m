@@ -96,7 +96,7 @@ classdef TFORUContractionSequence
                                 %tfs(ti).get_element_size()
                             end
 
-                            in{end+1} = { tfs(ti).source_factor_names };
+                            in{end+1} = tfs(ti).source_factor_names;
                         end
                     end
                     obj.cmt_output_names{i} = on;

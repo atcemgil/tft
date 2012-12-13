@@ -776,7 +776,15 @@ classdef PLTFModel
 
             for cfii = 1:length(contracted_factor_inds)
                 if obj.factors(contracted_factor_inds(cfii)).isTemp
+                    % add tmp factor name
                     tmp.source_factor_names{end+1} = [ '(' char(newmodel.factors(contracted_factor_inds(cfii)).get_short_name()) ')' ];
+
+                    % add sources of tmp factor, if they are altered tmp factor must also be recalculated
+                    input_tmp_source_factor_names = newmodel.factors(contracted_factor_inds(cfii)).source_factor_names;
+                    for i = 1:length(input_tmp_source_factor_names)
+                        tmp.source_factor_names{end+1} = input_tmp_source_factor_names{i};
+                    end
+                        
                 else
                     tmp.source_factor_names{end+1} = newmodel.factors(contracted_factor_inds(cfii)).name;
                 end
