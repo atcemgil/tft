@@ -1508,6 +1508,77 @@ classdef PLTFModel
 
 
 
+        function [] = remote_gpu_pltf(obj, host_url, username, dataset, poll, force_upload)
+        % executes remote job on given host with username
+        % if poll is true function does not return and poll server
+        % for job status and downloads result upon completion
+        % data name is the key on remote data storage for experiment data
+
+            if nargin < 4
+                display(['Missing required arguments' char(10) char(10)...
+                         'host_url: remote host url, example: http://localhost:8080' char(10) ...
+                         'username: remote user name, example: bob' char(10) ...
+                         'dataset: key string used to identify remote dataset name, example: experiment1' char(10) ...
+                         '(optional) poll: function returns only after remote results are downloaded to local storage if poll is true. Otherwise returns immediately after submiting remote job' char(10)
+                         '(optional) force_upload: if true upload is performed regardless remote dataset exists or not' char(10)
+                         ]);
+                return
+            end
+
+            if nargin == 4
+                poll = false;
+            end
+
+            if nargin < 6
+                force_upload = false
+            end
+
+            if host_url(1:7) ~= 'http://'
+                host_url = ['http://' host_url];
+            end
+
+
+            % check user access
+            display('Testing host url and username combination')
+            url = [host_url '/check_user?user=' username];
+            res = urlread([url]);
+            if res == 'ok'
+                display(' ok')
+            else
+                display(' bad host_url / username');
+                return
+            end
+
+            upload = false
+            % check if data exists
+            if force_upload == false
+                display('Checking remote dataset')
+                url = [host_url '/check_data?user=' username '&dataset=' dataset];
+                res = urlread(url);
+                if res == 'ok'
+                    display(' ok')
+                else
+                    display(' not found, uploading');
+                    upload = true;
+                end
+            else
+                upload = true;
+            end
+
+
+            if upload
+                for di = 1:length(obj.dims)
+                    obj.dims(di).remote_gpu_upload(host_url, username, dataset);
+                end
+
+                for fi = 1:length(obj.factors)
+                    obj.factors(fi).remote_gpu_upload(host_url, username, dataset);
+                end
+            end
+
+        end
+
+
     end
 
 

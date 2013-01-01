@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1 style="text-align:center;">Tensor Factorization Toolbox (TFT)</h1>
+
+<ul>
+<li>PLTF data structures are represented with PLTFModel, TFFactor and TFDimension classes.</li>
+<li>GCTF data structures are represented with GCTFModel with help from PLTFModel class.</li>
+<li>PLTF update rules: given a PLTF model, PLTF update rules available using the PLTFModel.pltf(iteration_number) function. The function displays and plots KL divergence (KL( X, hat_X)) values over PLTF iterations.</li>
+<li>GCTF update rules: given a GCTF model, GCTF update rules are performed using GCTFModel.gctf(iteration_number, contract_type) function. The function displays and plots KL divergence (KL( X_v, hat_X_v)) values over GCTF iterations for all of the models described in GCTF model.</li>
+<li>Model visualization: models are visualized using PLTFModel.print_ubigraph() function and <a href="../tft/visualize/fgplot.py">fgplot.py</a> with <a href="http://ubietylab.net/ubigraph/">Ubigraph</a> if available on your system.
+<li>GTM contraction scheduling: PLTFModel.schedule_dp() function performs a dynamic programming search to find optimal contraction sequence by generating directed acyclic graph of all possible contraction sequences for a single Generalized Tensor Multiplication (GTM) operation.
+<li>Basic inter-GTM memory re-use: each GTM contraction generates a set of temporary tensors. Minimizing use number of temporary tensors offers memory reduction and performance improvements due to re-used intermediate GTM results. Currently PLTFModel.schedule_dp() function looks up previously generated temporary tensors in optimal contraction paths of previous GTM operations. This is a suboptimal temporary tensor re-use detection method.
+<li>GTM contraction scheduling visualization: contraction operations required for PLTF update rules are visualized using <a href="http://www.graphviz.org/">GraphViz</a> with TFGraph.print_dot() function. PLTFModel.pltf_optimal_dot(svg_file_name) generates a SVG (Scalable Vector Graphics) image file of the basic inter-GTM memory re-use diagram using GraphViz.
+<li>Global data usage: all essential data elements are stored as global variables so that duplicate copies of large data structures are avoided. All other object instances have relatively small memory footprint so that any (reasonable) number of objects can be manipulated without considerable performance issues.</li>
+</ul>
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-34148766-1']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+</script>
+</body>
+</html>

@@ -20,14 +20,16 @@ classdef TFFactor
         name = '';
 
         dims = TFDimension;  % array of TFDimension
-        %data;  % contains data of this factor
+
+        data_mat_file;       % name of the mat file containing ...
+                             % a variable with obj.name with correct dimensions
 
         isLatent=0;
         isObserved=0;
         isInput=0;
         isTemp=0;
-        isReUsed=0; % true if this tensor is re-used (temporary)
-                    % factor
+        isReUsed=0; % true if this tensor is re-used (temporary) factor
+
 
         size = -1;
 
@@ -43,11 +45,10 @@ classdef TFFactor
             p = inputParser;
             addParamValue(p, 'name', '', @isstr);
             types={'latent', 'observed', 'temp'};
-            addParamValue(p, 'type', 'latent', @(x) ...
-                          any(validatestring(x,types)));
+            addParamValue(p, 'type', 'latent', @(x) any(validatestring(x,types)));
             addParamValue(p, 'isClamped', 0, @islogical);
             addParamValue(p, 'dims', [], @isvector);
-            %addParamValue(p, 'data', [], @isvector);
+            addParamValue(p, 'data_mat_file', [], @isstr);
 
             parse(p,varargin{:});
 
@@ -328,6 +329,74 @@ classdef TFFactor
             end
         end
 
+
+        function [] = remote_gpu_upload(obj, host_url, username, dataset)
+            display(['uploading factor ' obj.name]);
+            url = [host_url '/upload_data'];
+
+            dims = '';
+            for di = 1:length(obj.dims)
+                dims = [ dims char(10) obj.dims(di).name ];
+            end
+
+            % if data_mat_file is specified use that
+            %tfn = false;
+            if length(obj.data_mat_file) ~= 0
+                data_file_name = obj.data_mat_file
+                %f = fopen(obj.data_mat_file);
+                %data = fread(f,Inf,'*uint8');
+                %fclose(f);
+            else
+                % if global storage is defined use that
+                eval([ 'global ' obj.get_data_name() ';']);
+                if eval([ 'length(' obj.get_data_name() ')' ]) ~= 0
+                    data_file_name = [tempname '.mat'];
+                    save(data_file_name, obj.get_data_name());
+
+                    % there may not be enough space for both mat file and the variable itself
+                    %eval([ 'clear ' obj.get_data_name() ';' ]);
+                    %f = fopen(tfn);
+                    %data = fread(f,Inf,'*uint8');
+                    %fclose(f);
+
+                else
+                    throw(MException( 'TFFactor:DataError', ...
+                                      ['ERROR: no data specified for this factor: ' obj.name] ))
+                end
+            end
+
+            
+            urlread(url, 'Post', ...
+                    { 'user', username, 'dataset', dataset, ...
+                      'type', 'factor', ...
+                      'name', obj.name, ...
+                      'dims', dims, ...
+                      'isLatent', num2str(obj.isLatent), ...
+                      'isObserved', num2str(obj.isObserved), ...
+                      'isInput', num2str(obj.isInput), ...
+                      'isTemp', num2str(obj.isTemp), ...
+                      'isReUsed', num2str(obj.isReUsed), ...
+                    });
+
+            f = ftp('localhost:2121', username, '12345');
+            mput(f, data_file_name);
+            close(f);
+
+            fname = strread(data_file_name, '%s', 'delimiter', '/');
+            url = [host_url '/fix_ftp_upload?' ...
+                   'user=' username ...
+                   '&dataset=' dataset ...
+                   '&factor=' obj.name ...
+                   '&uploadname=' fname{end}
+                  ];
+            res = urlread(url);
+
+            display([ ' ' res]);
+            % reload data element if it was cleared
+            %if ~tfn
+            %    load(tfn);
+            %end
+        end
 
     end
 
