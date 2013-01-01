@@ -268,11 +268,12 @@ classdef PLTFModel
                                                          're-calculate hat_X');
                     dot_data = [ str char(10) dot_data ];
 
+                end
+
                     global oru_models;
                     if ~length(oru_models)
                         oru_models = [ newmodel ];
                     end
-                end
 
                 % perform contraction
                 % store result in hat_X_data
@@ -425,13 +426,16 @@ classdef PLTFModel
             % only not used if full, compute, no (so do it
             % always) was under if below
             graph = d_model.schedule_dp();
-            if strcmp(return_dot_data, 'yes')
-                global last_node_id;
                 title = ['alpha ' num2str(alpha) ' ' ...
                          output_name ];
+
+            if strcmp(return_dot_data, 'yes')
+                global last_node_id;
                 [ dot_data last_node_id ] = ...
                     graph.print_dot(last_node_id, ...
                                     title );
+
+            end
 
                 if strcmp(output_name, 'D1_data')
                     global oru_models;
@@ -439,7 +443,6 @@ classdef PLTFModel
                     oru_model.name = title;
                     oru_models = [ oru_models oru_model ];
                 end
-            end
 
             % perform contraction
             [ ~ ] = d_model.contract_all(contract_type, ...

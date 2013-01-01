@@ -174,7 +174,12 @@ classdef TFORUGraph
 
                     % calcuate p_new_cost
                     %p_new
-                    p_new_cost = p_cost + obj.calc_child_cost(first_zero_child_index, cind, p_new);
+                    p_new_cost = p_cost + obj.calc_child_cost(first_zero_child_index, p_new);
+                    %if ( p_new == [6   102     6    90     6    60     3    13])
+                    %    p_new_cost
+                    %    p_cost
+                    %    obj.calc_child_cost(first_zero_child_index, p_new)
+                    %end
                     % + path_mem_costs(cind)
 
 
@@ -204,13 +209,14 @@ classdef TFORUGraph
         end
 
         
-        function [child_cost] = calc_child_cost(obj, first_zero_child_index, cind, path)
+        function [child_cost] = calc_child_cost(obj, first_zero_child_index, path)
         % GOAL: calculate computation cost of this child path
         % Must check existance of a clean copy for each output factor of this path
         % if a clean copy exists can reuse computed value
         % first_zero_child_index, defines child index on path
             child_cost = 0;
             
+            cind = path(first_zero_child_index);
             child_output_names = containers.Map();
             for child_output_name_ind = 1:length(obj.path_output_names{cind})
                 child_output_names( obj.path_output_names{cind}{child_output_name_ind} ) = 1;
@@ -219,20 +225,21 @@ classdef TFORUGraph
             for child_output_name_ind = 1:length(obj.path_output_names{cind})
                 reuse = false;
                 clean = true;
+                child_output_name = obj.path_output_names{cind}{child_output_name_ind};
 
                 % check all previous paths for this output of the child path
                 for prev_path_ind = 1:(first_zero_child_index-1)
                     prev_output_names = obj.path_output_names{ path(prev_path_ind) };
                     prev_input_names = obj.path_input_names{ path(prev_path_ind) };
-
+                    prev_output_names_len = length(prev_output_names);
                     % for each previous path
-                    for prev_output_name_ind = 1:length(prev_output_names)
+                    for prev_output_name_ind = 1:prev_output_names_len
 
                         % if this previous path calculates this child path output factor
-                        %if strcmp(prev_output_names(prev_output_name_ind), obj.path_output_names{cind}{child_output_name_ind})
+                        %if strcmp(prev_output_names(prev_output_name_ind), child_output_name)
                         if isKey(child_output_names, prev_output_names(prev_output_name_ind))
 
-                            %display(['possible reuse ' char(poutput_names(prev_output_name_ind))  ' ' obj.path_output_names{cind}{child_output_name_ind}]);
+                            %display(['possible reuse ' char(poutput_names(prev_output_name_ind))  ' ' child_output_name}]);
 
                             reuse = true;
                             found = false;
@@ -275,15 +282,15 @@ classdef TFORUGraph
                 end
 
                 if reuse && clean
-                    %display(['reuse detected ' obj.path_output_names{cind}{child_output_name_ind} ]);
+                    %display(['reuse detected ' child_output_name]);
                 else
                     %if reuse && ~clean
-                    %    display(['dirty reuse aborted ' obj.path_output_names{cind}{child_output_name_ind} ]);
+                    %    display(['dirty reuse aborted ' child_output_name} ]);
                     %else
-                    %    display(['no reuse ' obj.path_output_names{cind}{child_output_name_ind} ]);
+                    %    display(['no reuse ' child_output_name} ]);
                     %end
-l
-                    child_cost = child_cost + obj.output_costs(  obj.path_output_names{cind}{child_output_name_ind} );
+
+                    child_cost = child_cost + obj.output_costs(  child_output_name );
                 end
             end
         end
@@ -357,7 +364,7 @@ l
                 if path(i) == 0
                     break;
                 else
-                    cost = cost + obj.calc_child_cost(i, path(i), path);
+                    cost = cost + obj.calc_child_cost(i, path);
                 end
             end
             display([ 'child cost ' num2str(cost) ])
