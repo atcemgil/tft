@@ -1549,7 +1549,7 @@ classdef PLTFModel
                 return
             end
 
-            upload = false
+            upload = false;
             % check if data exists
             if force_upload == false
                 display('Checking remote dataset')
@@ -1567,9 +1567,24 @@ classdef PLTFModel
 
 
             if upload
+                dims = '{ "dims": [';
                 for di = 1:length(obj.dims)
-                    obj.dims(di).remote_gpu_upload(host_url, username, dataset);
+                    %obj.dims(di).remote_gpu_upload(host_url, username, dataset);
+
+                    if di ~= 1
+                        dims = [ dims ',' ];
+                    end
+
+                    dims = [ dims ' "' obj.dims(di).name '", ' num2str(obj.dims(di).cardinality) ];
                 end
+                dims = [dims '] }' ];
+
+                display(['uploading dimensions ']);
+                url = [host_url '/upload_data'];
+                res = urlread(url, 'Post', {'user', username, 'dataset', dataset, ...
+                                    'type', 'dimension', ...
+                                    'dims', dims} );
+                display([' ' res]);
 
                 for fi = 1:length(obj.factors)
                     obj.factors(fi).remote_gpu_upload(host_url, username, dataset);

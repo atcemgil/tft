@@ -2,6 +2,7 @@ import tornado.ioloop
 import tornado.web
 import os
 import json
+import redis
 
 users=['sihirliparmakcan']
 data_dir='./data/'
@@ -31,12 +32,10 @@ class DataHandler(tornado.web.RequestHandler):
         datatype = self.get_argument('type')
         if datatype == 'dimension':
             dimsdir = datasetdir+'/dims'
-            if not os.path.isdir(dimsdir):
-                os.makedirs(dimsdir)
         
-            filename = datasetdir + '/dims/' + self.get_argument('name')
-            a=open(filename,'wb')
-            a.write(self.get_argument('cardinality'))
+            filename = datasetdir + '/dims'
+            a=open(filename,'w')
+            a.write(self.get_argument('dims'))
             a.close()
             print "wrote " + filename
 
@@ -64,6 +63,9 @@ class DataHandler(tornado.web.RequestHandler):
             #a.write(self.request.files['data'][0]['body'])
             #a.close()
 
+
+        r_server = redis.Redis("localhost")
+        r_server.rpush("tensorver", username + "$_$" + dataset)
         self.write('ok')
 
 class UserHandler(tornado.web.RequestHandler):

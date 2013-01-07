@@ -97,18 +97,6 @@ classdef TFDimension
             r = ~(a==b);
         end
 
-
-        function [] = remote_gpu_upload(obj, host_url, username, dataset)
-        % uploads this dimension to dataset named dataset name on host_url using username
-            display(['uploading dimension ' obj.name]);
-            url = [host_url '/upload_data'];
-            res = urlread(url, 'Post', {'user', username, 'dataset', dataset, ...
-                                'type', 'dimension', ...
-                                'name', obj.name, 'cardinality', num2str(obj.cardinality)});
-            display([' ' res]);
-        end
-
-
     end
 
 end
