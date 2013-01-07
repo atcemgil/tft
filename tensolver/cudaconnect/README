@@ -1,0 +1,5 @@
+Requirements
+- libhiredis0.10-dev
+- libhiredis0.10
+- libjsoncpp0-dev
+- libjsoncpp0
