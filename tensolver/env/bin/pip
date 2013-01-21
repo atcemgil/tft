@@ -1,4 +1,4 @@
-#!/home/can/arastir/code/tensorver/env/bin/python
+#!/home/can/arastir/code/tensolver/env/bin/python
 # EASY-INSTALL-ENTRY-SCRIPT: 'pip==1.0.2','console_scripts','pip'
 __requires__ = 'pip==1.0.2'
 import sys

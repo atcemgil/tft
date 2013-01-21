@@ -63,9 +63,6 @@ class DataHandler(tornado.web.RequestHandler):
             #a.write(self.request.files['data'][0]['body'])
             #a.close()
 
-
-        r_server = redis.Redis("localhost")
-        r_server.rpush("tensorver", username + "$_$" + dataset)
         self.write('ok')
 
 class UserHandler(tornado.web.RequestHandler):
@@ -104,6 +101,14 @@ class FixFtpUploadHandler(tornado.web.RequestHandler):
 
         self.write('ok')
 
+class QueueJobHandler(tornado.web.RequestHandler):
+    def get(self):
+        username = self.get_argument('user')
+        dataset = self.get_argument('dataset')
+        r_server = redis.Redis("localhost")
+        r_server.rpush("tensolver", username + "$_$" + dataset)
+        self.write('ok')
+
 application = tornado.web.Application( [
         (r"/", MainHandler),
         (r"/list_data", DataHandler),
@@ -111,6 +116,7 @@ application = tornado.web.Application( [
         (r"/check_user", UserHandler),
         (r"/check_data", CheckDataHandler),
         (r"/fix_ftp_upload", FixFtpUploadHandler),
+        (r"/queue_job", QueueJobHandler),
         ], debug=True)
 
 if __name__ == "__main__":

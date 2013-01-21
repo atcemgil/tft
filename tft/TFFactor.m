@@ -398,6 +398,18 @@ classdef TFFactor
             %end
         end
 
+
+        %function [] = load_data_from_file(all_dims)
+        %   accept any variable if mat file has a single variable
+        %   else search for data variable with name 
+        %   else if still not found exception
+        %
+        %   check data size
+        %   expect data to be in correct dimension order all_dims ...
+        %       array
+        %   else exception
+        %end
+
     end
 
 end

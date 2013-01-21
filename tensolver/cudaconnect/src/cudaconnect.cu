@@ -12,6 +12,7 @@
 #include <hiredis/hiredis.h>
 #include <sys/stat.h>
 #include <jsoncpp/json/reader.h>
+#include "pltf.h"
 
 const std::string data_path = "../data/";
 
@@ -25,7 +26,7 @@ int main(){
         exit(1);
     }
 
-    reply = (redisReply*)redisCommand(c,"BLPOP tensorver 0");
+    reply = (redisReply*)redisCommand(c,"BLPOP tensolver 0");
     std::string list_cmd(reply->element[1]->str, reply->element[1]->len);
     freeReplyObject(reply);
 

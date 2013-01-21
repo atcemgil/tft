@@ -5,9 +5,9 @@
 
 dim_i=TFDimension('name', 'i', 'cardinality', 5);
 dim_j=TFDimension('cardinality', 6, 'name', 'j');
-dim_k=TFDimension('cardinality', 70000, 'name', 'k');
-dim_p=TFDimension('cardinality', 8000, 'name', 'p');
-dim_q=TFDimension('cardinality', 900, 'name', 'q');
+dim_k=TFDimension('cardinality', 7, 'name', 'k');
+dim_p=TFDimension('cardinality', 8, 'name', 'p');
+dim_q=TFDimension('cardinality', 9, 'name', 'q');
 dim_r=TFDimension('cardinality', 10, 'name', 'r');
 
 A=TFFactor('name', 'A', 'type', 'latent', 'dims', [dim_i dim_p]);
