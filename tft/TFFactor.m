@@ -48,7 +48,7 @@ classdef TFFactor
             addParamValue(p, 'type', 'latent', @(x) any(validatestring(x,types)));
             addParamValue(p, 'isClamped', 0, @islogical);
             addParamValue(p, 'dims', [], @isvector);
-            addParamValue(p, 'data_mat_file', [], @isstr);
+            addParamValue(p, 'data_mat_file', '', @isstr);
 
             parse(p,varargin{:});
 
@@ -75,6 +75,8 @@ classdef TFFactor
             end
 
             obj.isInput = p.Results.isClamped;
+
+            obj.data_mat_file = p.Results.data_mat_file;
         end
 
 
@@ -399,16 +401,49 @@ classdef TFFactor
         end
 
 
-        %function [] = load_data_from_file(all_dims)
-        %   accept any variable if mat file has a single variable
-        %   else search for data variable with name 
-        %   else if still not found exception
-        %
-        %   check data size
-        %   expect data to be in correct dimension order all_dims ...
-        %       array
-        %   else exception
-        %end
+        function [] = load_data_from_file(obj, all_dims)
+        % loads data of factor from file
+
+            factor_data_name = obj.get_data_name();
+
+            var_list = who('-file', obj.data_mat_file);
+            display([ 'init factor ' obj.name ': found ' num2str(length(var_list))  ' variable(s) in file ' obj.data_mat_file ]);
+
+            if length(var_list) == 1
+                eval([ 'global ' factor_data_name ]);
+                cmd = [ 'load( ''' obj.data_mat_file ''' , ''' var_list{1} '''  )' ];
+                eval(cmd);
+                eval([ factor_data_name ' = ' var_list{1} ';' ]);
+                data_target_name = var_list{1};
+            else
+                found = false;
+                for vli = 1:length(var_list)
+                    if strcmp(var_list{vli}, factor_data_name)
+                        found = true;
+                        eval([ factor_data_name ' = ' var_list{vli} ';' ]);
+                        data_target_name = var_list{vli};
+                        break;
+                    end
+                end
+                if ~found
+                    err = MException( ...
+                        ['TFFactor:NoSuitableVariableFound'], ...
+                        ['please either provide a mat file with a single variable or make sure the mat file contains a variable named ' factor_data_name]);
+                    throw(err);
+                end
+            end
+
+            display([ ' -> using ' data_target_name ' to initialize ' factor_data_name ]);
+            for adi = 1:length(all_dims)
+                if size(eval(factor_data_name), adi) ~= 1 && size(eval(factor_data_name), adi) ~= all_dims(adi).cardinality
+                    err = MException( ...
+                        ['TFFactor:WrongDataSize'], ...
+                        ['wrong data size on dimension ' char(all_dims(adi).name) ' for variable ' factor_data_name '. Expecting ' num2str(all_dims(adi).cardinality) ' found ' num2str(size(eval(factor_data_name), adi)) char(10)...
+                        'size(' data_target_name ') = ' num2str( size(eval(data_target_name)) ) ]);
+                    throw(err);
+                end
+            end
+        end
 
     end
 

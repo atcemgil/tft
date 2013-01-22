@@ -831,9 +831,12 @@ classdef PLTFModel
                 if length(contracted_factor_inds) == 1
                     %'sdfa111'
                     % no multiplication
-                    eval( [ 'global ' ...
-                            obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ...
-                            ';'] );
+                    cmd= [ 'global ' ...
+                           obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ...
+                           ';'];
+                    eval(cmd);
+
+
                     %['aa :' obj.get_factor_data_name( ...
                     %    obj.factors(contracted_factor_inds(1)) ) ]
                     %['aalen :']
@@ -845,21 +848,23 @@ classdef PLTFModel
                     %    obj.factors(contracted_factor_inds(1)) ) ...
                     %  ' -> ' ...
                     %  on ]
+
                     cmd = [ on ' = ' ...
                             obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ...
                             ';'];
-                    if strcmp('disp', 'print_cmd')
-                        commands{end+1} = cmd
+                    if strcmp(disp, 'print_cmd')
+                        commands{end+1} = cmd;
                     else
-                        eval(cmd)
+                        eval(cmd);
                     end
                 else
                     %'sdfa222'
                     % multiply first two into tmp data
-                    eval( [ 'global' ...
+                    cmd = [ 'global' ...
                             ' ' obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ...
                             ' ' obj.get_factor_data_name( obj.factors(contracted_factor_inds(2)) ) ...
-                            ';'] );
+                            ';'] ;
+                    eval(cmd);
 
 
                     %[ obj.get_factor_data_name( ...
@@ -873,25 +878,28 @@ classdef PLTFModel
                             obj.get_factor_data_name( obj.factors(contracted_factor_inds(1)) ) ', '...
                             obj.get_factor_data_name( obj.factors(contracted_factor_inds(2)) ) ');' ...
                           ];
-                    if strcmp('disp', 'print_cmd')
-                        commands{end+1} = cmd
+                    if strcmp(disp, 'print_cmd')
+                        commands{end+1} = cmd;
                     else
-                        eval(cmd)
+                        eval(cmd);
                     end
 
                     % multiply tmp data with other factors
                     for cfii = 3:length(contracted_factor_inds)
-                        eval( [ 'global '...
+                        cmd = [ 'global '...
                                 obj.get_factor_data_name( obj.factors(contracted_factor_inds(cfii)) ) ...
-                                ';'] );
+                                ';'];
+                        eval(cmd);
+
+
                         cmd = [ on ' = bsxfun (@times, ' ...
                                 on ','...
                                 obj.get_factor_data_name( obj.factors(contracted_factor_inds(cfii)) ) ...
                                 ');' ];
-                        if strcmp('disp', 'print_cmd')
-                            commands{end+1} = cmd
+                        if strcmp(disp, 'print_cmd')
+                            commands{end+1} = cmd;
                         else
-                            eval(cmd)
+                            eval(cmd);
                         end
                     end
                 end
@@ -904,10 +912,10 @@ classdef PLTFModel
                 cmd = [ on ' = sum( ' ...
                         on ', ' ...
                         num2str(con_dim_index) ');'];
-                if strcmp('disp', 'print_cmd')
-                    commands{end+1} = cmd
+                if strcmp(disp, 'print_cmd')
+                    commands{end+1} = cmd;
                 else
-                    eval(cmd)
+                    eval(cmd);
                 end
 
             else
@@ -1021,8 +1029,18 @@ classdef PLTFModel
             newmodel = obj;
             global commands;
             commands = {};
+            global_cmd = 'global';
+            for fi = 1:length(obj.factors)
+                global_cmd = [ global_cmd ' ' obj.factors(fi).get_data_name() ];
+            end
+            commands{1} = global_cmd;
+
             for c_dim_ind = 1:length(ocs_dims)
-                newmodel = newmodel.contract( char(ocs_dims{c_dim_ind}), 'compute', '', 'print_cmd');
+                if length(ocs_dims) == c_dim_ind
+                    newmodel = newmodel.contract( char(ocs_dims{c_dim_ind}), 'compute', obj.observed_factor().get_data_name(), 'print_cmd');
+                else
+                    newmodel = newmodel.contract( char(ocs_dims{c_dim_ind}), 'compute', '', 'print_cmd');
+                end
             end
         end
 
@@ -1525,6 +1543,18 @@ classdef PLTFModel
                 end
             end
 
+        end
+
+
+
+        
+        function [] = init_factors_from_file(obj)
+        % initializes factors from files if there are any
+            for fi = 1:length(obj.factors)
+                if length(obj.factors(fi).data_mat_file)
+                    obj.factors(fi).load_data_from_file(obj.dims);
+                end
+            end
         end
 
 

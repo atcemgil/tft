@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1 style="text-align:center;">TFT: Memory Optimal Contraction of Multiple Tensors</h1>
+
+This tutorial lists steps to identify least memory using contraction order of a given contraction of multiple tensors (CMT) expression.
+
+<h2>CMT Description</h2>
+
+First step is to define a model using TFT primitives. Lines below define the Tucker3 model:
+
+<pre align="center">
+X(i,j,k) = sum_(p,q,r) A(i,p) B(j,q) C(k,r) G(p,q,r)
+</pre>
+
+Define dimensions, which may be used in multiple models:
+
+<pre>
+dim_i = TFDimension('name', 'i', 'cardinality', 5);
+dim_j = TFDimension('cardinality', 6, 'name', 'j');
+dim_k = TFDimension('cardinality', 7, 'name', 'k');
+dim_p = TFDimension('cardinality', 8, 'name', 'p');
+dim_q = TFDimension('cardinality', 9, 'name', 'q');
+dim_r = TFDimension('cardinality', 10, 'name', 'r');
+</pre>
+
+Define factors:
+
+<pre>
+A = TFFactor('name', 'A', 'type', 'latent', 'dims', [dim_i dim_p], 'data_mat_file', '/tmp/saved_variable.mat');
+B = TFFactor('name', 'B', 'type', 'latent', 'dims', [dim_j dim_q]);
+C = TFFactor('name', 'C', 'type', 'latent', 'dims', [dim_k dim_r], 'isClamped', true);
+G = TFFactor('name', 'G', 'type', 'latent', 'dims', [dim_p, dim_q, dim_r]);
+X = TFFactor('name', 'X', 'type', 'observed', 'dims', [dim_i, dim_j, dim_k]);
+</pre>
+
+<ul>
+<li>type: type of the factor, values: latent, observed, temp.</li>
+<li>isClamped: data belonging to the latent factor is provided as input, values: true, false</li>
+</ul>
+
+Define the model:
+
+<pre>
+tucker_model = PLTFModel('name', 'Tucker3', 'factors', [A B C G X], 'dims', [dim_i dim_j dim_k dim_p dim_q dim_r]);
+</pre>
+
+Please note that order of dimensions in the dims array are important.
+
+
+<h3>Providing data to model elements</h3>
+
+
+<pre>
+tucker_model.init_factors_from_file();
+</pre>
+
+To provide initial data for a factor, a variable with proper name must be defined in Matlab's global workspace. For instance, lines below define data for factor C:
+
+<pre>
+global C_data;
+C_data = load('my.mat', 'my_variable');
+</pre>
+
+Please note name of the variable. It is generated as follows: variable_name + '_data'.
+
+<h3>Random initialization</h3>
+
+TFFactor contains a convenient rand_init function. This function takes two parameters:
+
+<ul>
+<li>all_dims: all dimension objects array.</li>
+<li>max_int: maximum range of random integers.</li>
+</ul>
+
+For example the line below generates random data element for factor A of the Tucker3 model we described above:
+<pre>
+A.rand_init( tucker_model.dims, 100 );
+</pre>
+
+PLTFModel contains init functions to generate data for 'nonClamped' or 'all' factors:
+
+<pre>
+tucker_model.rand_init_latent_factors('nonClamped'); % does not initialize clamped latent factors
+tucker_model.rand_init_latent_factors('all', 50); % initialize all latent factors with randi(50)
+</pre>
+
+
+<h2>Memory Optimal Contraction Order</h2>
+
+Using the CMT description we can generate a contraction order graph with the command below:
+
+<pre>
+addpath utils;
+tucker_model.print_optimal_contraction_sequence()
+1 contract dimension p -> tmp_i_q_r_minus_p =  A G
+2 contract dimension q -> tmp_i_j_r_minus_q =  B tmp_i_q_r_minus_p
+3 contract dimension r -> tmp_i_j_k_minus_r =  C tmp_i_j_r_minus_q
+</pre>
+
+If you are running a Linux system with a graphviz package, you can use the following command to visualize possible contraction sequences:
+
+<pre>
+graph = tucker_model.schedule_dp();
+system([ 'echo '' ' graph.print_dot [ ' '' | dot -T svg | display' ]]);
+</pre>
+
+Image below is produced by using the model above. Each node has two sections. Top section contains contraction dimensions. Bottom section represents factors available using their data dimensions. For instance first node on the left in the image below represents represents initial condition of the model with initial contraction dimensions p, q and r. Bottom section of the node contains all of the factors of the model since we have not performed any contractions yet.
+
+<div align="center">
+  <img src="img/scheduling2.svg"/>
+</div>
+
+
+You can perform the contraction of multiple tensors operation with the memory optimal contraction order using the following lines:
+
+<pre>
+contracted_model = tucker_model.optimal_contact_all();
+</pre>
+
+The observed factor of the model now contains the result of the computation. You can access this data using the lines below for the model above:
+
+<pre>
+global X_data;
+display(X_data);
+</pre>
+
+
+
+
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-34148766-1']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+</script>
+</body>
+</html>
